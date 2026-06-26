@@ -1,0 +1,23 @@
+# Requirements for QLoRA fine-tuning
+
+# Core ML libraries
+torch>=2.0.0
+transformers>=4.35.0
+peft>=0.7.0  # LoRA library
+bitsandbytes>=0.41.0  # 4-bit quantization
+
+# Data processing
+datasets>=2.14.0
+PyPDF2>=3.0.0
+pandas>=2.1.0
+
+# Inference & embeddings
+sentence-transformers>=2.2.0
+
+# Utilities
+tqdm>=4.66.0
+accelerate>=0.24.0
+safetensors>=0.4.0
+
+# Optional: for distributed training
+# torch-distributed-training
