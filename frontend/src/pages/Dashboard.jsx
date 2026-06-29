@@ -216,7 +216,6 @@ export default function Dashboard() {
   const [isGuest, setIsGuest] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminStats, setAdminStats] = useState(null);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [examDate, setExamDate] = useState(() => localStorage.getItem("vidyaai_exam_date") || defaultExamDate());
   const [completedTargets, setCompletedTargets] = useState(() => readJson(`vidyaai_targets_${dateKey()}`, []));
   const [streak, setStreak] = useState(() => readJson("vidyaai_streak", { count: 0, lastActive: "" }));
@@ -487,6 +486,23 @@ export default function Dashboard() {
           </div>
 
           <div className="top-actions">
+            <div className="mobile-brand-mark" aria-label="VidyaAI">वि</div>
+
+            <button type="button" className="mobile-profile-chip" onClick={() => isGuest && navigate("/login")} title={t.profileTitle}>
+              <span className="mobile-profile-avatar" aria-hidden="true">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+              </span>
+              <span className="mobile-profile-copy">
+                <strong>{studentName}</strong>
+                <small>कक्षा {studentProfile?.class_level || "10"} • {studentProfile?.medium || "Hindi"}</small>
+              </span>
+            </button>
+
+            <button type="button" className="mobile-new-chat-btn" onClick={handleNewChat} title={t.newChat}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+              <span>{lang === "hi" ? "नई चैट" : "New"}</span>
+            </button>
+
             <button type="button" className="icon-btn top-icon-btn" onClick={() => setLang((l) => l === "hi" ? "en" : "hi")} title="Switch Language">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
               <span className="icon-btn-label">{lang === "hi" ? "EN" : "हिं"}</span>
@@ -540,6 +556,15 @@ export default function Dashboard() {
               onClick={() => setAnswerStyle(style.id)}
             >
               {style[lang]}
+            </button>
+          ))}
+        </div>
+
+        <div className="mobile-paper-strip" aria-label="previous-year-papers">
+          {previousPapers.map((paper) => (
+            <button key={`${paper.subject}-${paper.year}-mobile`} type="button" onClick={() => handlePaperPractice(paper)}>
+              <span>{paper.year}</span>
+              <strong>{paper.subject}</strong>
             </button>
           ))}
         </div>

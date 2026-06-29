@@ -627,6 +627,13 @@ select:focus-visible {
   flex: 0 0 auto;
 }
 
+.mobile-brand-mark,
+.mobile-profile-chip,
+.mobile-new-chat-btn,
+.mobile-paper-strip {
+  display: none;
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -1888,7 +1895,8 @@ select:focus-visible {
   .mobile-subject-strip::-webkit-scrollbar,
   .mobile-sample-strip::-webkit-scrollbar,
   .answer-style-bar::-webkit-scrollbar,
-  .suggestion-strip::-webkit-scrollbar {
+  .suggestion-strip::-webkit-scrollbar,
+  .mobile-paper-strip::-webkit-scrollbar {
     display: none;
   }
 
@@ -1922,6 +1930,35 @@ select:focus-visible {
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .mobile-paper-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.82);
+    padding: 10px 18px 12px;
+    scrollbar-width: none;
+  }
+
+  .mobile-paper-strip button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    min-height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--text);
+    padding: 8px 12px;
+    font-weight: 900;
+  }
+
+  .mobile-paper-strip span {
+    color: var(--blue);
+    font-family: "Sora", "Noto Sans Devanagari", sans-serif;
   }
 }
 
@@ -1975,7 +2012,7 @@ select:focus-visible {
   }
 
   .dashboard-main-chat {
-    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto minmax(0, 1fr);
     background: var(--canvas);
   }
 
@@ -1984,38 +2021,108 @@ select:focus-visible {
     top: 0;
     z-index: 5;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 1fr;
     align-items: center;
     gap: 10px;
     padding: max(10px, env(safe-area-inset-top)) 12px 10px;
   }
 
   .dashboard-title-block {
-    min-width: 0;
+    display: none;
   }
 
-  .dashboard-title-block h1 {
+  .top-actions {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) minmax(74px, auto) repeat(3, 38px);
+    justify-content: stretch;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .mobile-brand-mark {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.32), transparent),
+      linear-gradient(135deg, var(--brand), var(--blue));
+    color: #fff;
+    box-shadow: 0 10px 22px rgba(18, 107, 82, 0.16);
+    font-family: "Sora", "Noto Sans Devanagari", sans-serif;
+    font-size: 0.96rem;
+    font-weight: 900;
+  }
+
+  .mobile-profile-chip {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 38px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    padding: 2px 8px 2px 2px;
+    text-align: left;
+  }
+
+  .mobile-profile-avatar {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-family: "Sora", "Noto Sans Devanagari", sans-serif;
+    font-size: 0.88rem;
+    font-weight: 900;
+  }
+
+  .mobile-profile-copy {
+    display: grid;
+    min-width: 0;
+    line-height: 1.05;
+  }
+
+  .mobile-profile-copy strong,
+  .mobile-profile-copy small {
     overflow: hidden;
-    font-size: 1.05rem;
-    line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .student-tags {
-    gap: 6px;
-    margin-top: 6px;
+  .mobile-profile-copy strong {
+    color: var(--ink);
+    font-size: 0.82rem;
+    font-weight: 900;
   }
 
-  .student-tags span {
-    min-height: 24px;
-    padding: 4px 8px;
-    font-size: 0.72rem;
+  .mobile-profile-copy small {
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 800;
   }
 
-  .top-actions {
-    justify-content: flex-end;
-    gap: 6px;
+  .mobile-new-chat-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 0;
+    height: 38px;
+    border: 1px solid rgba(18, 107, 82, 0.26);
+    border-radius: 12px;
+    background: var(--brand-soft);
+    color: var(--brand);
+    padding: 0 9px;
+    font-size: 0.78rem;
+    font-weight: 900;
+    white-space: nowrap;
   }
 
   .top-icon-btn {
