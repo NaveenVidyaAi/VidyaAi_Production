@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Dev: direct to localhost:8000 | Prod: /api (proxied by Nginx)
-const baseURL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const baseURL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "/api" : "http://localhost:8000");
 
 const api = axios.create({ baseURL });
 
