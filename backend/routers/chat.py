@@ -63,6 +63,10 @@ def _extract_bare_section(question: str) -> str | None:
     return None
 
 
+def _is_cacheable_answer_source(answer_source: str) -> bool:
+    return answer_source in {"groq", "fallback-topic-guard"} or answer_source.startswith("rag")
+
+
 def _feedback_log_path(student_id: str, session_id: int) -> str:
     safe_student_id = re.sub(r"[^a-zA-Z0-9_.-]", "_", str(student_id or "guest"))
     feedback_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "feedback_logs"))
@@ -184,7 +188,7 @@ async def ask(request: AskRequest, current_student=Depends(get_current_student_o
         answer_style=request.answer_style,
     )
 
-    if not chapter_request:
+    if not chapter_request and _is_cacheable_answer_source(answer_source) and sources:
         in_memory_store["caches"][cache_key] = {
             "answer": answer,
             "sources": sources,

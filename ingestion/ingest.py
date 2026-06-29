@@ -1,5 +1,6 @@
 import argparse
 import hashlib
+import logging
 import os
 import re
 import unicodedata
@@ -16,6 +17,7 @@ from backend.services.embeddings import embedding_service
 COLLECTION_NAME = "cgbse_knowledge"
 CHUNK_SIZE = 260
 OVERLAP = 60
+logger = logging.getLogger(__name__)
 
 FIELD_KEYS = ["CLASS:", "SUBJECT:", "CHAPTER:", "TOPIC:", "SUBTOPIC:"]
 LESSON_RE = re.compile(
@@ -380,10 +382,20 @@ def get_qdrant_client() -> QdrantClient:
         client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port, timeout=5)
         client.get_collections()
         return client
-    except Exception:
+    except Exception as exc:
+        if str(settings.app_env).lower() == "production":
+            raise RuntimeError(
+                f"Qdrant unavailable at {settings.qdrant_host}:{settings.qdrant_port}; refusing to ingest into fallback storage in production."
+            ) from exc
+
         fallback_path = os.path.join(os.path.dirname(__file__), "..", "qdrant_storage_local")
         os.makedirs(fallback_path, exist_ok=True)
-        print(f"Qdrant server unavailable at {settings.qdrant_host}:{settings.qdrant_port}; using local persistence at {fallback_path}")
+        logger.warning(
+            "Qdrant unavailable at %s:%s; using local persistence at %s",
+            settings.qdrant_host,
+            settings.qdrant_port,
+            fallback_path,
+        )
         return QdrantClient(path=fallback_path)
 
 

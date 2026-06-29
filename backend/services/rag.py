@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import logging
 from typing import List, Tuple
 
 import requests
@@ -10,6 +11,7 @@ from backend.config import settings
 from backend.services.embeddings import embedding_service
 
 COLLECTION_NAME = "cgbse_knowledge"
+logger = logging.getLogger(__name__)
 
 HINDI_STOPWORDS = {
     "क्या",
@@ -115,7 +117,20 @@ def _is_chapter_style_question(question: str) -> bool:
         "व्याख्या",
         "सार",
     ]
-    return any(marker in q for marker in markers)
+    if any(marker in q for marker in markers):
+        return True
+
+    normalized_q = _normalize_for_match(question)
+    known_titles = [
+        item["title"]
+        for units in CLASS_10_HINDI_UNITS.values()
+        for item in units
+    ] + [
+        item["title"]
+        for units in CLASS_10_ENGLISH_UNITS.values()
+        for item in units
+    ]
+    return any(_normalize_for_match(title) in normalized_q for title in known_titles)
 
 
 def _clean_fallback_excerpt(text: str) -> str:
@@ -628,9 +643,20 @@ def _get_qdrant_client() -> QdrantClient:
         client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port, timeout=5)
         client.get_collections()
         return client
-    except Exception:
+    except Exception as exc:
+        if str(settings.app_env).lower() == "production":
+            raise RuntimeError(
+                f"Qdrant unavailable at {settings.qdrant_host}:{settings.qdrant_port}"
+            ) from exc
+
         fallback_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "qdrant_storage_local"))
         os.makedirs(fallback_path, exist_ok=True)
+        logger.warning(
+            "Qdrant unavailable at %s:%s; using local fallback store at %s",
+            settings.qdrant_host,
+            settings.qdrant_port,
+            fallback_path,
+        )
         return QdrantClient(path=fallback_path)
 
 
@@ -1016,6 +1042,12 @@ async def run_rag(student, subject: str, question: str, weak_topics: list[str] |
             section_hint=section_hint,
         )
     except Exception:
+        logger.exception(
+            "RAG retrieval failed for subject=%s class=%s question=%r",
+            inferred_subject,
+            class_level,
+            question,
+        )
         context_with_sources = []
     contexts = [f"[Source: {item[3]}]\n{item[0]}" for item in context_with_sources]
     sources = [item[3] for item in context_with_sources]
@@ -1024,14 +1056,14 @@ async def run_rag(student, subject: str, question: str, weak_topics: list[str] |
     has_strong_match = bool(context_with_sources and top_score >= 2.5)
     chapter_intent = _is_chapter_style_question(question)
 
-    # When textbook retrieval is weak, let Groq answer in general mode.
-    # Only return strict safe mode if Groq is not configured.
-    if chapter_intent and not has_strong_match and not settings.groq_api_key:
+    # Chapter/title requests must be grounded in retrieved textbook context.
+    # Do not let the LLM invent chapter facts when retrieval is weak or empty.
+    if chapter_intent and not has_strong_match:
         if inferred_subject.lower() == "english":
             safe_answer = (
                 "**Insufficient Context (Safe Mode)**\n\n"
                 "**Summary**\n"
-                "I do not have enough chapter-specific context for this question yet, so I will not guess details.\n\n"
+                "I do not have enough chapter-specific textbook context for this question yet, so I will not guess details.\n\n"
                 "**Please send**\n"
                 "1. Subject, such as English\n"
                 "2. Chapter/reading number or title\n"
@@ -1043,7 +1075,7 @@ async def run_rag(student, subject: str, question: str, weak_topics: list[str] |
             safe_answer = (
                 "**संदर्भ अपर्याप्त है (Safe Mode)**\n\n"
                 "**सारांश**\n"
-                "इस प्रश्न के लिए अध्याय-विशिष्ट संदर्भ अभी पर्याप्त नहीं मिला, इसलिए मैं अनुमानित तथ्य नहीं दूंगा।\n\n"
+                "इस प्रश्न के लिए अध्याय-विशिष्ट textbook संदर्भ अभी पर्याप्त नहीं मिला, इसलिए मैं अनुमानित तथ्य नहीं दूंगा।\n\n"
                 "**अभी क्या भेजें**\n"
                 "1. विषय (जैसे: हिंदी/विज्ञान)\n"
                 "2. अध्याय संख्या या नाम\n"

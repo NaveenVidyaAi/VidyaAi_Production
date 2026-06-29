@@ -30,6 +30,8 @@ services:
       - "127.0.0.1:8000:8000"     # Nginx proxies to this
     env_file:
       - .env
+    environment:
+      APP_ENV: production
     depends_on:
       - qdrant
       - postgres
