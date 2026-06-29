@@ -35,7 +35,7 @@ def _replace_host_in_url(url: str, new_host: str) -> str:
 
 
 class Settings(BaseSettings):
-    anthropic_api_key: str
+    anthropic_api_key: str = ""
     groq_api_key: str = ""
     groq_model: str = "llama-3.1-8b-instant"
     database_url: str
