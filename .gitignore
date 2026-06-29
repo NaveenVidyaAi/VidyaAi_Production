@@ -4,6 +4,10 @@
 # ── Database & vector store data (host-mounted volumes) ────────────────────────
 pg_data/
 qdrant_storage/
+qdrant_storage_local/
+backend_local.db
+*.sqlite
+*.sqlite3
 
 # ── Python ─────────────────────────────────────────────────────────────────────
 __pycache__/
@@ -21,6 +25,7 @@ build/
 # ── Virtual environments ────────────────────────────────────────────────────────
 backend/.venv*/
 .venv/
+.venv*/
 venv/
 env/
 ENV/
@@ -37,6 +42,7 @@ yarn-error.log*
 # ── Training artifacts ──────────────────────────────────────────────────────────
 training/fine_tuned_models/
 training/checkpoints/
+training/pipeline_test/
 training/*.bin
 training/*.safetensors
 training/*.gguf

@@ -1,7 +1,11 @@
-import sqlalchemy
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
+import logging
+
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+
 from backend.config import settings
+
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = settings.database_url
 if DATABASE_URL.startswith("postgresql://"):
@@ -9,10 +13,24 @@ if DATABASE_URL.startswith("postgresql://"):
 elif DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 
-engine: AsyncEngine = create_async_engine(DATABASE_URL, future=True)
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+engine: AsyncEngine | None = None
+AsyncSessionLocal = None
 Base = declarative_base()
 
+try:
+    if DATABASE_URL.startswith("sqlite"):
+        DATABASE_URL = DATABASE_URL.replace("sqlite://", "sqlite+aiosqlite://", 1)
+    engine = create_async_engine(DATABASE_URL, future=True)
+    AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+except Exception as exc:
+    logger.warning("Database engine initialization failed, continuing without ORM persistence: %s", exc)
+
+
 async def init_db() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    if engine is None:
+        return
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as exc:
+        logger.warning("Database initialization failed, continuing without ORM persistence: %s", exc)

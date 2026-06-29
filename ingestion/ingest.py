@@ -2,21 +2,67 @@ import argparse
 import hashlib
 import os
 import re
+import unicodedata
 from typing import Dict, List, Optional
 
 import pdfplumber
 import pytesseract
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import PointStruct
+from qdrant_client.http.models import FieldCondition, Filter, MatchValue, PointStruct
 
 from backend.config import settings
 from backend.services.embeddings import embedding_service
 
 COLLECTION_NAME = "cgbse_knowledge"
-CHUNK_SIZE = 400
-OVERLAP = 50
+CHUNK_SIZE = 260
+OVERLAP = 60
 
 FIELD_KEYS = ["CLASS:", "SUBJECT:", "CHAPTER:", "TOPIC:", "SUBTOPIC:"]
+LESSON_RE = re.compile(
+    r"(?P<prefix>(?:^|\n)\s*पाठ\s*-?\s*)"
+    r"(?P<lesson>\d{1,2}\s*[.\-]\s*\d{1,2})"
+    r"\s*:?\s*(?P<title>[^\n]{0,90})"
+)
+ENGLISH_READING_RE = re.compile(
+    r"(?P<prefix>(?:^|\n)\s*)"
+    r"Reading[ \t]*(?P<letter>[ABC])[ \t]*:?[ \t]*(?P<title>[^\n]{0,110})",
+    flags=re.IGNORECASE,
+)
+
+CLASS_10_ENGLISH_READINGS = {
+    "1-A": "Patriotism",
+    "1-B": "How The Little Kite Learned To Fly?",
+    "1-C": "A Great Moment For All Those Children",
+    "2-A": "The Never-Never Nest",
+    "2-B": "Excuses, Excuses and Excuses",
+    "2-C": "Uncle Podger Hangs a Picture",
+    "3-A": "The Girl Who Asked Why",
+    "3-B": "Including All My Friends",
+    "3-C": "An Open Letter To The Teacher From a Child With Autism",
+    "4-A": "Swami Is Expelled From School",
+    "4-B": "About Me",
+    "4-C": "Daddy's Enduring Script",
+    "5-A": "Swiss Family Robinson",
+    "5-B": "Sumba's Adventure",
+    "5-C": "Adventures of Ibn Battuta",
+}
+
+
+COMMON_TEXT_FIXES = {
+    "कवता": "कविता",
+    "हन्दी": "हिन्दी",
+    "हदं ी": "हिंदी",
+    "नमद ा": "नर्मदा",
+    "नमदा": "नर्मदा",
+    "घरत े": "घिरते",
+    "नागाजनु": "नागार्जुन",
+    "ऋतरु ाज": "ऋतुराज",
+    "वद्यासागर": "विद्यासागर",
+    "परहार": "परिहार",
+    "सख्ं या": "संख्या",
+    "वधा": "विधा",
+    "पाठ्यपस्ु तक": "पाठ्यपुस्तक",
+}
 
 
 def _looks_garbled(text: str) -> bool:
@@ -32,7 +78,36 @@ def _looks_garbled(text: str) -> bool:
         return False
 
     devanagari_ratio = devanagari_count / max(total_letters, 1)
-    return devanagari_ratio < 0.08 and latin_count > 120
+    latin_ratio = latin_count / max(total_letters, 1)
+    null_ratio = text.count("\x00") / max(len(text), 1)
+    mixed_script_edges = len(re.findall(r"[A-Za-z][\u0900-\u097F]|[\u0900-\u097F][A-Za-z]", text))
+    legacy_glyphs = len(re.findall(r"[¼½¾]", text))
+    legacy_roman_tokens = len(
+        re.findall(
+            r"\b(?:ds|dk|dh|fd|gS|ij|bl|vk|dks|esa|fy|rFkk|iz|;g|ugha|gks|dj|ls|esa)\b",
+            text,
+        )
+    )
+
+    return (
+        null_ratio > 0.01
+        or (devanagari_count > 80 and latin_ratio > 0.30 and mixed_script_edges > 25)
+        or (devanagari_count > 40 and legacy_glyphs > 8)
+        or (devanagari_count > 20 and latin_count > 120 and legacy_roman_tokens > 18)
+        or (0 < devanagari_ratio < 0.08 and latin_count > 120)
+    )
+
+
+def normalize_hindi_text(text: str) -> str:
+    text = unicodedata.normalize("NFC", text or "")
+    text = text.replace("\x00", "")
+    text = re.sub(r"[\u200b\u200c\u200d\ufeff]", "", text)
+    text = re.sub(r"([A-Za-z])-\s*\n\s*([A-Za-z])", r"\1\2", text)
+    text = re.sub(r"([^\S\n])+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    for wrong, right in COMMON_TEXT_FIXES.items():
+        text = text.replace(wrong, right)
+    return text.strip()
 
 
 def _metadata_from_filename(path: str) -> Dict[str, str]:
@@ -54,14 +129,17 @@ def _metadata_from_filename(path: str) -> Dict[str, str]:
         roman_map = {"X": "10", "IX": "9", "VIII": "8"}
         meta["class"] = roman_map.get(raw_class, raw_class)
 
-    subject_match = re.search(r"(hindi|english|math|science|social(?:_science)?)", normalized, flags=re.IGNORECASE)
+    subject_match = re.search(r"(hindi|english|maths?|science|vigyan|ganit|social(?:_science)?)", normalized, flags=re.IGNORECASE)
     if subject_match:
         raw = subject_match.group(1).lower().replace("_", " ")
         subject_map = {
             "hindi": "Hindi",
             "english": "English",
             "math": "Math",
+            "maths": "Math",
+            "ganit": "Math",
             "science": "Science",
+            "vigyan": "Science",
             "social science": "Social Science",
             "social": "Social Science",
         }
@@ -73,10 +151,11 @@ def _metadata_from_filename(path: str) -> Dict[str, str]:
 
     topic = normalized
     topic = re.sub(r"class[_\s]*(x|ix|viii|\d{1,2})", "", topic, flags=re.IGNORECASE)
-    topic = re.sub(r"(hindi|english|math|science|social[_\s]*science)", "", topic, flags=re.IGNORECASE)
+    topic = re.sub(r"(hindi|english|maths?|ganit|science|vigyan|social[_\s]*science)", "", topic, flags=re.IGNORECASE)
     topic = re.sub(r"chapter[_\s]*\d{1,2}", "", topic, flags=re.IGNORECASE)
     topic = re.sub(r"_+", " ", topic).strip(" _")
-    if topic and topic.lower() != "credits":
+    generic_topics = {"credits", "subject", "class subject", "ganit", "vigyan"}
+    if topic and topic.lower() not in generic_topics:
         meta["topic"] = topic.title()
 
     return meta
@@ -88,9 +167,7 @@ def extract_text_from_pdf(path: str) -> str:
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
             page_text = page.extract_text()
-            if page_text and not _looks_garbled(page_text):
-                text.append(page_text)
-            else:
+            if not page_text or _looks_garbled(page_text):
                 if ocr_available:
                     image = page.to_image(resolution=300)
                     try:
@@ -102,8 +179,8 @@ def extract_text_from_pdf(path: str) -> str:
 
                 # If OCR is unavailable or failed, keep extracted text (even if imperfect)
                 # so ingestion can proceed and metadata can still be attached.
-                text.append(page_text or "")
-    return "\n".join(text)
+            text.append(normalize_hindi_text(page_text or ""))
+    return normalize_hindi_text("\n".join(text))
 
 
 def detect_metadata(text: str) -> Dict[str, str]:
@@ -142,6 +219,138 @@ def chunk_text(text: str) -> List[str]:
     return chunks
 
 
+def _clean_lesson_title(title: str) -> str:
+    title = re.sub(r"\s+", " ", title or "").strip(" :-।\t")
+    title = re.sub(r"\b\d{1,3}\s*[-–]\s*\d{1,3}\b.*$", "", title).strip()
+    title = re.sub(r"\([^)]{0,40}\)", "", title).strip()
+    return title[:90]
+
+
+def _lesson_metadata(section_text: str, base_metadata: Dict[str, str]) -> Dict[str, str]:
+    metadata = dict(base_metadata)
+    match = LESSON_RE.search(section_text)
+    if match:
+        lesson = re.sub(r"\s+", "", match.group("lesson")).replace(".", "-")
+        metadata["chapter"] = lesson
+        metadata["topic"] = _clean_lesson_title(match.group("title")) or metadata.get("topic", "")
+    return metadata
+
+
+def _normalize_english_title(text: str) -> str:
+    text = (text or "").replace("’", "'")
+    text = text.replace("austim", "autism").replace("Austim", "Autism")
+    text = text.replace("batutta", "battuta").replace("Batutta", "Battuta")
+    text = re.sub(r"[^a-zA-Z0-9]+", " ", text)
+    text = re.sub(r"\b\d{1,3}\b", " ", text)
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+def _class_10_english_reading_key(section_text: str, letter: str, raw_title: str) -> Optional[str]:
+    normalized_section = _normalize_english_title(section_text[:900])
+    normalized_title = _normalize_english_title(raw_title)
+    letter = (letter or "").upper()
+
+    for key, title in CLASS_10_ENGLISH_READINGS.items():
+        if not key.endswith(f"-{letter}"):
+            continue
+        normalized_known = _normalize_english_title(title)
+        title_tokens = normalized_title.split()
+        known_tokens = normalized_known.split()
+        if normalized_known and normalized_known in normalized_section:
+            return key
+        if normalized_title and (
+            normalized_title in normalized_known
+            or normalized_known in normalized_title
+            or (len(title_tokens) >= 5 and title_tokens[:5] == known_tokens[:5])
+            or all(token in normalized_section for token in normalized_known.split()[-3:])
+        ):
+            return key
+    return None
+
+
+def _english_reading_metadata(section_text: str, base_metadata: Dict[str, str]) -> Dict[str, str]:
+    metadata = dict(base_metadata)
+    match = ENGLISH_READING_RE.search(section_text)
+    if not match:
+        return metadata
+
+    letter = match.group("letter").upper()
+    raw_title = _clean_lesson_title(match.group("title"))
+    if not raw_title:
+        after_heading = section_text[match.end():].splitlines()
+        raw_title = _clean_lesson_title(next((line for line in after_heading if line.strip()), ""))
+
+    reading_key = _class_10_english_reading_key(section_text, letter, raw_title)
+    metadata["chapter"] = reading_key or letter
+    metadata["topic"] = CLASS_10_ENGLISH_READINGS.get(reading_key, raw_title or metadata.get("topic", ""))
+    metadata["content_type"] = "reading"
+    return metadata
+
+
+def _chunk_english_text_with_metadata(text: str, base_metadata: Dict[str, str]) -> List[tuple[str, Dict[str, str]]]:
+    matches = list(ENGLISH_READING_RE.finditer(text))
+    body_matches = [match for match in matches if not match.group("title").strip()]
+    if body_matches:
+        matches = body_matches
+    if not matches:
+        return [(chunk, dict(base_metadata)) for chunk in chunk_text(text)]
+
+    chunks: List[tuple[str, Dict[str, str]]] = []
+    preface = text[: matches[0].start()].strip()
+    if preface:
+        preface_meta = dict(base_metadata)
+        preface_meta["content_type"] = "toc"
+        preface_meta["topic"] = preface_meta.get("topic") or "Front Matter"
+        chunks.extend((chunk, dict(preface_meta)) for chunk in chunk_text(preface))
+
+    seen_reading_keys = set()
+    for idx, match in enumerate(matches):
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
+        section_text = text[match.start():end].strip()
+        if not section_text:
+            continue
+
+        reading_meta = _english_reading_metadata(section_text, base_metadata)
+        reading_key = reading_meta.get("chapter", "")
+
+        # Skip duplicate table-of-contents snippets once the real reading body was seen.
+        if reading_key in seen_reading_keys and len(section_text.split()) < 90:
+            continue
+        if reading_key:
+            seen_reading_keys.add(reading_key)
+
+        for chunk in chunk_text(section_text):
+            chunks.append((chunk, dict(reading_meta)))
+    return chunks
+
+
+def chunk_text_with_metadata(text: str, base_metadata: Dict[str, str]) -> List[tuple[str, Dict[str, str]]]:
+    if str(base_metadata.get("subject", "")).lower() == "english":
+        return _chunk_english_text_with_metadata(text, base_metadata)
+
+    matches = list(LESSON_RE.finditer(text))
+    if not matches:
+        return [(chunk, dict(base_metadata)) for chunk in chunk_text(text)]
+
+    chunks: List[tuple[str, Dict[str, str]]] = []
+    preface = text[: matches[0].start()].strip()
+    if preface:
+        preface_meta = dict(base_metadata)
+        preface_meta["content_type"] = "toc"
+        preface_meta["topic"] = preface_meta.get("topic") or "अनुक्रमणिका"
+        chunks.extend((chunk, dict(preface_meta)) for chunk in chunk_text(preface))
+
+    for idx, match in enumerate(matches):
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
+        section_text = text[match.start():end].strip()
+        if not section_text:
+            continue
+        lesson_meta = _lesson_metadata(section_text, base_metadata)
+        for chunk in chunk_text(section_text):
+            chunks.append((chunk, dict(lesson_meta)))
+    return chunks
+
+
 def create_qdrant_collection(client: QdrantClient):
     existing = [col.name for col in client.get_collections().collections]
     if COLLECTION_NAME not in existing:
@@ -152,22 +361,52 @@ def create_qdrant_collection(client: QdrantClient):
         )
 
 
+def _delete_existing_source(client: QdrantClient, source_file: str) -> None:
+    client.delete(
+        collection_name=COLLECTION_NAME,
+        points_selector=Filter(
+            must=[
+                FieldCondition(
+                    key="source_file",
+                    match=MatchValue(value=source_file),
+                )
+            ]
+        ),
+    )
+
+
+def get_qdrant_client() -> QdrantClient:
+    try:
+        client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port, timeout=5)
+        client.get_collections()
+        return client
+    except Exception:
+        fallback_path = os.path.join(os.path.dirname(__file__), "..", "qdrant_storage_local")
+        os.makedirs(fallback_path, exist_ok=True)
+        print(f"Qdrant server unavailable at {settings.qdrant_host}:{settings.qdrant_port}; using local persistence at {fallback_path}")
+        return QdrantClient(path=fallback_path)
+
+
 def ingest_file(path: str):
     text = extract_text_from_pdf(path)
-    chunks = chunk_text(text)
     file_metadata = _metadata_from_filename(path)
-    client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+    chunks = chunk_text_with_metadata(text, file_metadata)
+    client = get_qdrant_client()
     create_qdrant_collection(client)
+    source_file = os.path.basename(path)
+    _delete_existing_source(client, source_file)
     points = []
-    for idx, chunk in enumerate(chunks):
+    for idx, (chunk, base_metadata) in enumerate(chunks):
         metadata = detect_metadata(chunk)
-        for key, value in file_metadata.items():
-            if value and not metadata.get(key):
+        for key, value in base_metadata.items():
+            if key == "content_type" and value:
                 metadata[key] = value
-        metadata["source_file"] = os.path.basename(path)
+            elif value and not metadata.get(key):
+                metadata[key] = value
+        metadata["source_file"] = source_file
 
-        vector = embedding_service.embed(f"passage: {chunk}")
-        stable_id = int(hashlib.sha1(f"{os.path.basename(path)}::{idx}".encode("utf-8")).hexdigest()[:16], 16)
+        vector = embedding_service.embed(chunk)
+        stable_id = int(hashlib.sha1(f"{source_file}::{idx}".encode("utf-8")).hexdigest()[:16], 16)
         points.append(
             PointStruct(
                 id=stable_id,

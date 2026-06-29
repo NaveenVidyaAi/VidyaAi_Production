@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     app_env: str = "development"
     cors_origins: str = "http://localhost:5173"
     use_mock_embeddings: str = "true"
+    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    allow_embedding_download: str = "false"
     admin_emails: str = ""
 
     @field_validator("database_url")

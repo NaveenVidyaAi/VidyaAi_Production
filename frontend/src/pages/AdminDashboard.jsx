@@ -24,6 +24,29 @@ function BarChart({ data, labelKey, valueKey, color = "#6366f1" }) {
   );
 }
 
+function GroupedBarChart({ data }) {
+  if (!data || data.length === 0) return <p className="adm-empty">No data</p>;
+  const max = Math.max(...data.map((d) => Math.max(d.questions || 0, d.active_users || 0)), 1);
+  return (
+    <div className="adm-barchart">
+      {data.map((d) => (
+        <div key={d.date} className="adm-bar-row adm-bar-row-stacked">
+          <span className="adm-bar-label" title={d.date}>{new Date(d.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</span>
+          <div className="adm-dual-bars">
+            <div className="adm-bar-track">
+              <div className="adm-bar-fill" style={{ width: `${Math.round(((d.questions || 0) / max) * 100)}%`, background: "#126b52" }} />
+            </div>
+            <div className="adm-bar-track">
+              <div className="adm-bar-fill" style={{ width: `${Math.round(((d.active_users || 0) / max) * 100)}%`, background: "#2563eb" }} />
+            </div>
+          </div>
+          <span className="adm-bar-value">{d.questions}/{d.active_users}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ─────────────────── donut chart (SVG) ─────────────────── */
 const COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#3b82f6","#8b5cf6","#ec4899"];
 function DonutChart({ data, labelKey, valueKey }) {
@@ -91,6 +114,7 @@ function UserDrawer({ user, onClose }) {
         <div className="adm-drawer-stats">
           <StatCard label="Questions" value={user.total_questions} accent="#6366f1" />
           <StatCard label="Time Spent" value={`${user.estimated_minutes} min`} accent="#10b981" />
+          <StatCard label="Accuracy" value={`${user.feedback?.accuracy_score ?? 0}%`} sub={`${user.feedback?.positive ?? 0} up / ${user.feedback?.negative ?? 0} down`} accent="#d95d39" />
           <StatCard label="Last Active" value={user.last_active ? new Date(user.last_active).toLocaleDateString("en-IN") : "Never"} accent="#f59e0b" />
           <StatCard label="Joined" value={user.joined ? new Date(user.joined).toLocaleDateString("en-IN") : "—"} accent="#3b82f6" />
         </div>
@@ -126,6 +150,8 @@ export default function AdminDashboard() {
   const [summary, setSummary] = useState(null);
   const [topSubjects, setTopSubjects] = useState([]);
   const [sourceMix, setSourceMix] = useState([]);
+  const [feedbackMix, setFeedbackMix] = useState([]);
+  const [dailyActivity, setDailyActivity] = useState([]);
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [search, setSearch] = useState("");
@@ -150,6 +176,8 @@ export default function AdminDashboard() {
         setSummary(dash.data.summary);
         setTopSubjects(dash.data.top_subjects || []);
         setSourceMix(dash.data.answer_source_mix || []);
+        setFeedbackMix(dash.data.feedback_mix || []);
+        setDailyActivity(dash.data.daily_activity || []);
         setUsers(userList.data.users || []);
       } catch (err) {
         if (err?.response?.status === 403) {
@@ -180,13 +208,30 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleStudentMetricsExport() {
+    const response = await api.get("/admin/export-student-metrics", { responseType: "blob" });
+    const downloadUrl = window.URL.createObjectURL(new Blob([response.data], { type: "text/csv" }));
+    const link = document.createElement("a");
+    const disposition = response.headers["content-disposition"] || "";
+    const filename = disposition.match(/filename="([^"]+)"/)?.[1] || "vidyaai_student_metrics.csv";
+    link.href = downloadUrl;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(downloadUrl);
+  }
+
   const filtered = users
     .filter((u) =>
       !search ||
       u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase())
     )
-    .sort((a, b) => (b[sortKey] ?? 0) - (a[sortKey] ?? 0));
+    .sort((a, b) => {
+      const getValue = (user) => sortKey === "accuracy_score" ? (user.feedback?.accuracy_score ?? 0) : (user[sortKey] ?? 0);
+      return getValue(b) - getValue(a);
+    });
 
   if (loading) return <div className="adm-loading">Loading admin data...</div>;
   if (error) return <div className="adm-error">{error} <button onClick={() => navigate("/dashboard")}>← Back</button></div>;
@@ -198,7 +243,10 @@ export default function AdminDashboard() {
           <h1 className="adm-title">VidyaAI Admin Dashboard</h1>
           <p className="adm-subtitle">Real-time usage analytics for all registered students</p>
         </div>
-        <button className="adm-back-btn" onClick={() => navigate("/dashboard")}>← Student View</button>
+        <div className="adm-header-actions">
+          <button className="adm-export-btn" onClick={handleStudentMetricsExport}>Export Excel CSV</button>
+          <button className="adm-back-btn" onClick={() => navigate("/dashboard")}>← Student View</button>
+        </div>
       </header>
 
       {/* ── Summary KPIs ── */}
@@ -208,6 +256,11 @@ export default function AdminDashboard() {
         <StatCard label="Active Users (24h)" value={summary?.active_users_24h} sub={`Avg Q/user: ${summary?.avg_questions_per_user}`} accent="#f59e0b" />
         <StatCard label="Study Time (est.)" value={`${summary?.estimated_minutes_total} min`} sub="Across all users" accent="#3b82f6" />
         <StatCard label="Cache Hits" value={summary?.cache_hits_total} sub={`${summary?.cache_entries} unique Qs cached`} accent="#8b5cf6" />
+        <StatCard label="Retention Rate" value={`${summary?.retention_rate ?? 0}%`} sub={`${summary?.retained_users ?? 0} weekly active users`} accent="#126b52" />
+        <StatCard label="Engagement Rate" value={summary?.engagement_rate ?? 0} sub="Avg questions/study session" accent="#2563eb" />
+        <StatCard label="Accuracy Score" value={`${summary?.accuracy_score ?? 0}%`} sub={`${summary?.thumbs_up ?? 0} up / ${summary?.thumbs_down ?? 0} down`} accent="#d95d39" />
+        <StatCard label="DAU / WAU" value={`${summary?.dau ?? 0} / ${summary?.wau ?? 0}`} sub={`${summary?.dau_wau_ratio ?? 0}% stickiness`} accent="#c07616" />
+        <StatCard label="Study Sessions" value={summary?.study_sessions ?? 0} sub="30 min inactivity split" accent="#0f8c6b" />
       </section>
 
       {/* ── Charts row ── */}
@@ -219,6 +272,15 @@ export default function AdminDashboard() {
         <div className="adm-chart-card">
           <h3>Answer Source Mix</h3>
           <DonutChart data={sourceMix} labelKey="source" valueKey="count" />
+        </div>
+        <div className="adm-chart-card">
+          <h3>Student Activity: Questions / Active Users</h3>
+          <GroupedBarChart data={dailyActivity} />
+          <div className="adm-chart-note"><span className="adm-dot adm-dot-green" /> Questions <span className="adm-dot adm-dot-blue" /> Active users</div>
+        </div>
+        <div className="adm-chart-card">
+          <h3>Feedback Accuracy Pie</h3>
+          <DonutChart data={feedbackMix} labelKey="label" valueKey="count" />
         </div>
       </section>
 
@@ -236,6 +298,7 @@ export default function AdminDashboard() {
             <select className="adm-sort" value={sortKey} onChange={(e) => setSortKey(e.target.value)}>
               <option value="total_questions">Sort: Most Questions</option>
               <option value="estimated_minutes">Sort: Most Time</option>
+              <option value="accuracy_score">Sort: Accuracy Score</option>
             </select>
           </div>
         </div>
@@ -252,6 +315,7 @@ export default function AdminDashboard() {
                 <th>Time (min)</th>
                 <th>Subjects</th>
                 <th>Weak Topics</th>
+                <th>Accuracy</th>
                 <th>Last Active</th>
                 <th></th>
               </tr>
@@ -277,6 +341,9 @@ export default function AdminDashboard() {
                         ? <span className="adm-badge adm-badge-red">{u.weak_topics.length} weak</span>
                         : <span className="adm-td-muted">—</span>}
                     </td>
+                    <td>
+                      <span className="adm-badge adm-badge-amber">{u.feedback?.accuracy_score ?? 0}%</span>
+                    </td>
                     <td className="adm-td-muted">
                       {u.last_active ? new Date(u.last_active).toLocaleDateString("en-IN") : "Never"}
                     </td>
@@ -287,7 +354,7 @@ export default function AdminDashboard() {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan="10" style={{ textAlign: "center", padding: "2rem", color: "#9ca3af" }}>No users found</td></tr>
+                <tr><td colSpan="11" style={{ textAlign: "center", padding: "2rem", color: "#9ca3af" }}>No users found</td></tr>
               )}
             </tbody>
           </table>

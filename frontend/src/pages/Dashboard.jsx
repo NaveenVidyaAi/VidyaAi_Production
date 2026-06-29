@@ -40,6 +40,18 @@ const translations = {
     recentChats: ["कक्षा 10 हिंदी अध्याय 3", "विज्ञान: अम्ल और क्षार", "इतिहास त्वरित पुनरावृत्ति", "गणित महत्वपूर्ण प्रश्न"],
     adminPanelTitle: "एडमिन एनालिटिक्स",
     adminPanelSubtitle: "उपयोग, अध्ययन और सिस्टम स्केलिंग के मुख्य संकेतक",
+    countdownTitle: "बोर्ड परीक्षा में",
+    countdownUnit: "दिन",
+    countdownNote: "हर दिन एक छोटा लक्ष्य पूरा करें।",
+    examDateLabel: "Exam date",
+    todayTargetTitle: "आज का लक्ष्य",
+    targetProgress: (done, total) => `${done}/${total} पूरे`,
+    streakTitle: "Study streak",
+    streakUnit: "दिन",
+    streakNote: "आज एक लक्ष्य पूरा करके streak बचाएं।",
+    papersTitle: "Previous Year Papers",
+    papersNote: "एक पेपर चुनें और VidyaAI से practice शुरू कराएं।",
+    startPaper: "Practice",
   },
   en: {
     greeting: (name) => `Hello, ${name}`,
@@ -76,8 +88,120 @@ const translations = {
     recentChats: ["Class 10 Hindi Ch. 3", "Science: Acids & Bases", "History Quick Revision", "Maths Important Questions"],
     adminPanelTitle: "Admin Analytics",
     adminPanelSubtitle: "Key usage, study and scaling metrics",
+    countdownTitle: "Board Exam In",
+    countdownUnit: "days",
+    countdownNote: "Finish one small target every day.",
+    examDateLabel: "Exam date",
+    todayTargetTitle: "Today's Target",
+    targetProgress: (done, total) => `${done}/${total} done`,
+    streakTitle: "Study streak",
+    streakUnit: "days",
+    streakNote: "Complete one target today to protect it.",
+    papersTitle: "Previous Year Papers",
+    papersNote: "Choose a paper and let VidyaAI start practice.",
+    startPaper: "Practice",
   },
 };
+
+const dailyTargets = [
+  [
+    { id: "acid-base", hi: "विज्ञान: अम्ल-क्षार revise करें", en: "Science: revise Acid-Base" },
+    { id: "hindi-3", hi: "हिंदी: अध्याय 3 से 3 प्रश्न करें", en: "Hindi: attempt 3 questions from Chapter 3" },
+    { id: "math-formula", hi: "गणित: 10 सूत्र दोहराएं", en: "Math: revise 10 formulas" },
+  ],
+  [
+    { id: "history", hi: "सामाजिक विज्ञान: इतिहास के 2 short answers", en: "Social Science: 2 history short answers" },
+    { id: "science-diagram", hi: "विज्ञान: एक diagram practice करें", en: "Science: practice one diagram" },
+    { id: "hindi-poem", hi: "हिंदी: एक कविता का सारांश लिखें", en: "Hindi: write one poem summary" },
+  ],
+  [
+    { id: "math-paper", hi: "गणित: 15 मिनट previous questions", en: "Math: 15 minutes previous questions" },
+    { id: "english-writing", hi: "English: writing section का एक प्रश्न", en: "English: one writing question" },
+    { id: "weak-topic", hi: "अपना एक weak topic revise करें", en: "Revise one weak topic" },
+  ],
+];
+
+const previousPapers = [
+  { year: "2025", subject: "Hindi", title: "Hindi Board Paper", prompt: "Class 10 Hindi previous year paper 2025 से 5 important questions practice कराइए" },
+  { year: "2024", subject: "Science", title: "Science Board Paper", prompt: "Class 10 Science previous year paper 2024 pattern से important questions पूछिए" },
+  { year: "2024", subject: "Math", title: "Math Board Paper", prompt: "Class 10 Math previous year paper 2024 से 5 exam questions practice कराइए" },
+  { year: "2023", subject: "Social Science", title: "Social Science Paper", prompt: "Class 10 Social Science previous year paper 2023 से revision test लीजिए" },
+];
+
+const subjects = [
+  { id: "Hindi", hi: "हिंदी", en: "Hindi" },
+  { id: "Science", hi: "विज्ञान", en: "Science" },
+  { id: "Math", hi: "गणित", en: "Math" },
+  { id: "Social Science", hi: "सामाजिक विज्ञान", en: "Social Science" },
+  { id: "English", hi: "English", en: "English" },
+  { id: "Sanskrit", hi: "संस्कृत", en: "Sanskrit" },
+];
+
+const subjectQuestionSamples = {
+  Hindi: [
+    { hi: "कक्षा 10 हिंदी अध्याय 3 का सारांश सरल भाषा में समझाइए", en: "Explain Class 10 Hindi Chapter 3 in simple language" },
+    { hi: "कविता का केंद्रीय भाव और मुख्य बिंदु लिखिए", en: "Write the central idea and key points of the poem" },
+    { hi: "इस अध्याय से 5 महत्वपूर्ण प्रश्नोत्तर दीजिए", en: "Give 5 important Q&A from this chapter" },
+  ],
+  Science: [
+    { hi: "अम्ल, क्षार और लवण में अंतर उदाहरण सहित समझाइए", en: "Explain the difference between acids, bases, and salts with examples" },
+    { hi: "प्रकाश के परावर्तन के नियम diagram के साथ बताइए", en: "Explain laws of reflection of light with a diagram" },
+    { hi: "इस chapter से 2 अंक और 5 अंक के महत्वपूर्ण प्रश्न दीजिए", en: "Give important 2-mark and 5-mark questions from this chapter" },
+  ],
+  Math: [
+    { hi: "द्विघात समीकरण का सूत्र उदाहरण सहित समझाइए", en: "Explain the quadratic formula with an example" },
+    { hi: "x² - 5x + 6 = 0 के मूल step-by-step निकालिए", en: "Find the roots of x² - 5x + 6 = 0 step by step" },
+    { hi: "समांतर श्रेणी के 5 practice questions answer सहित दीजिए", en: "Give 5 arithmetic progression practice questions with answers" },
+  ],
+  "Social Science": [
+    { hi: "चंपारण सत्याग्रह को परीक्षा के लिए 5 अंकों में समझाइए", en: "Explain Champaran Satyagraha for a 5-mark exam answer" },
+    { hi: "भारत के राष्ट्रपति की शक्तियां और कार्य लिखिए", en: "Write the powers and functions of the President of India" },
+    { hi: "इस chapter के short notes और important dates दीजिए", en: "Give short notes and important dates from this chapter" },
+  ],
+  English: [
+    { hi: "Class 10 English poem का summary और theme बताइए", en: "Give the summary and theme of this Class 10 English poem" },
+    { hi: "Write a letter/application for board exam practice", en: "Write a letter/application for board exam practice" },
+    { hi: "Give 5 important English grammar practice questions", en: "Give 5 important English grammar practice questions" },
+  ],
+  Sanskrit: [
+    { hi: "संस्कृत पाठ का हिंदी अनुवाद और सारांश दीजिए", en: "Give Hindi translation and summary of the Sanskrit lesson" },
+    { hi: "इस श्लोक का अर्थ और व्याकरण समझाइए", en: "Explain the meaning and grammar of this shloka" },
+    { hi: "संस्कृत संधि/समास के 5 examples answer सहित दीजिए", en: "Give 5 Sanskrit sandhi/samas examples with answers" },
+  ],
+};
+
+const answerStyles = [
+  { id: "exam", hi: "परीक्षा-मित्र", en: "Exam-ready" },
+  { id: "summary", hi: "सारांश", en: "Summary" },
+  { id: "two", hi: "2 अंक", en: "2 marks" },
+  { id: "five", hi: "5 अंक", en: "5 marks" },
+  { id: "qa", hi: "प्रश्नोत्तर", en: "Q&A" },
+];
+
+const suggestionChips = [
+  { hi: "अध्याय 3 सारांश", en: "Chapter 3 summary" },
+  { hi: "मीरा बाई कविता", en: "Meera Bai poem" },
+  { hi: "5 अंक प्रश्न", en: "5-mark question" },
+  { hi: "परीक्षा टिप्स", en: "Exam tips" },
+];
+
+const dateKey = (date = new Date()) => date.toISOString().slice(0, 10);
+
+const addDays = (date, days) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+
+const readJson = (key, fallback) => {
+  try {
+    return JSON.parse(localStorage.getItem(key) || "") || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const defaultExamDate = () => dateKey(addDays(new Date(), 47));
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -92,10 +216,22 @@ export default function Dashboard() {
   const [isGuest, setIsGuest] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminStats, setAdminStats] = useState(null);
-  const [showProfile, setShowProfile] = useState(true);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [examDate, setExamDate] = useState(() => localStorage.getItem("vidyaai_exam_date") || defaultExamDate());
+  const [completedTargets, setCompletedTargets] = useState(() => readJson(`vidyaai_targets_${dateKey()}`, []));
+  const [streak, setStreak] = useState(() => readJson("vidyaai_streak", { count: 0, lastActive: "" }));
+  const [selectedSubject, setSelectedSubject] = useState("Hindi");
+  const [answerStyle, setAnswerStyle] = useState("exam");
   const windowRef = useRef(null);
 
   const t = translations[lang];
+  const todayIndex = Math.floor(new Date().getTime() / 86400000) % dailyTargets.length;
+  const todaysTargets = dailyTargets[todayIndex];
+  const completedCount = todaysTargets.filter((item) => completedTargets.includes(item.id)).length;
+  const daysToExam = Math.max(Math.ceil((new Date(examDate) - new Date()) / 86400000), 0);
+  const askedQuestions = messages.filter((message) => message.role === "student");
+  const recentQuestions = askedQuestions.slice(-4).reverse();
+  const selectedSubjectSamples = subjectQuestionSamples[selectedSubject] || [];
 
   const inferSubject = (text) => {
     const q = (text || "").toLowerCase();
@@ -107,8 +243,6 @@ export default function Dashboard() {
     return "General";
   };
 
-  const studyCards = t.studyCards(studentProfile?.class_level, studentProfile?.medium);
-
   useEffect(() => {
     async function loadProfile() {
       try {
@@ -116,6 +250,11 @@ export default function Dashboard() {
         if (response?.data?.name) {
           setStudentName(response.data.name);
           setStudentProfile(response.data);
+          if (response.data.exam_date) {
+            const profileExamDate = dateKey(new Date(response.data.exam_date));
+            setExamDate(profileExamDate);
+            localStorage.setItem("vidyaai_exam_date", profileExamDate);
+          }
           setIsGuest(false);
           setIsAdmin(Boolean(response.data.is_admin));
         }
@@ -150,6 +289,38 @@ export default function Dashboard() {
     windowRef.current.scrollTop = windowRef.current.scrollHeight;
   }, [messages, isLoading]);
 
+  useEffect(() => {
+    localStorage.setItem("vidyaai_exam_date", examDate);
+  }, [examDate]);
+
+  useEffect(() => {
+    setCompletedTargets(readJson(`vidyaai_targets_${dateKey()}`, []));
+  }, []);
+
+  const recordStudyActivity = () => {
+    const today = dateKey();
+    if (streak.lastActive === today) return;
+
+    const yesterday = dateKey(addDays(new Date(), -1));
+    const nextStreak = {
+      count: streak.lastActive === yesterday ? streak.count + 1 : 1,
+      lastActive: today,
+    };
+    setStreak(nextStreak);
+    localStorage.setItem("vidyaai_streak", JSON.stringify(nextStreak));
+  };
+
+  const toggleTarget = (targetId) => {
+    setCompletedTargets((prev) => {
+      const next = prev.includes(targetId)
+        ? prev.filter((id) => id !== targetId)
+        : [...prev, targetId];
+      localStorage.setItem(`vidyaai_targets_${dateKey()}`, JSON.stringify(next));
+      if (!prev.includes(targetId)) recordStudyActivity();
+      return next;
+    });
+  };
+
   const handleCopy = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -178,22 +349,35 @@ export default function Dashboard() {
     navigate("/login");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const currentQuestion = question.trim();
+  const askQuestion = async (currentQuestion, subjectOverride = null) => {
     if (!currentQuestion || isLoading) return;
 
+    recordStudyActivity();
     setQuestion("");
     setIsLoading(true);
     setMessages((prev) => [...prev, { role: "student", text: currentQuestion }]);
+    const outgoingSubject = subjectOverride || selectedSubject || inferSubject(currentQuestion);
 
     try {
       const response = await api.post("/chat/ask", {
         question: currentQuestion,
-        subject: inferSubject(currentQuestion),
+        subject: outgoingSubject,
+        answer_style: answerStyle,
       });
 
-      setMessages((prev) => [...prev, { role: "assistant", text: response?.data?.answer || t.welcomeMsg }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: response?.data?.answer || t.welcomeMsg,
+          sessionId: response?.data?.session_id,
+          question: currentQuestion,
+          subject: outgoingSubject,
+          answerStyle,
+          chapterOptions: response?.data?.chapter_options || [],
+          feedback: null,
+        },
+      ]);
     } catch (err) {
       const status = err?.response?.status;
       setMessages((prev) => [
@@ -205,61 +389,113 @@ export default function Dashboard() {
     }
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await askQuestion(question.trim());
+  };
+
+  const handleChapterOption = async (option) => {
+    const optionSubject = option.subject || selectedSubject || "Hindi";
+    setSelectedSubject(optionSubject);
+    await askQuestion(option.prompt || `class 10 ${optionSubject} chapter ${option.section}`, optionSubject);
+  };
+
+  const handlePaperPractice = async (paper) => {
+    setSelectedSubject(paper.subject);
+    await askQuestion(paper.prompt, paper.subject);
+  };
+
+  const handleFeedback = async (messageIndex, sessionId, understood) => {
+    if (!sessionId) return;
+    setMessages((prev) => prev.map((message, index) => (
+      index === messageIndex ? { ...message, feedback: understood ? "up" : "down" } : message
+    )));
+    try {
+      await api.post("/chat/feedback", { session_id: sessionId, understood });
+    } catch {
+      setMessages((prev) => prev.map((message, index) => (
+        index === messageIndex ? { ...message, feedback: null } : message
+      )));
+    }
+  };
+
+  const handleRetry = async (message) => {
+    const retryQuestion = message.question || [...messages].reverse().find((item) => item.role === "student")?.text;
+    if (!retryQuestion) return;
+    if (message.answerStyle) {
+      setAnswerStyle(message.answerStyle);
+    }
+    await askQuestion(retryQuestion, message.subject || selectedSubject || inferSubject(retryQuestion));
+  };
+
   return (
     <div className="page-shell dashboard-app-shell">
       <aside className="dashboard-left-nav">
         <div className="sidebar-brand">
-          <BrandMark compact />
-          <p>{t.sidebarTagline}</p>
+          <div className="sidebar-brand-mark" aria-hidden="true">वि</div>
+          <div className="sidebar-brand-copy">
+            <strong>VidyaAI</strong>
+            <p>{t.sidebarTagline}</p>
+          </div>
         </div>
 
         <button type="button" className="nav-action primary" onClick={handleNewChat}>{t.newChat}</button>
-        <button type="button" className="nav-action">{t.chapterLib}</button>
         {isAdmin && (
-          <button type="button" className="nav-action nav-action-admin" onClick={() => navigate("/admin")}>⚙ Admin Panel</button>
+          <button type="button" className="nav-action nav-action-admin" onClick={() => navigate("/admin")}>Admin Panel</button>
         )}
 
         <div className="sidebar-section">
           <p>{t.quickPromptsTitle}</p>
           {t.quickPrompts.map((prompt, index) => (
-            <button key={index} type="button" className="recent-item" onClick={() => setQuestion(prompt)}>{prompt}</button>
+            <button key={index} type="button" className="plain-list-button" onClick={() => setQuestion(prompt)}>{prompt}</button>
           ))}
         </div>
 
-        <div className="recent-list">
-          <p>{t.recentChatsTitle}</p>
-          {t.recentChats.map((chat, index) => (
-            <button key={index} type="button" className="recent-item">{chat}</button>
-          ))}
+        {recentQuestions.length > 0 && (
+          <div className="sidebar-section">
+            <p>{t.recentChatsTitle}</p>
+            {recentQuestions.map((message, index) => (
+              <button key={`${message.text}-${index}`} type="button" className="recent-item active" onClick={() => setQuestion(message.text)}>
+                {message.text}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="sidebar-section papers-sidebar-section">
+          <p>{t.papersTitle}</p>
+          <div className="paper-list compact">
+            {previousPapers.map((paper) => (
+              <button key={`${paper.subject}-${paper.year}`} type="button" onClick={() => handlePaperPractice(paper)}>
+                <span>{paper.year}</span>
+                <strong>{paper.subject}</strong>
+                <small>{t.startPaper}</small>
+              </button>
+            ))}
+          </div>
         </div>
       </aside>
 
       <section className="dashboard-main-chat">
         <header className="dashboard-main-top">
           <div className="dashboard-title-block">
-            <span className="section-pill">Student Dashboard</span>
             <h1>{t.greeting(studentName)}</h1>
-            <p>{isGuest ? t.guestNote : t.classInfo(studentProfile?.class_level || "10", studentProfile?.medium || "Hindi")}</p>
+            <div className="student-tags">
+              <span>कक्षा {studentProfile?.class_level || "10"}</span>
+              <span>{studentProfile?.medium || "Hindi"} माध्यम</span>
+            </div>
           </div>
 
           <div className="top-actions">
-            {/* Language toggle */}
             <button type="button" className="icon-btn top-icon-btn" onClick={() => setLang((l) => l === "hi" ? "en" : "hi")} title="Switch Language">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
               <span className="icon-btn-label">{lang === "hi" ? "EN" : "हिं"}</span>
             </button>
 
-            {/* Share chat */}
             <button type="button" className="icon-btn top-icon-btn" onClick={handleShare} title="Share Chat">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
             </button>
 
-            {/* Profile toggle */}
-            <button type="button" className={`icon-btn top-icon-btn ${showProfile ? "active" : ""}`} onClick={() => setShowProfile((prev) => !prev)} title={t.profileTitle}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            </button>
-
-            {/* Login / Logout */}
             {isGuest ? (
               <button type="button" className="icon-btn top-icon-btn" onClick={() => navigate("/login")} title="Login">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
@@ -272,15 +508,19 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <section className="dashboard-overview">
-          {studyCards.map((card) => (
-            <article key={card.title} className="overview-card">
-              <p>{card.title}</p>
-              <strong>{card.value}</strong>
-              <span>{card.note}</span>
-            </article>
+        <div className="answer-style-bar">
+          <span>उत्तर शैली:</span>
+          {answerStyles.map((style) => (
+            <button
+              key={style.id}
+              type="button"
+              className={answerStyle === style.id ? "active" : ""}
+              onClick={() => setAnswerStyle(style.id)}
+            >
+              {style[lang]}
+            </button>
           ))}
-        </section>
+        </div>
 
         {isAdmin && adminStats?.summary && (
           <section className="dashboard-overview" aria-label="admin-analytics">
@@ -311,10 +551,22 @@ export default function Dashboard() {
           <div className="dashboard-chat-panel">
             <div className="chat-panel-header">
               <div>
-                <h2>{t.answerSection}</h2>
-                <p>{t.answerSubtext}</p>
+                <div className="assistant-card-title">
+                  <div className="assistant-logo">वि</div>
+                  <div>
+                    <h2>VidyaAI</h2>
+                    <p>{t.sidebarTagline}</p>
+                  </div>
+                </div>
               </div>
-              <span className="answer-badge">Hindi Friendly</span>
+              <label className="chat-exam-date">
+                {t.examDateLabel}
+                <input
+                  type="date"
+                  value={examDate}
+                  onChange={(e) => setExamDate(e.target.value || defaultExamDate())}
+                />
+              </label>
             </div>
 
             <div ref={windowRef} className="dashboard-chatgpt-window">
@@ -324,21 +576,50 @@ export default function Dashboard() {
                     <span className="message-label">{message.role === "assistant" ? t.assistantLabel : t.studentLabel}</span>
                     <div className={`dashboard-message-bubble ${message.role === "assistant" ? "assistant" : "student"}`}>
                       <ReactMarkdown>{message.text}</ReactMarkdown>
+                      {message.role === "assistant" && message.chapterOptions?.length > 0 && (
+                        <div className="chapter-option-list">
+                          {message.chapterOptions.map((option) => (
+                            <button
+                              key={option.section}
+                              type="button"
+                              onClick={() => handleChapterOption(option)}
+                              disabled={isLoading}
+                            >
+                              <span>{option.section}</span>
+                              {option.title}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     {message.role === "assistant" && (
                       <div className="message-signs">
                         <button type="button" className="icon-btn" onClick={() => handleCopy(message.text)} title="Copy">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                         </button>
-                        <button type="button" className="icon-btn" title="Regenerate">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.36"/></svg>
+                        <button type="button" className="icon-btn" onClick={() => handleRetry(message)} title="Retry">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
                         </button>
-                        <button type="button" className="icon-btn" title="Good answer">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
-                        </button>
-                        <button type="button" className="icon-btn" title="Needs improvement">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>
-                        </button>
+                        {message.sessionId && !message.chapterOptions?.length && (
+                          <>
+                            <button
+                              type="button"
+                              className={`icon-btn feedback-icon positive${message.feedback === "up" ? " active" : ""}`}
+                              onClick={() => handleFeedback(index, message.sessionId, true)}
+                              title="Good answer"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v11"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>
+                            </button>
+                            <button
+                              type="button"
+                              className={`icon-btn feedback-icon negative${message.feedback === "down" ? " active" : ""}`}
+                              onClick={() => handleFeedback(index, message.sessionId, false)}
+                              title="Needs improvement"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V3"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -358,6 +639,14 @@ export default function Dashboard() {
               )}
             </div>
 
+            <div className="suggestion-strip">
+              {suggestionChips.map((chip) => (
+                <button key={chip.en} type="button" onClick={() => setQuestion(chip[lang])}>
+                  {chip[lang]}
+                </button>
+              ))}
+            </div>
+
             <form className="dashboard-chatgpt-form sticky-input" onSubmit={handleSubmit}>
               <input
                 value={question}
@@ -370,33 +659,81 @@ export default function Dashboard() {
             </form>
           </div>
 
-          {showProfile && (
-            <aside className="profile-rail">
-              <div className="profile-card profile-brand-card">
-                <BrandMark compact />
-                <p>{t.brandTagline}</p>
-              </div>
-
-              <div className="profile-card">
-                <h3>{t.profileTitle}</h3>
-                <ul className="profile-list">
-                  <li><span>{t.profileLabels.name}</span><strong>{studentName}</strong></li>
-                  <li><span>{t.profileLabels.class}</span><strong>{studentProfile?.class_level || "10"}</strong></li>
-                  <li><span>{t.profileLabels.medium}</span><strong>{studentProfile?.medium || "Hindi"}</strong></li>
-                  <li><span>{t.profileLabels.status}</span><strong>{isGuest ? t.profileLabels.guest : t.profileLabels.loggedIn}</strong></li>
-                </ul>
-              </div>
-
-              <div className="profile-card">
-                <h3>{t.tipsTitle}</h3>
-                <ul className="tips-list">
-                  {t.tips.map((tip, i) => <li key={i}>{tip}</li>)}
-                </ul>
-              </div>
-            </aside>
-          )}
         </div>
       </section>
+
+      <aside className="dashboard-right-rail">
+        <section className="right-section">
+          <p className="rail-heading">{t.profileTitle}</p>
+          <div className="profile-summary-card">
+            <div className="profile-card-head">
+              <div className="profile-avatar-large" aria-hidden="true">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21a8 8 0 0 0-16 0" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              </div>
+              <h3>{studentName}</h3>
+            </div>
+            <dl>
+              <div><dt>{t.profileLabels.class}</dt><dd>{studentProfile?.class_level || "10"}</dd></div>
+              <div><dt>{t.profileLabels.medium}</dt><dd>{studentProfile?.medium || "Hindi"}</dd></div>
+              <div><dt>बोर्ड</dt><dd>CGBSE</dd></div>
+            </dl>
+          </div>
+        </section>
+
+        <section className="right-section">
+          <p className="rail-heading">आज की गतिविधि</p>
+          <div className="activity-grid">
+            <div><strong>{askedQuestions.length}</strong><span>प्रश्न पूछे</span></div>
+            <div><strong>{completedCount}</strong><span>लक्ष्य पूरे</span></div>
+          </div>
+          <div className="mini-stat-row">
+            <span>{t.countdownTitle}</span>
+            <strong>{daysToExam} {t.countdownUnit}</strong>
+          </div>
+          <div className="mini-stat-row">
+            <span>{t.streakTitle}</span>
+            <strong>{streak.count || 0} {t.streakUnit}</strong>
+          </div>
+        </section>
+
+        <section className="right-section">
+          <p className="rail-heading">विषय चुनें</p>
+          <div className="subject-list">
+            {subjects.map((subject) => (
+              <button
+                key={subject.id}
+                type="button"
+                className={selectedSubject === subject.id ? "active" : ""}
+                onClick={() => setSelectedSubject(subject.id)}
+              >
+                <span>{subject[lang]}</span>
+                <small>{selectedSubject === subject.id ? "चुना गया" : "कक्षा 10"}</small>
+              </button>
+            ))}
+          </div>
+
+          <div className="question-sample-panel">
+            <div className="sample-panel-head">
+              <strong>{lang === "hi" ? "कैसे पूछें?" : "How to ask"}</strong>
+              <span>{subjects.find((subject) => subject.id === selectedSubject)?.[lang] || selectedSubject}</span>
+            </div>
+            <div className="question-sample-list">
+              {selectedSubjectSamples.map((sample) => (
+                <button
+                  key={sample.en}
+                  type="button"
+                  onClick={() => setQuestion(sample[lang])}
+                >
+                  {sample[lang]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      </aside>
     </div>
   );
 }

@@ -1,7 +1,12 @@
+import csv
+import io
+import json
+import os
 from collections import defaultdict
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,8 +16,11 @@ from backend.models.session import ChatSession
 from backend.models.student import Student
 from backend.models.weak_topic import WeakTopic
 from backend.routers.auth import get_current_student, get_db
+from backend.routers.chat import in_memory_store
 
 router = APIRouter()
+
+STUDY_SESSION_GAP_MINUTES = 30
 
 
 def _estimated_minutes_per_user(timestamps: list[datetime]) -> float:
@@ -28,14 +36,263 @@ def _estimated_minutes_per_user(timestamps: list[datetime]) -> float:
     return round(total_seconds / 60.0, 2)
 
 
+def _parse_datetime(value) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if not value or value == "now":
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError:
+        return None
+
+
+def _count_study_sessions(timestamps: list[datetime]) -> int:
+    if not timestamps:
+        return 0
+    ordered = sorted(timestamps)
+    sessions = 1
+    for index in range(1, len(ordered)):
+        if ordered[index] - ordered[index - 1] > timedelta(minutes=STUDY_SESSION_GAP_MINUTES):
+            sessions += 1
+    return sessions
+
+
+def _feedback_log_dir() -> str:
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "feedback_logs"))
+
+
+def _load_feedback_records() -> list[dict]:
+    records_by_key: dict[tuple[str, str], dict] = {}
+    for session in in_memory_store.get("sessions", []):
+        if "understood" not in session:
+            continue
+        student_id = str(session.get("student_id", "guest"))
+        session_id = str(session.get("id", ""))
+        records_by_key[(student_id, session_id)] = {
+            "student_id": student_id,
+            "session_id": session_id,
+            "useful": bool(session.get("understood")),
+            "feedback": session.get("feedback") or ("thumbs_up" if session.get("understood") else "thumbs_down"),
+            "feedback_timestamp": session.get("feedback_at"),
+        }
+
+    feedback_dir = _feedback_log_dir()
+    if os.path.isdir(feedback_dir):
+        for filename in os.listdir(feedback_dir):
+            if not filename.endswith(".json"):
+                continue
+            path = os.path.join(feedback_dir, filename)
+            try:
+                with open(path, encoding="utf-8") as feedback_file:
+                    record = json.load(feedback_file)
+            except (OSError, json.JSONDecodeError):
+                continue
+            student_id = str(record.get("student_id", "guest"))
+            session_id = str(record.get("session_id", ""))
+            records_by_key[(student_id, session_id)] = {
+                "student_id": student_id,
+                "session_id": session_id,
+                "useful": bool(record.get("useful")),
+                "feedback": record.get("feedback") or ("thumbs_up" if record.get("useful") else "thumbs_down"),
+                "feedback_timestamp": record.get("feedback_timestamp"),
+            }
+
+    return list(records_by_key.values())
+
+
+def _feedback_summary(records: list[dict]) -> dict:
+    positive = sum(1 for record in records if record.get("useful") is True)
+    negative = sum(1 for record in records if record.get("useful") is False)
+    total = positive + negative
+    accuracy_score = round((positive / total) * 100, 1) if total else 0.0
+    return {
+        "positive": positive,
+        "negative": negative,
+        "total": total,
+        "accuracy_score": accuracy_score,
+        "mix": [
+            {"label": "Thumbs up", "count": positive},
+            {"label": "Thumbs down", "count": negative},
+        ],
+    }
+
+
+def _student_activity_metrics(session_events: list[dict], total_users: int, now: datetime | None = None) -> dict:
+    now = now or datetime.utcnow()
+    today = now.date()
+    since_24h = now - timedelta(hours=24)
+    since_7d = now - timedelta(days=7)
+    timestamps_by_student: dict[str, list[datetime]] = defaultdict(list)
+    dau_students: set[str] = set()
+    wau_students: set[str] = set()
+    active_24h_students: set[str] = set()
+    daily: dict[str, dict[str, object]] = {}
+
+    for offset in range(6, -1, -1):
+        date_key = (today - timedelta(days=offset)).isoformat()
+        daily[date_key] = {"date": date_key, "questions": 0, "active_users": set()}
+
+    for event in session_events:
+        student_id = str(event.get("student_id") or "guest")
+        created_at = _parse_datetime(event.get("created_at")) or now
+        timestamps_by_student[student_id].append(created_at)
+
+        if created_at >= since_24h:
+            active_24h_students.add(student_id)
+        if created_at.date() == today:
+            dau_students.add(student_id)
+        if created_at >= since_7d:
+            wau_students.add(student_id)
+        date_key = created_at.date().isoformat()
+        if date_key in daily:
+            daily[date_key]["questions"] += 1
+            daily[date_key]["active_users"].add(student_id)
+
+    study_session_count = sum(_count_study_sessions(items) for items in timestamps_by_student.values())
+    total_questions = len(session_events)
+    dau = len(dau_students)
+    wau = len(wau_students)
+    retained_users = wau
+    denominator = total_users or len(timestamps_by_student)
+
+    return {
+        "active_users_24h": len(active_24h_students),
+        "dau": dau,
+        "wau": wau,
+        "dau_wau_ratio": round((dau / wau) * 100, 1) if wau else 0.0,
+        "retention_rate": round((retained_users / denominator) * 100, 1) if denominator else 0.0,
+        "retained_users": retained_users,
+        "study_sessions": study_session_count,
+        "avg_questions_per_study_session": round(total_questions / study_session_count, 2) if study_session_count else 0,
+        "daily_activity": [
+            {
+                "date": row["date"],
+                "questions": int(row["questions"]),
+                "active_users": len(row["active_users"]),
+            }
+            for row in daily.values()
+        ],
+    }
+
+
+def _feedback_by_student(records: list[dict]) -> dict[str, dict[str, int | float]]:
+    grouped: dict[str, dict[str, int | float]] = defaultdict(lambda: {"positive": 0, "negative": 0, "total": 0, "accuracy_score": 0.0})
+    for record in records:
+        item = grouped[str(record.get("student_id", "guest"))]
+        if record.get("useful") is True:
+            item["positive"] += 1
+        elif record.get("useful") is False:
+            item["negative"] += 1
+        item["total"] = item["positive"] + item["negative"]
+        item["accuracy_score"] = round((item["positive"] / item["total"]) * 100, 1) if item["total"] else 0.0
+    return grouped
+
+
 async def _require_admin(current_student=Depends(get_current_student)):
     if not is_admin_email(current_student.email):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return current_student
 
 
+def _build_fallback_dashboard_payload() -> dict:
+    sessions = in_memory_store.get("sessions", [])
+    caches = in_memory_store.get("caches", {})
+    weak_topics = in_memory_store.get("weak_topics", {})
+    now = datetime.utcnow()
+    feedback = _feedback_summary(_load_feedback_records())
+    activity = _student_activity_metrics(sessions, len({session.get("student_id", "guest") for session in sessions}), now)
+
+    grouped_subjects: dict[str, int] = defaultdict(int)
+    grouped_users: dict[str, int] = defaultdict(int)
+    for session in sessions:
+        subject = session.get("subject") or "General"
+        grouped_subjects[subject] += 1
+        grouped_users[session.get("student_id", "guest")] += 1
+
+    top_subjects = [{"subject": subject, "questions": count} for subject, count in sorted(grouped_subjects.items(), key=lambda item: item[1], reverse=True)[:8]]
+    top_users = [{"student_id": student_id, "questions": count} for student_id, count in sorted(grouped_users.items(), key=lambda item: item[1], reverse=True)[:10]]
+
+    source_counts: dict[str, int] = defaultdict(int)
+    for entry in caches.values():
+        source_counts[entry.get("source_type", "fallback")] += 1
+    source_mix = [{"source": source, "count": count} for source, count in source_counts.items()]
+
+    total_users = len(grouped_users) or 1
+    total_questions = len(sessions)
+    questions_24h = sum(1 for session in sessions if (_parse_datetime(session.get("created_at")) or now) >= now - timedelta(hours=24))
+    estimated_minutes_total = round(total_questions * 0.8, 2)
+
+    return {
+        "summary": {
+            "total_users": total_users,
+            "total_questions": total_questions,
+            "questions_24h": questions_24h,
+            "active_users_24h": activity["active_users_24h"],
+            "dau": activity["dau"],
+            "wau": activity["wau"],
+            "dau_wau_ratio": activity["dau_wau_ratio"],
+            "retention_rate": activity["retention_rate"],
+            "retained_users": activity["retained_users"],
+            "study_sessions": activity["study_sessions"],
+            "engagement_rate": activity["avg_questions_per_study_session"],
+            "accuracy_score": feedback["accuracy_score"],
+            "feedback_total": feedback["total"],
+            "thumbs_up": feedback["positive"],
+            "thumbs_down": feedback["negative"],
+            "avg_questions_per_user": round(total_questions / total_users, 2) if total_users else 0,
+            "estimated_minutes_total": estimated_minutes_total,
+            "cache_entries": len(caches),
+            "cache_hits_total": sum(1 for _ in caches.values()),
+        },
+        "top_subjects": top_subjects,
+        "top_users": top_users,
+        "answer_source_mix": source_mix or [{"source": "fallback", "count": 1}],
+        "feedback_mix": feedback["mix"],
+        "daily_activity": activity["daily_activity"],
+    }
+
+
+def _build_fallback_users_payload() -> dict:
+    sessions = in_memory_store.get("sessions", [])
+    weak_topics = in_memory_store.get("weak_topics", {})
+    feedback = _feedback_by_student(_load_feedback_records())
+    sessions_by_student: dict[str, list[dict]] = defaultdict(list)
+    for session in sessions:
+        sessions_by_student[session.get("student_id", "guest")].append(session)
+
+    users_data = []
+    for student_id, student_sessions in sessions_by_student.items():
+        subject_counts: dict[str, int] = defaultdict(int)
+        for session in student_sessions:
+            subject_counts[session.get("subject") or "General"] += 1
+        recent_qs = [item.get("question") for item in student_sessions[-5:]]
+        timestamps = [_parse_datetime(item.get("created_at")) for item in student_sessions]
+        timestamps = [item for item in timestamps if item]
+        users_data.append({
+            "id": student_id,
+            "name": student_id.split("@", 1)[0].replace(".", " ").title() if "@" in student_id else student_id,
+            "email": student_id,
+            "class_level": "10",
+            "medium": "Hindi",
+            "joined": None,
+            "total_questions": len(student_sessions),
+            "estimated_minutes": round(len(student_sessions) * 0.8, 2),
+            "subjects": dict(subject_counts),
+            "weak_topics": weak_topics.get(student_id, []),
+            "recent_questions": recent_qs,
+            "last_active": max(timestamps).isoformat() if timestamps else None,
+            "feedback": feedback.get(student_id, {"positive": 0, "negative": 0, "total": 0, "accuracy_score": 0.0}),
+        })
+
+    users_data.sort(key=lambda item: item["total_questions"], reverse=True)
+    return {"users": users_data, "total": len(users_data)}
+
+
 @router.get("/dashboard")
 async def admin_dashboard(admin=Depends(_require_admin), db: AsyncSession = Depends(get_db)):
+    if db is None:
+        return _build_fallback_dashboard_payload()
     now = datetime.utcnow()
     since_24h = now - timedelta(hours=24)
 
@@ -78,11 +335,15 @@ async def admin_dashboard(admin=Depends(_require_admin), db: AsyncSession = Depe
 
     sessions_for_time = await db.execute(select(ChatSession.student_id, ChatSession.created_at).order_by(ChatSession.created_at.asc()))
     grouped: dict[str, list[datetime]] = defaultdict(list)
+    session_events: list[dict] = []
     for student_id, created_at in sessions_for_time.all():
         if created_at:
             grouped[student_id].append(created_at)
+        session_events.append({"student_id": student_id, "created_at": created_at})
 
     estimated_minutes_total = round(sum(_estimated_minutes_per_user(items) for items in grouped.values()), 2)
+    activity = _student_activity_metrics(session_events, int(total_users), now)
+    feedback = _feedback_summary(_load_feedback_records())
 
     return {
         "summary": {
@@ -90,6 +351,17 @@ async def admin_dashboard(admin=Depends(_require_admin), db: AsyncSession = Depe
             "total_questions": int(total_questions),
             "questions_24h": int(questions_24h),
             "active_users_24h": int(active_users_24h),
+            "dau": activity["dau"],
+            "wau": activity["wau"],
+            "dau_wau_ratio": activity["dau_wau_ratio"],
+            "retention_rate": activity["retention_rate"],
+            "retained_users": activity["retained_users"],
+            "study_sessions": activity["study_sessions"],
+            "engagement_rate": activity["avg_questions_per_study_session"],
+            "accuracy_score": feedback["accuracy_score"],
+            "feedback_total": feedback["total"],
+            "thumbs_up": feedback["positive"],
+            "thumbs_down": feedback["negative"],
             "avg_questions_per_user": round((total_questions / total_users), 2) if total_users else 0,
             "estimated_minutes_total": estimated_minutes_total,
             "cache_entries": int(cache_entries),
@@ -98,12 +370,17 @@ async def admin_dashboard(admin=Depends(_require_admin), db: AsyncSession = Depe
         "top_subjects": top_subjects,
         "top_users": top_users,
         "answer_source_mix": source_mix,
+        "feedback_mix": feedback["mix"],
+        "daily_activity": activity["daily_activity"],
     }
 
 
 @router.get("/users")
 async def admin_users(admin=Depends(_require_admin), db: AsyncSession = Depends(get_db)):
     """Per-user breakdown: name, class, questions, subjects, time, weak topics, last active."""
+    if db is None:
+        return _build_fallback_users_payload()
+
     students_result = await db.execute(select(Student).order_by(Student.created_at.desc()))
     students = students_result.scalars().all()
 
@@ -115,6 +392,7 @@ async def admin_users(admin=Depends(_require_admin), db: AsyncSession = Depends(
 
     weak_topics_result = await db.execute(select(WeakTopic.student_id, WeakTopic.subject, WeakTopic.topic))
     all_weak = weak_topics_result.all()
+    feedback = _feedback_by_student(_load_feedback_records())
 
     # Group sessions by student
     sessions_by_student: dict[str, list] = defaultdict(list)
@@ -153,11 +431,85 @@ async def admin_users(admin=Depends(_require_admin), db: AsyncSession = Depends(
             "weak_topics": weak_by_student.get(sid, []),
             "recent_questions": recent_qs,
             "last_active": last_active,
+            "feedback": feedback.get(sid, {"positive": 0, "negative": 0, "total": 0, "accuracy_score": 0.0}),
         })
 
     # sort by total questions desc
     users_data.sort(key=lambda u: u["total_questions"], reverse=True)
     return {"users": users_data, "total": len(users_data)}
+
+
+@router.get("/export-student-metrics")
+async def export_student_metrics(admin=Depends(_require_admin), db: AsyncSession = Depends(get_db)):
+    dashboard = await admin_dashboard(admin, db)
+    users_payload = await admin_users(admin, db)
+    summary = dashboard.get("summary", {})
+    users = users_payload.get("users", [])
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["VidyaAI Student Metrics Export", datetime.utcnow().isoformat()])
+    writer.writerow([])
+    writer.writerow(["Metric", "Value"])
+    for label, key in [
+        ("Total Users", "total_users"),
+        ("Total Questions", "total_questions"),
+        ("Questions 24h", "questions_24h"),
+        ("DAU", "dau"),
+        ("WAU", "wau"),
+        ("DAU/WAU %", "dau_wau_ratio"),
+        ("Retention Rate %", "retention_rate"),
+        ("Study Sessions", "study_sessions"),
+        ("Engagement Rate", "engagement_rate"),
+        ("Accuracy Score %", "accuracy_score"),
+        ("Thumbs Up", "thumbs_up"),
+        ("Thumbs Down", "thumbs_down"),
+    ]:
+        writer.writerow([label, summary.get(key, 0)])
+
+    writer.writerow([])
+    writer.writerow([
+        "Rank",
+        "Name",
+        "Email",
+        "Class",
+        "Medium",
+        "Questions",
+        "Estimated Minutes",
+        "Subjects",
+        "Weak Topics",
+        "Last Active",
+        "Thumbs Up",
+        "Thumbs Down",
+        "Feedback Total",
+        "Accuracy Score %",
+    ])
+    for index, user in enumerate(users, start=1):
+        feedback = user.get("feedback") or {}
+        writer.writerow([
+            index,
+            user.get("name", ""),
+            user.get("email", ""),
+            user.get("class_level", ""),
+            user.get("medium", ""),
+            user.get("total_questions", 0),
+            user.get("estimated_minutes", 0),
+            "; ".join(f"{subject}: {count}" for subject, count in (user.get("subjects") or {}).items()),
+            "; ".join(user.get("weak_topics") or []),
+            user.get("last_active") or "",
+            feedback.get("positive", 0),
+            feedback.get("negative", 0),
+            feedback.get("total", 0),
+            feedback.get("accuracy_score", 0),
+        ])
+
+    output.seek(0)
+    filename = f"vidyaai_student_metrics_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/export-training-data")
