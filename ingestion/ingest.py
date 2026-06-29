@@ -163,15 +163,15 @@ def _metadata_from_filename(path: str) -> Dict[str, str]:
     return meta
 
 
-def extract_text_from_pdf(path: str) -> str:
+def extract_text_from_pdf(path: str, enable_ocr: bool = False) -> str:
     text = []
     ocr_available = True
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
             page_text = page.extract_text()
-            if not page_text or _looks_garbled(page_text):
+            if enable_ocr and (not page_text or _looks_garbled(page_text)):
                 if ocr_available:
-                    image = page.to_image(resolution=300)
+                    image = page.to_image(resolution=150)
                     try:
                         page_text = pytesseract.image_to_string(image.original, lang="hin+eng")
                     except pytesseract.TesseractNotFoundError:
@@ -399,10 +399,12 @@ def get_qdrant_client() -> QdrantClient:
         return QdrantClient(path=fallback_path)
 
 
-def ingest_file(path: str):
-    text = extract_text_from_pdf(path)
+def ingest_file(path: str, enable_ocr: bool = False):
+    print(f"Extracting text from {path} (OCR {'enabled' if enable_ocr else 'disabled'})...", flush=True)
+    text = extract_text_from_pdf(path, enable_ocr=enable_ocr)
     file_metadata = _metadata_from_filename(path)
     chunks = chunk_text_with_metadata(text, file_metadata)
+    print(f"Prepared {len(chunks)} chunks from {path}.", flush=True)
     client = get_qdrant_client()
     create_qdrant_collection(client)
     source_file = os.path.basename(path)
@@ -433,8 +435,9 @@ def ingest_file(path: str):
 def main():
     parser = argparse.ArgumentParser(description="Ingest CGBSE textbook PDF into Qdrant.")
     parser.add_argument("--file", required=True, help="Path to textbook PDF under ingestion/data/textbooks")
+    parser.add_argument("--enable-ocr", action="store_true", help="Render pages and OCR garbled text. Uses much more memory.")
     args = parser.parse_args()
-    ingest_file(os.path.join(os.path.dirname(__file__), "data", "textbooks", args.file))
+    ingest_file(os.path.join(os.path.dirname(__file__), "data", "textbooks", args.file), enable_ocr=args.enable_ocr)
 
 
 if __name__ == "__main__":
