@@ -121,13 +121,6 @@ const dailyTargets = [
   ],
 ];
 
-const previousPapers = [
-  { year: "2025", subject: "Hindi", title: "Hindi Board Paper", prompt: "Class 10 Hindi previous year paper 2025 से 5 important questions practice कराइए" },
-  { year: "2024", subject: "Science", title: "Science Board Paper", prompt: "Class 10 Science previous year paper 2024 pattern से important questions पूछिए" },
-  { year: "2024", subject: "Math", title: "Math Board Paper", prompt: "Class 10 Math previous year paper 2024 से 5 exam questions practice कराइए" },
-  { year: "2023", subject: "Social Science", title: "Social Science Paper", prompt: "Class 10 Social Science previous year paper 2023 से revision test लीजिए" },
-];
-
 const subjects = [
   { id: "Hindi", hi: "हिंदी", en: "Hindi" },
   { id: "Science", hi: "विज्ञान", en: "Science" },
@@ -216,12 +209,15 @@ export default function Dashboard() {
   const [isGuest, setIsGuest] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminStats, setAdminStats] = useState(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [examDate, setExamDate] = useState(() => localStorage.getItem("vidyaai_exam_date") || defaultExamDate());
   const [completedTargets, setCompletedTargets] = useState(() => readJson(`vidyaai_targets_${dateKey()}`, []));
   const [streak, setStreak] = useState(() => readJson("vidyaai_streak", { count: 0, lastActive: "" }));
   const [selectedSubject, setSelectedSubject] = useState("Hindi");
   const [answerStyle, setAnswerStyle] = useState("exam");
   const windowRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const profileMenuRef = useRef(null);
 
   const t = translations[lang];
   const todayIndex = Math.floor(new Date().getTime() / 86400000) % dailyTargets.length;
@@ -231,6 +227,9 @@ export default function Dashboard() {
   const askedQuestions = messages.filter((message) => message.role === "student");
   const recentQuestions = askedQuestions.slice(-4).reverse();
   const selectedSubjectSamples = subjectQuestionSamples[selectedSubject] || [];
+  const chatSuggestions = selectedSubjectSamples.length
+    ? selectedSubjectSamples.map((sample) => sample[lang])
+    : suggestionChips.map((chip) => chip[lang]);
 
   const inferSubject = (text) => {
     const q = (text || "").toLowerCase();
@@ -284,8 +283,37 @@ export default function Dashboard() {
   }, [isAdmin]);
 
   useEffect(() => {
-    if (!windowRef.current) return;
-    windowRef.current.scrollTop = windowRef.current.scrollHeight;
+    if (!showProfileMenu) return;
+
+    const handlePointerDown = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showProfileMenu]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ block: "end" });
+      } else if (windowRef.current) {
+        windowRef.current.scrollTop = windowRef.current.scrollHeight;
+      }
+    });
+    return () => cancelAnimationFrame(frame);
   }, [messages, isLoading]);
 
   useEffect(() => {
@@ -345,6 +373,7 @@ export default function Dashboard() {
     setStudentProfile(null);
     setStudentName("अतिथि विद्यार्थी");
     setIsGuest(true);
+    setShowProfileMenu(false);
     navigate("/login");
   };
 
@@ -397,11 +426,6 @@ export default function Dashboard() {
     const optionSubject = option.subject || selectedSubject || "Hindi";
     setSelectedSubject(optionSubject);
     await askQuestion(option.prompt || `class 10 ${optionSubject} chapter ${option.section}`, optionSubject);
-  };
-
-  const handlePaperPractice = async (paper) => {
-    setSelectedSubject(paper.subject);
-    await askQuestion(paper.prompt, paper.subject);
   };
 
   const handleFeedback = async (messageIndex, sessionId, understood) => {
@@ -461,18 +485,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="sidebar-section papers-sidebar-section">
-          <p>{t.papersTitle}</p>
-          <div className="paper-list compact">
-            {previousPapers.map((paper) => (
-              <button key={`${paper.subject}-${paper.year}`} type="button" onClick={() => handlePaperPractice(paper)}>
-                <span>{paper.year}</span>
-                <strong>{paper.subject}</strong>
-                <small>{t.startPaper}</small>
-              </button>
-            ))}
-          </div>
-        </div>
       </aside>
 
       <section className="dashboard-main-chat">
@@ -488,20 +500,45 @@ export default function Dashboard() {
           <div className="top-actions">
             <div className="mobile-brand-mark" aria-label="VidyaAI">वि</div>
 
-            <button type="button" className="mobile-profile-chip" onClick={() => isGuest && navigate("/login")} title={t.profileTitle}>
-              <span className="mobile-profile-avatar" aria-hidden="true">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
-              </span>
-              <span className="mobile-profile-copy">
-                <strong>{studentName}</strong>
-                <small>कक्षा {studentProfile?.class_level || "10"} • {studentProfile?.medium || "Hindi"}</small>
-              </span>
-            </button>
+            <div className="mobile-profile-wrap" ref={profileMenuRef}>
+              <button type="button" className="mobile-profile-chip" onClick={() => setShowProfileMenu((open) => !open)} title={t.profileTitle} aria-expanded={showProfileMenu}>
+                <span className="mobile-profile-avatar" aria-hidden="true">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+                </span>
+                <span className="mobile-profile-copy">
+                  <strong>{studentName}</strong>
+                  <small>कक्षा {studentProfile?.class_level || "10"} • {studentProfile?.medium || "Hindi"}</small>
+                </span>
+              </button>
 
-            <button type="button" className="mobile-new-chat-btn" onClick={handleNewChat} title={t.newChat}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-              <span>{lang === "hi" ? "नई चैट" : "New"}</span>
-            </button>
+              {showProfileMenu && (
+                <div className="mobile-profile-menu">
+                  <div className="mobile-profile-menu-head">
+                    <strong>{studentName}</strong>
+                    <span>{isGuest ? t.profileLabels.guest : t.profileLabels.loggedIn}</span>
+                  </div>
+                  <dl>
+                    <div><dt>{t.profileLabels.class}</dt><dd>{studentProfile?.class_level || "10"}</dd></div>
+                    <div><dt>{t.profileLabels.medium}</dt><dd>{studentProfile?.medium || "Hindi"}</dd></div>
+                    <div><dt>Board</dt><dd>CGBSE</dd></div>
+                  </dl>
+                  {isAdmin && (
+                    <button type="button" onClick={() => { setShowProfileMenu(false); navigate("/admin"); }}>
+                      Admin Panel
+                    </button>
+                  )}
+                  {isGuest ? (
+                    <button type="button" onClick={() => { setShowProfileMenu(false); navigate("/login"); }}>
+                      Login
+                    </button>
+                  ) : (
+                    <button type="button" onClick={handleLogout}>
+                      Logout
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
 
             <button type="button" className="icon-btn top-icon-btn" onClick={() => setLang((l) => l === "hi" ? "en" : "hi")} title="Switch Language">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -537,13 +574,6 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
-          <div className="mobile-sample-strip">
-            {selectedSubjectSamples.slice(0, 3).map((sample) => (
-              <button key={sample.en} type="button" onClick={() => setQuestion(sample[lang])}>
-                {sample[lang]}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div className="answer-style-bar">
@@ -556,15 +586,6 @@ export default function Dashboard() {
               onClick={() => setAnswerStyle(style.id)}
             >
               {style[lang]}
-            </button>
-          ))}
-        </div>
-
-        <div className="mobile-paper-strip" aria-label="previous-year-papers">
-          {previousPapers.map((paper) => (
-            <button key={`${paper.subject}-${paper.year}-mobile`} type="button" onClick={() => handlePaperPractice(paper)}>
-              <span>{paper.year}</span>
-              <strong>{paper.subject}</strong>
             </button>
           ))}
         </div>
@@ -684,12 +705,17 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+              <div ref={messagesEndRef} className="chat-scroll-anchor" aria-hidden="true" />
             </div>
 
             <div className="suggestion-strip">
-              {suggestionChips.map((chip) => (
-                <button key={chip.en} type="button" onClick={() => setQuestion(chip[lang])}>
-                  {chip[lang]}
+              <button type="button" className="suggestion-new-chat" onClick={handleNewChat}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                {lang === "hi" ? "नई चैट" : "New Chat"}
+              </button>
+              {chatSuggestions.map((suggestion) => (
+                <button key={suggestion} type="button" onClick={() => setQuestion(suggestion)}>
+                  {suggestion}
                 </button>
               ))}
             </div>
