@@ -508,6 +508,28 @@ export default function Dashboard() {
           </div>
         </header>
 
+        <div className="mobile-study-controls" aria-label="study-controls">
+          <div className="mobile-subject-strip">
+            {subjects.map((subject) => (
+              <button
+                key={subject.id}
+                type="button"
+                className={selectedSubject === subject.id ? "active" : ""}
+                onClick={() => setSelectedSubject(subject.id)}
+              >
+                {subject[lang]}
+              </button>
+            ))}
+          </div>
+          <div className="mobile-sample-strip">
+            {selectedSubjectSamples.slice(0, 3).map((sample) => (
+              <button key={sample.en} type="button" onClick={() => setQuestion(sample[lang])}>
+                {sample[lang]}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="answer-style-bar">
           <span>उत्तर शैली:</span>
           {answerStyles.map((style) => (
