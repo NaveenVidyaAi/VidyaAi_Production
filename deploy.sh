@@ -6,7 +6,7 @@
 set -e
 
 APP_DIR="/opt/vidyaai"
-REPO_URL="https://github.com/YOUR_USERNAME/vidyaai-cgbse.git"   # ← update this
+REPO_URL="https://github.com/NaveenVidyaAi/VidyaAi_Production.git"
 
 echo "=== VidyaAI Deploy ==="
 
