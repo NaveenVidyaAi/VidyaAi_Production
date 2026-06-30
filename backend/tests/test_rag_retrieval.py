@@ -76,10 +76,41 @@ class RAGRetrievalTests(unittest.TestCase):
             "two",
         )
 
-        self.assertIn("2-Mark Answer", answer)
+        self.assertNotIn("2-Mark Answer", answer)
         self.assertIn("1. First important point", answer)
         self.assertIn("2. Second important point", answer)
         self.assertNotIn("Extra point", answer)
+
+    def test_followup_reference_is_contextualized_with_previous_chapter(self):
+        history = [
+            {
+                "question": "class 10 hindi chapter 3.2 कन्यादान",
+                "answer": "कन्यादान कविता मां और बेटी के संबंध पर आधारित है।",
+                "subject": "Hindi",
+            }
+        ]
+
+        question = chat._contextualize_followup_question(
+            "give me 5 question and answers of this chapter",
+            history,
+        )
+
+        self.assertIn("class 10 hindi chapter 3.2 कन्यादान", question)
+        self.assertIn("Follow-up request", question)
+
+    def test_hinglish_application_request_uses_hindi_school_format(self):
+        requested = rag._requested_format_for_question("application likho principle ko", "General")
+
+        self.assertIsNotNone(requested)
+        self.assertIn("Hindi school format", requested)
+        self.assertIn("सेवा में", requested)
+
+    def test_definition_request_gets_definition_format(self):
+        requested = rag._requested_format_for_question("प्रकाश संश्लेषण किसे कहते हैं", "Science")
+
+        self.assertIsNotNone(requested)
+        self.assertIn("proper exam definition", requested)
+        self.assertIn("2-4 lines", requested)
 
     def test_recent_history_keeps_last_two_student_questions(self):
         original_sessions = chat.in_memory_store["sessions"]
@@ -145,7 +176,8 @@ class RAGRetrievalTests(unittest.TestCase):
         self.assertIn("student's requested format or wording has priority", prompt_text)
         self.assertIn("Recent conversation context", prompt_text)
         self.assertIn("Previous Q1: What is x?", prompt_text)
-        self.assertIn("maths questions, solve carefully step by step", prompt_text.lower())
+        self.assertIn("for maths questions, solve carefully", prompt_text.lower())
+        self.assertIn("2-3 maths questions together", prompt_text.lower())
         self.assertIn("Step 1", answer)
 
     def test_essay_request_replaces_standard_exam_template(self):

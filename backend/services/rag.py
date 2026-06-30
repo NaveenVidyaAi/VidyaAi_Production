@@ -379,13 +379,13 @@ def _answer_format_for_style(subject: str, answer_style: str) -> str:
                 "3) Main idea (1-2 lines)"
             ),
             "two": (
-                "Answer as a 2-mark exam answer:\n"
+                "Use the selected 2-mark style without saying '2-mark answer' in the response:\n"
                 "1) Write 2-3 concise lines only\n"
                 "2) Include the most important point\n"
                 "3) Do not add long explanation or extra Q&A"
             ),
             "five": (
-                "Answer as a 5-mark exam answer:\n"
+                "Use the selected 5-mark style without saying '5-mark answer' in the response:\n"
                 "1) Title\n"
                 "2) Introduction (1-2 lines)\n"
                 "3) Explanation in 5-7 bullet points\n"
@@ -414,13 +414,13 @@ def _answer_format_for_style(subject: str, answer_style: str) -> str:
                 "3) मुख्य भाव (1-2 पंक्तियां)"
             ),
             "two": (
-                "2 अंक के परीक्षा उत्तर की तरह लिखें:\n"
+                "चुनी हुई 2 अंक शैली में लिखें, लेकिन उत्तर में '2 अंक का उत्तर' न लिखें:\n"
                 "1) केवल 2-3 संक्षिप्त पंक्तियां\n"
                 "2) सबसे जरूरी बात शामिल करें\n"
                 "3) लंबी व्याख्या या अतिरिक्त प्रश्नोत्तर न दें"
             ),
             "five": (
-                "5 अंक के परीक्षा उत्तर की तरह लिखें:\n"
+                "चुनी हुई 5 अंक शैली में लिखें, लेकिन उत्तर में '5 अंक का उत्तर' न लिखें:\n"
                 "1) शीर्षक\n"
                 "2) भूमिका (1-2 पंक्तियां)\n"
                 "3) 5-7 मुख्य बिंदुओं में व्याख्या\n"
@@ -446,7 +446,17 @@ def _answer_format_for_style(subject: str, answer_style: str) -> str:
 
 def _requested_format_for_question(question: str, subject: str) -> str | None:
     normalized = re.sub(r"\s+", " ", question or "").strip().lower()
-    is_hindi_request = bool(re.search(r"[\u0900-\u097f]", question or "")) or (subject or "").lower() == "hindi"
+    hinglish_hindi_request = bool(
+        re.search(
+            r"\b(likho|likh|batao|samjhao|kya|kaise|ko|ke\s+liye|principal|principle|pradhanacharya|adhyaksh|school)\b",
+            normalized,
+        )
+    )
+    is_hindi_request = (
+        bool(re.search(r"[\u0900-\u097f]", question or ""))
+        or (subject or "").lower() == "hindi"
+        or hinglish_hindi_request
+    )
 
     if re.search(r"\b(essay|assay|paragraph)\b|निबंध|अनुच्छेद", normalized):
         if is_hindi_request:
@@ -467,10 +477,10 @@ def _requested_format_for_question(question: str, subject: str) -> str | None:
             "Do not add summary, key points, Q&A, practice questions, or bullet lists unless the student explicitly asks for them."
         )
 
-    if re.search(r"\b(letter|application)\b|पत्र|आवेदन", normalized):
+    if re.search(r"\b(letter|application|applicaton|aplication)\b|पत्र|आवेदन", normalized):
         if is_hindi_request:
             return (
-                "The student asked for a letter/application. Answer only in proper school format:\n"
+                "The student asked for a letter/application, possibly in Hinglish. Answer only in proper Hindi school format:\n"
                 "1) प्रेषक का पता\n"
                 "2) दिनांक\n"
                 "3) प्राप्तकर्ता/सेवा में\n"
@@ -490,6 +500,23 @@ def _requested_format_for_question(question: str, subject: str) -> str | None:
             "6) Body in paragraphs\n"
             "7) Closing and name\n"
             "Do not add summary, key points, Q&A, or practice questions."
+        )
+
+    if re.search(r"\b(definition|define|meaning|what is|kise kahte|kya hota|kya hai)\b|परिभाषा|किसे कहते|क्या होता|क्या है", normalized):
+        if is_hindi_request:
+            return (
+                "The student asked for a definition. Give a proper exam definition:\n"
+                "1) Start directly with '<term> वह/उसे कहते हैं...' or '<term> का अर्थ है...'\n"
+                "2) Keep it precise and complete in 2-4 lines\n"
+                "3) Add one short example only if it improves the definition\n"
+                "Do not add unrelated summary, Q&A, or practice questions."
+            )
+        return (
+            "The student asked for a definition. Give a proper exam definition:\n"
+            "1) Start directly with '<term> is/means...'\n"
+            "2) Keep it precise and complete in 2-4 lines\n"
+            "3) Add one short example only if it improves the definition\n"
+            "Do not add unrelated summary, Q&A, or practice questions."
         )
 
     if re.search(r"\b(grammar|tense|voice|narration|correct|fill in|rewrite|change into)\b|व्याकरण|काल|वाच्य|रिक्त|शुद्ध", normalized):
@@ -526,7 +553,6 @@ def _coerce_answer_to_style(answer: str, subject: str, answer_style: str) -> str
     if style != "two":
         return answer
 
-    is_english = (subject or "").lower() == "english"
     cleaned = re.sub(r"(?i)^answer as a 2-?mark exam answer:\s*", "", answer or "").strip()
     cleaned = re.sub(r"(?i)^2-?mark answer:\s*", "", cleaned).strip()
     cleaned = re.sub(r"(?i)^vocabulary:.*$", "", cleaned, flags=re.DOTALL).strip()
@@ -542,8 +568,7 @@ def _coerce_answer_to_style(answer: str, subject: str, answer_style: str) -> str
     if not compact:
         compact = cleaned[:320]
 
-    title = "**2-Mark Answer**" if is_english else "**2 अंक का उत्तर**"
-    return f"{title}\n\n{compact}"
+    return compact
 
 
 def _tokenize(text: str) -> set[str]:
@@ -603,7 +628,6 @@ def _science_chapter_2_overview(answer_style: str) -> str:
     style = _normalize_answer_style(answer_style)
     if style == "two":
         return (
-            "**2 अंक का उत्तर**\n\n"
             "1. कक्षा 10 विज्ञान अध्याय 2 में अम्ल, क्षार और लवण के गुण, सूचक और pH मान समझाए गए हैं।\n"
             "2. इसमें उदासीनीकरण, लवणों की प्रकृति और दैनिक जीवन में इनके उपयोग पढ़े जाते हैं।"
         )
@@ -645,7 +669,7 @@ def _science_chapter_2_fallback(contexts: list[str], answer_style: str) -> str:
     excerpt = _clean_fallback_excerpt(contexts[0])
     style = _normalize_answer_style(answer_style)
     if style == "two":
-        return f"**2 अंक का उत्तर**\n\n{excerpt[:260]}"
+        return excerpt[:260]
     if style == "summary":
         return f"**अध्याय 2: अम्ल, क्षार और लवण**\n\n{excerpt}"
     return (
@@ -952,8 +976,13 @@ def _groq_answer(
         "Read the student's question carefully before choosing the final format. "
         "If the student asks for step-by-step solution, points, short note, topic-only explanation, letter, application, essay, grammar exercise, translation, or any specific format, follow that requested format first. "
         "If no specific format is requested, use the selected answer style. "
-        "For maths questions, solve carefully step by step, show the working clearly, and avoid skipping reasoning. "
-        "For English or Hindi letter, application, essay, or grammar tasks, answer in the proper school format requested by the question."
+        "Do not announce the selected style with headings like '2-mark answer' or '5-mark answer'; simply write in that length and structure. "
+        "For maths questions, solve carefully. For a single maths question, show enough working unless the student asks for only the final answer. "
+        "If the student asks 2-3 maths questions together, or says 'just solve'/'only answer', give concise numbered solutions and final answers; add detailed explanation only when explicitly requested. "
+        "Understand Hinglish requests such as 'application likho principal ko' as Hindi school-writing tasks unless English is explicitly requested. "
+        "For definitions, start with a proper definition sentence and keep it precise. "
+        "For English or Hindi letter, application, essay, or grammar tasks, answer in the proper school format requested by the question. "
+        "When the student says 'this chapter' or similar, use the recent conversation context to identify the chapter/topic."
     )
 
     if has_context:
@@ -1019,10 +1048,9 @@ def _groq_answer(
             excerpt = re.sub(r"\s+", " ", excerpt)[:700]
             style = _normalize_answer_style(answer_style)
             if style == "two":
-                return f"**2-Mark Answer**\n\n{excerpt[:260]}"
+                return excerpt[:260]
             if style == "five":
                 return (
-                    "**5-Mark Answer**\n\n"
                     f"**Introduction:** {excerpt[:180]}\n\n"
                     "**Key Points**\n"
                     "1. Read the chapter context carefully.\n"
@@ -1050,10 +1078,9 @@ def _groq_answer(
 
         style = _normalize_answer_style(answer_style)
         if style == "two":
-            return f"**2 अंक का उत्तर**\n\n{excerpt[:260]}"
+            return excerpt[:260]
         if style == "five":
             return (
-                "**5 अंक का उत्तर**\n\n"
                 f"**भूमिका:** {excerpt[:180]}\n\n"
                 "**मुख्य बिंदु**\n"
                 "1. पाठ के मुख्य भाव को पहचानें।\n"
@@ -1109,7 +1136,17 @@ def _groq_answer(
                 data = response.json()
                 content = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
                 if content:
-                    return _coerce_answer_to_style(_squash_repetition(content), subject, answer_style), "groq"
+                    cleaned_content = _squash_repetition(content)
+                    explicit_detail_request = bool(
+                        re.search(
+                            r"\b(step\s*by\s*step|explain|explanation|samjhao|detail|detailed)\b|समझा|व्याख्या|विस्तार",
+                            question or "",
+                            flags=re.IGNORECASE,
+                        )
+                    )
+                    if requested_format or explicit_detail_request:
+                        return cleaned_content, "groq"
+                    return _coerce_answer_to_style(cleaned_content, subject, answer_style), "groq"
 
             # Retry on rate-limit and transient server errors.
             if response.status_code in (429, 500, 502, 503, 504) and attempt < 2:

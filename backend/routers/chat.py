@@ -76,7 +76,7 @@ def _recent_student_history(student_id: str, limit: int = 2) -> list[dict[str, s
     recent_sessions = sorted(student_sessions, key=lambda item: item["id"], reverse=True)[:limit]
     return [
         {
-            "question": str(session.get("question", "")),
+            "question": str(session.get("effective_question") or session.get("question", "")),
             "answer": str(session.get("answer", "")),
             "subject": str(session.get("subject", "")),
         }
@@ -91,6 +91,37 @@ def _history_for_question(student_id: str, question: str, limit: int = 2) -> lis
         for item in _recent_student_history(student_id, limit=limit + 2)
         if _normalize_question(item.get("question", "")) != normalized_question
     ][-limit:]
+
+
+def _is_followup_reference(question: str) -> bool:
+    normalized = re.sub(r"\s+", " ", (question or "").strip().lower())
+    return bool(
+        re.search(
+            r"\b(this|same|that)\s+(chapter|lesson|poem|story|topic)\b"
+            r"|\b(is|iss|us|usi)\s+(chapter|lesson|poem|story|topic|adhyay|path)\b"
+            r"|इस\s+(अध्याय|पाठ|कविता|कहानी|विषय)"
+            r"|इसी\s+(अध्याय|पाठ|कविता|कहानी|विषय)",
+            normalized,
+        )
+    )
+
+
+def _contextualize_followup_question(question: str, recent_history: list[dict[str, str]]) -> str:
+    if not recent_history or not _is_followup_reference(question):
+        return question
+
+    previous = recent_history[-1]
+    previous_question = str(previous.get("question", "")).strip()
+    previous_subject = str(previous.get("subject", "")).strip()
+    if not previous_question:
+        return question
+
+    subject_prefix = f"Previous subject: {previous_subject}\n" if previous_subject else ""
+    return (
+        f"{subject_prefix}"
+        f"Previous chapter/topic question: {previous_question}\n"
+        f"Follow-up request: {question}"
+    )
 
 
 def _feedback_log_path(student_id: str, session_id: int) -> str:
@@ -147,7 +178,6 @@ async def ask(request: AskRequest, current_student=Depends(get_current_student_o
             effective_subject = selected_option.get("subject") or request.subject
             in_memory_store["pending_chapter_options"].pop(current_student.id, None)
 
-    normalized_question = _normalize_question(effective_question)
     chapter_options = get_unit_options(effective_subject, effective_question, current_student.class_level)
     if chapter_options:
         created_at = datetime.utcnow().isoformat()
@@ -181,6 +211,8 @@ async def ask(request: AskRequest, current_student=Depends(get_current_student_o
         )
 
     recent_history = _history_for_question(current_student.id, effective_question)
+    effective_question = _contextualize_followup_question(effective_question, recent_history)
+    normalized_question = _normalize_question(effective_question)
     history_signature = tuple(
         _normalize_question(item.get("question", "")) for item in recent_history
     )
@@ -203,6 +235,7 @@ async def ask(request: AskRequest, current_student=Depends(get_current_student_o
                 "id": session_id,
                 "student_id": current_student.id,
                 "question": request.question,
+                "effective_question": effective_question,
                 "answer": cached_entry["answer"],
                 "subject": effective_subject,
                 "topic": "",
@@ -241,6 +274,7 @@ async def ask(request: AskRequest, current_student=Depends(get_current_student_o
             "id": session_id,
             "student_id": current_student.id,
             "question": request.question,
+            "effective_question": effective_question,
             "answer": answer,
             "subject": effective_subject,
             "topic": "",
