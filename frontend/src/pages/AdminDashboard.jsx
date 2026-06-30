@@ -115,6 +115,8 @@ function UserDrawer({ user, onClose }) {
           <StatCard label="Questions" value={user.total_questions} accent="#6366f1" />
           <StatCard label="Time Spent" value={`${user.estimated_minutes} min`} accent="#10b981" />
           <StatCard label="Accuracy" value={`${user.feedback?.accuracy_score ?? 0}%`} sub={`${user.feedback?.positive ?? 0} up / ${user.feedback?.negative ?? 0} down`} accent="#d95d39" />
+          <StatCard label="Quiz Score" value={`${user.quiz?.avg_quiz_score ?? 0}%`} sub={`${user.quiz?.quizzes_completed ?? 0}/${user.quiz?.quizzes_started ?? 0} completed`} accent="#2563eb" />
+          <StatCard label="Improvement" value={`${user.quiz?.improvement ?? 0}%`} sub={`Latest: ${user.quiz?.latest_quiz_score ?? 0}%`} accent="#126b52" />
           <StatCard label="Last Active" value={user.last_active ? new Date(user.last_active).toLocaleDateString("en-IN") : "Never"} accent="#f59e0b" />
           <StatCard label="Joined" value={user.joined ? new Date(user.joined).toLocaleDateString("en-IN") : "—"} accent="#3b82f6" />
         </div>
@@ -152,6 +154,7 @@ export default function AdminDashboard() {
   const [sourceMix, setSourceMix] = useState([]);
   const [feedbackMix, setFeedbackMix] = useState([]);
   const [dailyActivity, setDailyActivity] = useState([]);
+  const [quizSubjectPerformance, setQuizSubjectPerformance] = useState([]);
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [search, setSearch] = useState("");
@@ -178,6 +181,7 @@ export default function AdminDashboard() {
         setSourceMix(dash.data.answer_source_mix || []);
         setFeedbackMix(dash.data.feedback_mix || []);
         setDailyActivity(dash.data.daily_activity || []);
+        setQuizSubjectPerformance(dash.data.summary?.quiz_subject_performance || []);
         setUsers(userList.data.users || []);
       } catch (err) {
         if (err?.response?.status === 403) {
@@ -230,6 +234,8 @@ export default function AdminDashboard() {
     )
     .sort((a, b) => {
       const getValue = (user) => sortKey === "accuracy_score" ? (user.feedback?.accuracy_score ?? 0) : (user[sortKey] ?? 0);
+      if (sortKey === "avg_quiz_score") return (b.quiz?.avg_quiz_score ?? 0) - (a.quiz?.avg_quiz_score ?? 0);
+      if (sortKey === "improvement") return (b.quiz?.improvement ?? 0) - (a.quiz?.improvement ?? 0);
       return getValue(b) - getValue(a);
     });
 
@@ -261,6 +267,9 @@ export default function AdminDashboard() {
         <StatCard label="Accuracy Score" value={`${summary?.accuracy_score ?? 0}%`} sub={`${summary?.thumbs_up ?? 0} up / ${summary?.thumbs_down ?? 0} down`} accent="#d95d39" />
         <StatCard label="DAU / WAU" value={`${summary?.dau ?? 0} / ${summary?.wau ?? 0}`} sub={`${summary?.dau_wau_ratio ?? 0}% stickiness`} accent="#c07616" />
         <StatCard label="Study Sessions" value={summary?.study_sessions ?? 0} sub="30 min inactivity split" accent="#0f8c6b" />
+        <StatCard label="Quizzes Completed" value={summary?.quizzes_completed ?? 0} sub={`${summary?.quiz_completion_rate ?? 0}% completion`} accent="#2563eb" />
+        <StatCard label="Avg Quiz Score" value={`${summary?.avg_quiz_score ?? 0}%`} sub={`${summary?.avg_improvement ?? 0}% avg improvement`} accent="#126b52" />
+        <StatCard label="Skipped Quizzes" value={summary?.quizzes_skipped ?? 0} sub={`${summary?.quiz_skip_rate ?? 0}% skip rate`} accent="#d95d39" />
       </section>
 
       {/* ── Charts row ── */}
@@ -282,6 +291,10 @@ export default function AdminDashboard() {
           <h3>Feedback Accuracy Pie</h3>
           <DonutChart data={feedbackMix} labelKey="label" valueKey="count" />
         </div>
+        <div className="adm-chart-card">
+          <h3>Quiz Score by Subject</h3>
+          <BarChart data={quizSubjectPerformance} labelKey="subject" valueKey="avg_score" color="#126b52" />
+        </div>
       </section>
 
       {/* ── User table ── */}
@@ -299,6 +312,8 @@ export default function AdminDashboard() {
               <option value="total_questions">Sort: Most Questions</option>
               <option value="estimated_minutes">Sort: Most Time</option>
               <option value="accuracy_score">Sort: Accuracy Score</option>
+              <option value="avg_quiz_score">Sort: Quiz Score</option>
+              <option value="improvement">Sort: Improvement</option>
             </select>
           </div>
         </div>
@@ -316,6 +331,8 @@ export default function AdminDashboard() {
                 <th>Subjects</th>
                 <th>Weak Topics</th>
                 <th>Accuracy</th>
+                <th>Quiz</th>
+                <th>Improvement</th>
                 <th>Last Active</th>
                 <th></th>
               </tr>
@@ -344,6 +361,12 @@ export default function AdminDashboard() {
                     <td>
                       <span className="adm-badge adm-badge-amber">{u.feedback?.accuracy_score ?? 0}%</span>
                     </td>
+                    <td>
+                      <span className="adm-badge adm-badge-blue">{u.quiz?.avg_quiz_score ?? 0}%</span>
+                    </td>
+                    <td>
+                      <span className={`adm-badge ${(u.quiz?.improvement ?? 0) >= 0 ? "adm-badge-green" : "adm-badge-red"}`}>{u.quiz?.improvement ?? 0}%</span>
+                    </td>
                     <td className="adm-td-muted">
                       {u.last_active ? new Date(u.last_active).toLocaleDateString("en-IN") : "Never"}
                     </td>
@@ -354,7 +377,7 @@ export default function AdminDashboard() {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan="11" style={{ textAlign: "center", padding: "2rem", color: "#9ca3af" }}>No users found</td></tr>
+                <tr><td colSpan="13" style={{ textAlign: "center", padding: "2rem", color: "#9ca3af" }}>No users found</td></tr>
               )}
             </tbody>
           </table>

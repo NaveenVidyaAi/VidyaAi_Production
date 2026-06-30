@@ -64,5 +64,6 @@ feedback_logs/
 .docker/
 
 # ── Ingestion: keep code, ignore large raw PDF/text dumps ──────────────────────
+ingestion/data/*.jsonl
 ingestion/data/textbooks/*.txt
 ingestion/data/textbooks/*.pdf

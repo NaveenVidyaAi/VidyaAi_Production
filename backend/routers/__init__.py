@@ -1,1 +1,1 @@
-from backend.routers import auth, chat, profile, admin
+from backend.routers import auth, chat, profile, admin, quiz

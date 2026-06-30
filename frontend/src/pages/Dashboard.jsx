@@ -215,6 +215,7 @@ export default function Dashboard() {
   const [streak, setStreak] = useState(() => readJson("vidyaai_streak", { count: 0, lastActive: "" }));
   const [selectedSubject, setSelectedSubject] = useState("Hindi");
   const [answerStyle, setAnswerStyle] = useState("exam");
+  const [quizLoading, setQuizLoading] = useState(false);
   const windowRef = useRef(null);
   const messagesEndRef = useRef(null);
   const profileMenuRef = useRef(null);
@@ -230,6 +231,8 @@ export default function Dashboard() {
   const chatSuggestions = selectedSubjectSamples.length
     ? selectedSubjectSamples.map((sample) => sample[lang])
     : suggestionChips.map((chip) => chip[lang]);
+  const learningSubjects = studentProfile?.subject_activity || [];
+  const maxSubjectQuestions = Math.max(...learningSubjects.map((item) => item.questions || 0), 1);
 
   const inferSubject = (text) => {
     const q = (text || "").toLowerCase();
@@ -247,7 +250,12 @@ export default function Dashboard() {
         const response = await api.get("/auth/me");
         if (response?.data?.name) {
           setStudentName(response.data.name);
-          setStudentProfile(response.data);
+          let mergedProfile = response.data;
+          try {
+            const profileResponse = await api.get("/profile/summary");
+            mergedProfile = { ...response.data, ...profileResponse.data };
+          } catch {}
+          setStudentProfile(mergedProfile);
           if (response.data.exam_date) {
             const profileExamDate = dateKey(new Date(response.data.exam_date));
             setExamDate(profileExamDate);
@@ -337,6 +345,13 @@ export default function Dashboard() {
     localStorage.setItem("vidyaai_streak", JSON.stringify(nextStreak));
   };
 
+  const refreshLearningProfile = async () => {
+    try {
+      const profileResponse = await api.get("/profile/summary");
+      setStudentProfile((prev) => ({ ...(prev || {}), ...profileResponse.data }));
+    } catch {}
+  };
+
   const toggleTarget = (targetId) => {
     setCompletedTargets((prev) => {
       const next = prev.includes(targetId)
@@ -401,20 +416,24 @@ export default function Dashboard() {
         subject: outgoingSubject,
         answer_style: answerStyle,
       });
+      const assistantMessage = {
+        role: "assistant",
+        text: response?.data?.answer || t.welcomeMsg,
+        sessionId: response?.data?.session_id,
+        question: currentQuestion,
+        subject: outgoingSubject,
+        answerStyle,
+        chapterOptions: response?.data?.chapter_options || [],
+        feedback: null,
+      };
 
       setMessages((prev) => [
         ...prev,
-        {
-          role: "assistant",
-          text: response?.data?.answer || t.welcomeMsg,
-          sessionId: response?.data?.session_id,
-          question: currentQuestion,
-          subject: outgoingSubject,
-          answerStyle,
-          chapterOptions: response?.data?.chapter_options || [],
-          feedback: null,
-        },
+        assistantMessage,
       ]);
+      if (assistantMessage.sessionId && !assistantMessage.chapterOptions.length) {
+        await generateActivityQuiz(assistantMessage);
+      }
     } catch (err) {
       const status = err?.response?.status;
       setMessages((prev) => [
@@ -423,6 +442,69 @@ export default function Dashboard() {
       ]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const generateActivityQuiz = async (message) => {
+    setQuizLoading(true);
+    try {
+      const response = await api.post("/quiz/generate", {
+        subject: message.subject || selectedSubject || "General",
+        chapter: null,
+        topic: null,
+        source_session_id: message.sessionId,
+        source_question: message.question,
+        source_answer: message.text,
+        quiz_type: "activity",
+        count: 2,
+      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "quiz",
+          text: "Quick MCQ practice",
+          quiz: response.data,
+          selectedAnswers: {},
+          result: null,
+          status: "started",
+        },
+      ]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
+  const updateQuizMessage = (quizId, updater) => {
+    setMessages((prev) => prev.map((message) => (
+      message.role === "quiz" && message.quiz?.quiz_id === quizId ? updater(message) : message
+    )));
+  };
+
+  const handleQuizOption = (quizId, questionId, optionIndex) => {
+    updateQuizMessage(quizId, (message) => ({
+      ...message,
+      selectedAnswers: { ...(message.selectedAnswers || {}), [questionId]: optionIndex },
+    }));
+  };
+
+  const handleQuizSubmit = async (quizId, selectedAnswers) => {
+    const response = await api.post(`/quiz/${quizId}/submit`, { answers: selectedAnswers || {} });
+    updateQuizMessage(quizId, (message) => ({
+      ...message,
+      result: response.data,
+      status: "completed",
+    }));
+    await refreshLearningProfile();
+  };
+
+  const handleQuizSkip = async (quizId) => {
+    try {
+      await api.post(`/quiz/${quizId}/skip`);
+    } finally {
+      updateQuizMessage(quizId, (message) => ({ ...message, status: "skipped" }));
+      await refreshLearningProfile();
     }
   };
 
@@ -531,6 +613,52 @@ export default function Dashboard() {
                     <div><dt>{t.profileLabels.medium}</dt><dd>{studentProfile?.medium || "Hindi"}</dd></div>
                     <div><dt>Board</dt><dd>CGBSE</dd></div>
                   </dl>
+                  <div className="mobile-learning-panel">
+                    <div className="mobile-learning-head">
+                      <strong>Learning Tracker</strong>
+                      <span>{studentProfile?.quiz?.completed ?? 0}/{studentProfile?.quiz?.started ?? 0} quizzes</span>
+                    </div>
+                    <div className="mobile-learning-grid">
+                      <div><span>Quiz Avg</span><strong>{studentProfile?.quiz?.avg_score ?? 0}%</strong></div>
+                      <div><span>Improve</span><strong>{studentProfile?.quiz?.improvement ?? 0}%</strong></div>
+                      <div><span>Subjects</span><strong>{learningSubjects.length}</strong></div>
+                      <div><span>Weak</span><strong>{studentProfile?.weak_topics?.length ?? 0}</strong></div>
+                    </div>
+                    {learningSubjects.length > 0 && (
+                      <div className="mobile-learning-subjects">
+                        {learningSubjects.slice(0, 3).map((item) => (
+                          <button
+                            key={item.subject}
+                            type="button"
+                            onClick={() => {
+                              setShowProfileMenu(false);
+                              setSelectedSubject(item.subject);
+                              setQuestion(`${item.subject} revision कराइए`);
+                            }}
+                          >
+                            <span>{item.subject}</span>
+                            <small>{item.questions} Q · {item.quiz_attempts} quiz · {item.avg_quiz_score || 0}%</small>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {studentProfile?.weak_topics?.length > 0 && (
+                      <div className="mobile-weak-topics">
+                        {studentProfile.weak_topics.slice(0, 3).map((topic) => (
+                          <button
+                            key={`${topic.subject}-${topic.topic}`}
+                            type="button"
+                            onClick={() => {
+                              setShowProfileMenu(false);
+                              setQuestion(`${topic.subject} ${topic.topic} revise कराइए`);
+                            }}
+                          >
+                            {topic.topic}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   {isAdmin && (
                     <button type="button" onClick={() => { setShowProfileMenu(false); navigate("/admin"); }}>
                       Admin Panel
@@ -648,11 +776,68 @@ export default function Dashboard() {
 
             <div ref={windowRef} className="dashboard-chatgpt-window">
               {messages.map((message, index) => (
-                <div key={index} className={`dashboard-message-row ${message.role === "assistant" ? "assistant" : "student"}`}>
+                <div key={index} className={`dashboard-message-row ${message.role === "student" ? "student" : "assistant"}`}>
                   <div className="dashboard-message-stack">
-                    <span className="message-label">{message.role === "assistant" ? t.assistantLabel : t.studentLabel}</span>
-                    <div className={`dashboard-message-bubble ${message.role === "assistant" ? "assistant" : "student"}`}>
-                      <ReactMarkdown>{message.text}</ReactMarkdown>
+                    <span className="message-label">{message.role === "student" ? t.studentLabel : message.role === "quiz" ? "MCQ Quiz" : t.assistantLabel}</span>
+                    <div className={`dashboard-message-bubble ${message.role === "student" ? "student" : "assistant"}${message.role === "quiz" ? " quiz-bubble" : ""}`}>
+                      {message.role !== "quiz" && <ReactMarkdown>{message.text}</ReactMarkdown>}
+                      {message.role === "quiz" && (
+                        <div className="quiz-card">
+                          <div className="quiz-card-head">
+                            <div>
+                              <strong>Quick MCQ Practice</strong>
+                              <span>{message.quiz?.subject} · {message.quiz?.topic}</span>
+                            </div>
+                            {message.status === "started" && (
+                              <button type="button" className="quiz-skip-btn" onClick={() => handleQuizSkip(message.quiz.quiz_id)}>
+                                Skip
+                              </button>
+                            )}
+                          </div>
+                          {message.status === "skipped" ? (
+                            <p className="quiz-status">Skipped. You can continue studying.</p>
+                          ) : (
+                            <>
+                              <div className="quiz-question-list">
+                                {message.quiz?.questions?.map((quizQuestion, qIndex) => {
+                                  const selected = message.selectedAnswers?.[quizQuestion.id];
+                                  const detail = message.result?.details?.find((item) => item.id === quizQuestion.id);
+                                  return (
+                                    <div key={quizQuestion.id} className="quiz-question">
+                                      <p>{qIndex + 1}. {quizQuestion.prompt}</p>
+                                      <div className="quiz-options">
+                                        {quizQuestion.options.map((option, optionIndex) => (
+                                          <button
+                                            key={option}
+                                            type="button"
+                                            className={[
+                                              selected === optionIndex ? "selected" : "",
+                                              detail?.correct_option === optionIndex ? "correct" : "",
+                                              detail && selected === optionIndex && !detail.is_correct ? "wrong" : "",
+                                            ].filter(Boolean).join(" ")}
+                                            onClick={() => handleQuizOption(message.quiz.quiz_id, quizQuestion.id, optionIndex)}
+                                            disabled={Boolean(message.result)}
+                                          >
+                                            {option}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      {detail?.explanation && <small>{detail.explanation}</small>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {message.result ? (
+                                <p className="quiz-status">Score: {message.result.correct}/{message.result.total} ({message.result.score_percent}%)</p>
+                              ) : (
+                                <button type="button" className="quiz-submit-btn" onClick={() => handleQuizSubmit(message.quiz.quiz_id, message.selectedAnswers)}>
+                                  Submit MCQ
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
                       {message.role === "assistant" && message.chapterOptions?.length > 0 && (
                         <div className="chapter-option-list">
                           {message.chapterOptions.map((option) => (
@@ -713,7 +898,7 @@ export default function Dashboard() {
                 </div>
               ))}
 
-              {isLoading && (
+              {(isLoading || quizLoading) && (
                 <div className="dashboard-message-row assistant">
                   <div className="dashboard-message-stack">
                     <div className="dashboard-message-bubble assistant typing-bubble">
@@ -773,6 +958,76 @@ export default function Dashboard() {
               <div><dt>बोर्ड</dt><dd>CGBSE</dd></div>
             </dl>
           </div>
+        </section>
+
+        <section className="right-section">
+          <p className="rail-heading">Learning Tracker</p>
+          <div className="learning-tracker-card">
+            <div className="learning-score-grid">
+              <div>
+                <span>Quiz Avg</span>
+                <strong>{studentProfile?.quiz?.avg_score ?? 0}%</strong>
+              </div>
+              <div>
+                <span>Completed</span>
+                <strong>{studentProfile?.quiz?.completed ?? 0}/{studentProfile?.quiz?.started ?? 0}</strong>
+              </div>
+              <div>
+                <span>Improvement</span>
+                <strong>{studentProfile?.quiz?.improvement ?? 0}%</strong>
+              </div>
+              <div>
+                <span>Weak Topics</span>
+                <strong>{studentProfile?.weak_topics?.length ?? 0}</strong>
+              </div>
+            </div>
+
+            {learningSubjects.length > 0 && (
+              <div className="learning-subject-list">
+                {learningSubjects.slice(0, 5).map((item) => (
+                  <div key={item.subject} className="learning-subject-row">
+                    <div>
+                      <strong>{item.subject}</strong>
+                      <span>{item.questions} questions · {item.quiz_attempts} quizzes · {item.weak_topics} weak</span>
+                    </div>
+                    <div className="learning-progress-track" aria-hidden="true">
+                      <span style={{ width: `${Math.max(8, Math.round(((item.questions || 0) / maxSubjectQuestions) * 100))}%` }} />
+                    </div>
+                    <small>{item.avg_quiz_score ? `${item.avg_quiz_score}% quiz avg` : "No quiz score yet"}</small>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {studentProfile?.weak_topics?.length > 0 && (
+              <div className="learning-chip-list">
+                {studentProfile.weak_topics.slice(0, 4).map((topic) => (
+                  <button
+                    key={`${topic.subject}-${topic.topic}`}
+                    type="button"
+                    onClick={() => setQuestion(`${topic.subject} ${topic.topic} revise कराइए`)}
+                  >
+                    {topic.subject}: {topic.topic}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {studentProfile?.recent_quizzes?.length > 0 && (
+            <div className="question-sample-panel">
+              <div className="sample-panel-head">
+                <strong>Recent MCQs</strong>
+                <span>{studentProfile.recent_quizzes.length}</span>
+              </div>
+              <div className="question-sample-list">
+                {studentProfile.recent_quizzes.slice(0, 3).map((quiz) => (
+                  <button key={quiz.id} type="button" onClick={() => setQuestion(`${quiz.subject} ${quiz.topic || ""} revise कराइए`)}>
+                    {quiz.subject}: {quiz.score_percent}% · {quiz.status}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="right-section">

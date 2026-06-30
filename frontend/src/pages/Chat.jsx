@@ -9,6 +9,7 @@ export default function Chat() {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]);
   const [student, setStudent] = useState({ name: "", class_level: "", exam_date: null });
+  const [quizLoading, setQuizLoading] = useState(false);
 
   useEffect(() => {
     async function loadProfile() {
@@ -33,18 +34,83 @@ export default function Chat() {
     setMessages((prev) => [...prev, userMessage]);
     setQuestion("");
     const response = await api.post("/chat/ask", { question: nextQuestion, subject: subjectOverride });
+    const assistantMessage = {
+      role: "assistant",
+      text: response.data.answer,
+      sessionId: response.data.session_id,
+      question: nextQuestion,
+      subject: subjectOverride,
+      chapterOptions: response.data.chapter_options || [],
+      feedback: null,
+    };
     setMessages((prev) => [
       ...prev,
-      {
-        role: "assistant",
-        text: response.data.answer,
-        sessionId: response.data.session_id,
-        question: nextQuestion,
-        subject: subjectOverride,
-        chapterOptions: response.data.chapter_options || [],
-        feedback: null,
-      },
+      assistantMessage,
     ]);
+    if (assistantMessage.sessionId && !assistantMessage.chapterOptions.length) {
+      await generateActivityQuiz(assistantMessage);
+    }
+  };
+
+  const generateActivityQuiz = async (message) => {
+    setQuizLoading(true);
+    try {
+      const response = await api.post("/quiz/generate", {
+        subject: message.subject || subject || "General",
+        chapter: null,
+        topic: null,
+        source_session_id: message.sessionId,
+        source_question: message.question,
+        source_answer: message.text,
+        quiz_type: "activity",
+        count: 2,
+      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "quiz",
+          text: "Quick MCQ practice",
+          quiz: response.data,
+          selectedAnswers: {},
+          result: null,
+          status: "started",
+        },
+      ]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
+  const updateQuizMessage = (quizId, updater) => {
+    setMessages((prev) => prev.map((message) => (
+      message.role === "quiz" && message.quiz?.quiz_id === quizId ? updater(message) : message
+    )));
+  };
+
+  const handleQuizOption = (quizId, questionId, optionIndex) => {
+    updateQuizMessage(quizId, (message) => ({
+      ...message,
+      selectedAnswers: { ...(message.selectedAnswers || {}), [questionId]: optionIndex },
+    }));
+  };
+
+  const handleQuizSubmit = async (quizId, selectedAnswers) => {
+    const response = await api.post(`/quiz/${quizId}/submit`, { answers: selectedAnswers || {} });
+    updateQuizMessage(quizId, (message) => ({
+      ...message,
+      result: response.data,
+      status: "completed",
+    }));
+  };
+
+  const handleQuizSkip = async (quizId) => {
+    try {
+      await api.post(`/quiz/${quizId}/skip`);
+    } finally {
+      updateQuizMessage(quizId, (message) => ({ ...message, status: "skipped" }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -105,8 +171,65 @@ export default function Chat() {
         <main className="chat-main">
           <div className="chat-window">
             {messages.map((message, index) => (
-              <div key={index} className={`chat-bubble ${message.role === "assistant" ? "assistant" : "student"}`}>
-                <ReactMarkdown>{message.text}</ReactMarkdown>
+              <div key={index} className={`chat-bubble ${message.role === "assistant" ? "assistant" : message.role === "quiz" ? "assistant quiz-bubble" : "student"}`}>
+                {message.role !== "quiz" && <ReactMarkdown>{message.text}</ReactMarkdown>}
+                {message.role === "quiz" && (
+                  <div className="quiz-card">
+                    <div className="quiz-card-head">
+                      <div>
+                        <strong>Quick MCQ Practice</strong>
+                        <span>{message.quiz?.subject} · {message.quiz?.topic}</span>
+                      </div>
+                      {message.status === "started" && (
+                        <button type="button" className="quiz-skip-btn" onClick={() => handleQuizSkip(message.quiz.quiz_id)}>
+                          Skip
+                        </button>
+                      )}
+                    </div>
+                    {message.status === "skipped" ? (
+                      <p className="quiz-status">Skipped. You can continue studying.</p>
+                    ) : (
+                      <>
+                        <div className="quiz-question-list">
+                          {message.quiz?.questions?.map((quizQuestion, qIndex) => {
+                            const selected = message.selectedAnswers?.[quizQuestion.id];
+                            const detail = message.result?.details?.find((item) => item.id === quizQuestion.id);
+                            return (
+                              <div key={quizQuestion.id} className="quiz-question">
+                                <p>{qIndex + 1}. {quizQuestion.prompt}</p>
+                                <div className="quiz-options">
+                                  {quizQuestion.options.map((option, optionIndex) => (
+                                    <button
+                                      key={option}
+                                      type="button"
+                                      className={[
+                                        selected === optionIndex ? "selected" : "",
+                                        detail?.correct_option === optionIndex ? "correct" : "",
+                                        detail && selected === optionIndex && !detail.is_correct ? "wrong" : "",
+                                      ].filter(Boolean).join(" ")}
+                                      onClick={() => handleQuizOption(message.quiz.quiz_id, quizQuestion.id, optionIndex)}
+                                      disabled={Boolean(message.result)}
+                                    >
+                                      {option}
+                                    </button>
+                                  ))}
+                                </div>
+                                {detail?.explanation && <small>{detail.explanation}</small>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {message.result ? (
+                          <p className="quiz-status">Score: {message.result.correct}/{message.result.total} ({message.result.score_percent}%)</p>
+                        ) : (
+                          <button type="button" className="quiz-submit-btn" onClick={() => handleQuizSubmit(message.quiz.quiz_id, message.selectedAnswers)}>
+                            Submit MCQ
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
                 {message.role === "assistant" && message.chapterOptions?.length > 0 && (
                   <div className="chapter-option-list">
                     {message.chapterOptions.map((option) => (
@@ -159,6 +282,7 @@ export default function Chat() {
                 )}
               </div>
             ))}
+            {quizLoading && <div className="chat-bubble assistant">Creating a skippable MCQ quiz...</div>}
           </div>
           <form className="chat-input-form" onSubmit={handleSubmit}>
             <select value={subject} onChange={(e) => setSubject(e.target.value)}>

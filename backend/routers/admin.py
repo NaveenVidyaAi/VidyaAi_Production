@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import is_admin_email
 from backend.models.qa_cache import QACache
+from backend.models.quiz import Quiz
 from backend.models.session import ChatSession
 from backend.models.student import Student
 from backend.models.weak_topic import WeakTopic
@@ -189,6 +190,86 @@ def _feedback_by_student(records: list[dict]) -> dict[str, dict[str, int | float
     return grouped
 
 
+def _quiz_metrics_from_rows(rows: list[tuple]) -> dict:
+    completed = [row for row in rows if row.status == "completed" and row.total_questions]
+    skipped = [row for row in rows if row.status == "skipped" or row.skipped]
+    scores = [
+        (row.correct_count / row.total_questions) * 100
+        for row in completed
+        if row.total_questions
+    ]
+    by_student: dict[str, list] = defaultdict(list)
+    by_subject: dict[str, list[float]] = defaultdict(list)
+    for row in completed:
+        by_student[row.student_id].append(row)
+        by_subject[row.subject].append((row.correct_count / row.total_questions) * 100)
+
+    improvements = []
+    for student_rows in by_student.values():
+        ordered = sorted(student_rows, key=lambda item: item.completed_at or item.created_at or datetime.min)
+        if len(ordered) < 2:
+            continue
+        first = (ordered[0].correct_count / ordered[0].total_questions) * 100 if ordered[0].total_questions else 0
+        latest = (ordered[-1].correct_count / ordered[-1].total_questions) * 100 if ordered[-1].total_questions else 0
+        improvements.append(latest - first)
+
+    return {
+        "quizzes_started": len(rows),
+        "quizzes_completed": len(completed),
+        "quizzes_skipped": len(skipped),
+        "quiz_completion_rate": round((len(completed) / len(rows)) * 100, 1) if rows else 0.0,
+        "quiz_skip_rate": round((len(skipped) / len(rows)) * 100, 1) if rows else 0.0,
+        "avg_quiz_score": round(sum(scores) / len(scores), 1) if scores else 0.0,
+        "avg_improvement": round(sum(improvements) / len(improvements), 1) if improvements else 0.0,
+        "improved_students": sum(1 for item in improvements if item > 0),
+        "quiz_subject_performance": [
+            {
+                "subject": subject,
+                "avg_score": round(sum(subject_scores) / len(subject_scores), 1),
+                "attempts": len(subject_scores),
+            }
+            for subject, subject_scores in sorted(
+                by_subject.items(),
+                key=lambda item: (sum(item[1]) / len(item[1])) if item[1] else 0,
+                reverse=True,
+            )
+        ],
+    }
+
+
+def _empty_quiz_metrics() -> dict:
+    return _quiz_metrics_from_rows([])
+
+
+def _quiz_metrics_by_student(rows: list[Quiz]) -> dict[str, dict]:
+    grouped: dict[str, list[Quiz]] = defaultdict(list)
+    for row in rows:
+        grouped[row.student_id].append(row)
+
+    metrics: dict[str, dict] = {}
+    for student_id, student_rows in grouped.items():
+        completed = [row for row in student_rows if row.status == "completed" and row.total_questions]
+        skipped = [row for row in student_rows if row.status == "skipped" or row.skipped]
+        ordered = sorted(completed, key=lambda item: item.completed_at or item.created_at or datetime.min)
+        scores = [
+            (row.correct_count / row.total_questions) * 100
+            for row in ordered
+            if row.total_questions
+        ]
+        first_score = scores[0] if scores else 0.0
+        latest_score = scores[-1] if scores else 0.0
+        metrics[student_id] = {
+            "quizzes_started": len(student_rows),
+            "quizzes_completed": len(completed),
+            "quizzes_skipped": len(skipped),
+            "quiz_completion_rate": round((len(completed) / len(student_rows)) * 100, 1) if student_rows else 0.0,
+            "avg_quiz_score": round(sum(scores) / len(scores), 1) if scores else 0.0,
+            "latest_quiz_score": round(latest_score, 1),
+            "improvement": round(latest_score - first_score, 1) if len(scores) > 1 else 0.0,
+        }
+    return metrics
+
+
 async def _require_admin(current_student=Depends(get_current_student)):
     if not is_admin_email(current_student.email):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
@@ -244,6 +325,7 @@ def _build_fallback_dashboard_payload() -> dict:
             "estimated_minutes_total": estimated_minutes_total,
             "cache_entries": len(caches),
             "cache_hits_total": sum(1 for _ in caches.values()),
+            **_empty_quiz_metrics(),
         },
         "top_subjects": top_subjects,
         "top_users": top_users,
@@ -283,6 +365,15 @@ def _build_fallback_users_payload() -> dict:
             "recent_questions": recent_qs,
             "last_active": max(timestamps).isoformat() if timestamps else None,
             "feedback": feedback.get(student_id, {"positive": 0, "negative": 0, "total": 0, "accuracy_score": 0.0}),
+            "quiz": {
+                "quizzes_started": 0,
+                "quizzes_completed": 0,
+                "quizzes_skipped": 0,
+                "quiz_completion_rate": 0.0,
+                "avg_quiz_score": 0.0,
+                "latest_quiz_score": 0.0,
+                "improvement": 0.0,
+            },
         })
 
     users_data.sort(key=lambda item: item["total_questions"], reverse=True)
@@ -344,6 +435,9 @@ async def admin_dashboard(admin=Depends(_require_admin), db: AsyncSession = Depe
     estimated_minutes_total = round(sum(_estimated_minutes_per_user(items) for items in grouped.values()), 2)
     activity = _student_activity_metrics(session_events, int(total_users), now)
     feedback = _feedback_summary(_load_feedback_records())
+    quiz_result = await db.execute(select(Quiz))
+    quiz_rows = quiz_result.scalars().all()
+    quiz_metrics = _quiz_metrics_from_rows(quiz_rows)
 
     return {
         "summary": {
@@ -366,6 +460,7 @@ async def admin_dashboard(admin=Depends(_require_admin), db: AsyncSession = Depe
             "estimated_minutes_total": estimated_minutes_total,
             "cache_entries": int(cache_entries),
             "cache_hits_total": int(cache_hit_sum),
+            **quiz_metrics,
         },
         "top_subjects": top_subjects,
         "top_users": top_users,
@@ -393,6 +488,8 @@ async def admin_users(admin=Depends(_require_admin), db: AsyncSession = Depends(
     weak_topics_result = await db.execute(select(WeakTopic.student_id, WeakTopic.subject, WeakTopic.topic))
     all_weak = weak_topics_result.all()
     feedback = _feedback_by_student(_load_feedback_records())
+    quiz_result = await db.execute(select(Quiz))
+    quiz_by_student = _quiz_metrics_by_student(quiz_result.scalars().all())
 
     # Group sessions by student
     sessions_by_student: dict[str, list] = defaultdict(list)
@@ -432,6 +529,15 @@ async def admin_users(admin=Depends(_require_admin), db: AsyncSession = Depends(
             "recent_questions": recent_qs,
             "last_active": last_active,
             "feedback": feedback.get(sid, {"positive": 0, "negative": 0, "total": 0, "accuracy_score": 0.0}),
+            "quiz": quiz_by_student.get(sid, {
+                "quizzes_started": 0,
+                "quizzes_completed": 0,
+                "quizzes_skipped": 0,
+                "quiz_completion_rate": 0.0,
+                "avg_quiz_score": 0.0,
+                "latest_quiz_score": 0.0,
+                "improvement": 0.0,
+            }),
         })
 
     # sort by total questions desc
@@ -464,6 +570,13 @@ async def export_student_metrics(admin=Depends(_require_admin), db: AsyncSession
         ("Accuracy Score %", "accuracy_score"),
         ("Thumbs Up", "thumbs_up"),
         ("Thumbs Down", "thumbs_down"),
+        ("Quizzes Started", "quizzes_started"),
+        ("Quizzes Completed", "quizzes_completed"),
+        ("Quizzes Skipped", "quizzes_skipped"),
+        ("Quiz Completion Rate %", "quiz_completion_rate"),
+        ("Average Quiz Score %", "avg_quiz_score"),
+        ("Average Quiz Improvement %", "avg_improvement"),
+        ("Improved Students", "improved_students"),
     ]:
         writer.writerow([label, summary.get(key, 0)])
 
@@ -483,9 +596,17 @@ async def export_student_metrics(admin=Depends(_require_admin), db: AsyncSession
         "Thumbs Down",
         "Feedback Total",
         "Accuracy Score %",
+        "Quizzes Started",
+        "Quizzes Completed",
+        "Quizzes Skipped",
+        "Quiz Completion %",
+        "Avg Quiz Score %",
+        "Latest Quiz Score %",
+        "Quiz Improvement %",
     ])
     for index, user in enumerate(users, start=1):
         feedback = user.get("feedback") or {}
+        quiz = user.get("quiz") or {}
         writer.writerow([
             index,
             user.get("name", ""),
@@ -501,6 +622,13 @@ async def export_student_metrics(admin=Depends(_require_admin), db: AsyncSession
             feedback.get("negative", 0),
             feedback.get("total", 0),
             feedback.get("accuracy_score", 0),
+            quiz.get("quizzes_started", 0),
+            quiz.get("quizzes_completed", 0),
+            quiz.get("quizzes_skipped", 0),
+            quiz.get("quiz_completion_rate", 0),
+            quiz.get("avg_quiz_score", 0),
+            quiz.get("latest_quiz_score", 0),
+            quiz.get("improvement", 0),
         ])
 
     output.seek(0)

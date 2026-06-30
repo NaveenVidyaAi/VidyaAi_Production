@@ -1057,6 +1057,92 @@ select:focus-visible {
   padding: 18px;
 }
 
+.learning-tracker-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fff, #f8fbf9);
+  box-shadow: var(--shadow-soft);
+  padding: 16px;
+}
+
+.learning-score-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.learning-score-grid div {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.learning-score-grid span,
+.learning-subject-row span,
+.learning-subject-row small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.learning-score-grid strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink);
+  font-family: "Sora", sans-serif;
+  font-size: 1.15rem;
+}
+
+.learning-subject-list {
+  display: grid;
+  gap: 10px;
+}
+
+.learning-subject-row {
+  display: grid;
+  gap: 6px;
+}
+
+.learning-subject-row strong {
+  display: block;
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.learning-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf2ef;
+}
+
+.learning-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand), var(--blue));
+}
+
+.learning-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.learning-chip-list button {
+  border: 1px solid rgba(217, 93, 57, 0.2);
+  border-radius: 999px;
+  background: var(--coral-soft);
+  color: var(--coral);
+  cursor: pointer;
+  padding: 7px 10px;
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
 .profile-card-head {
   display: grid;
   grid-template-columns: 58px minmax(0, 1fr);
@@ -1351,6 +1437,119 @@ select:focus-visible {
   color: var(--coral);
   padding: 8px 10px;
   font-weight: 800;
+}
+
+.quiz-bubble {
+  width: min(760px, 100%);
+}
+
+.quiz-card {
+  display: grid;
+  gap: 14px;
+}
+
+.quiz-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quiz-card-head strong {
+  display: block;
+  color: var(--ink);
+  font-family: "Sora", "Noto Sans Devanagari", sans-serif;
+  font-size: 1rem;
+}
+
+.quiz-card-head span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.quiz-skip-btn,
+.quiz-submit-btn {
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 10px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  cursor: pointer;
+  padding: 8px 11px;
+  font-weight: 900;
+}
+
+.quiz-submit-btn {
+  width: fit-content;
+  border-color: rgba(18, 107, 82, 0.22);
+  background: var(--brand);
+  color: #fff;
+}
+
+.quiz-question-list {
+  display: grid;
+  gap: 12px;
+}
+
+.quiz-question {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.quiz-question p,
+.quiz-status {
+  margin: 0;
+  color: var(--text);
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.quiz-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.quiz-options button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  color: var(--text);
+  cursor: pointer;
+  padding: 9px 10px;
+  text-align: left;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.quiz-options button:hover:not(:disabled),
+.quiz-options button.selected {
+  border-color: rgba(37, 99, 235, 0.34);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.quiz-options button.correct {
+  border-color: rgba(18, 107, 82, 0.38);
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.quiz-options button.wrong {
+  border-color: rgba(217, 93, 57, 0.36);
+  background: var(--coral-soft);
+  color: var(--coral);
+}
+
+.quiz-question small {
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 /* Admin */
@@ -2103,7 +2302,9 @@ select:focus-visible {
     z-index: 20;
     top: calc(100% + 8px);
     left: 0;
-    width: min(86vw, 300px);
+    width: min(94vw, 380px);
+    max-height: min(76svh, 640px);
+    overflow-y: auto;
     display: grid;
     gap: 10px;
     border: 1px solid var(--line);
@@ -2167,6 +2368,96 @@ select:focus-visible {
     color: var(--brand);
     padding: 10px 12px;
     font-weight: 900;
+  }
+
+  .mobile-learning-panel {
+    display: grid;
+    gap: 10px;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 10px 0;
+  }
+
+  .mobile-learning-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .mobile-learning-head strong {
+    color: var(--ink);
+    font-size: 0.86rem;
+  }
+
+  .mobile-learning-head span {
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 900;
+  }
+
+  .mobile-learning-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .mobile-learning-grid div {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-raised);
+    padding: 9px;
+  }
+
+  .mobile-learning-grid span,
+  .mobile-learning-subjects small {
+    display: block;
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 850;
+  }
+
+  .mobile-learning-grid strong {
+    display: block;
+    margin-top: 3px;
+    color: var(--ink);
+    font-size: 0.96rem;
+  }
+
+  .mobile-learning-subjects {
+    display: grid;
+    gap: 7px;
+  }
+
+  .mobile-learning-subjects button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: var(--surface-raised);
+    color: var(--text);
+    text-align: left;
+  }
+
+  .mobile-learning-subjects span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-weak-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .mobile-weak-topics button {
+    width: auto;
+    border-color: rgba(217, 93, 57, 0.22);
+    background: var(--coral-soft);
+    color: var(--coral);
+    padding: 7px 9px;
+    font-size: 0.72rem;
   }
 
   .top-icon-btn {

@@ -463,6 +463,48 @@ def _normalize_answer_style(answer_style: str | None) -> str:
     return aliases.get(style, "exam")
 
 
+def _is_english_prompt(question: str) -> bool:
+    text = question or ""
+    if re.search(r"[\u0900-\u097f]", text):
+        return False
+    return bool(re.search(r"[a-zA-Z]", text))
+
+
+def _requested_item_count(question: str) -> int | None:
+    normalized = re.sub(r"\s+", " ", question or "").strip().lower()
+    number_words = {
+        "one": 1,
+        "two": 2,
+        "three": 3,
+        "four": 4,
+        "five": 5,
+        "six": 6,
+        "seven": 7,
+        "eight": 8,
+        "nine": 9,
+        "ten": 10,
+        "एक": 1,
+        "दो": 2,
+        "तीन": 3,
+        "चार": 4,
+        "पांच": 5,
+        "पाँच": 5,
+        "छह": 6,
+        "सात": 7,
+        "आठ": 8,
+        "नौ": 9,
+        "दस": 10,
+    }
+    item_terms = r"questions?|प्रश्न|sawal|सवाल|examples?|उदाहरण|sentences?|वाक्य|exercises?|अभ्यास"
+    digit_match = re.search(rf"\b([1-9]|10)\b\s*(?:\w+\s*){{0,3}}(?:{item_terms})", normalized)
+    if digit_match:
+        return int(digit_match.group(1))
+    for word, value in number_words.items():
+        if re.search(rf"\b{re.escape(word)}\b\s*(?:\w+\s*){{0,3}}(?:{item_terms})", normalized):
+            return value
+    return None
+
+
 def _answer_format_for_style(subject: str, answer_style: str) -> str:
     style = _normalize_answer_style(answer_style)
     is_english = (subject or "").lower() == "english"
@@ -543,6 +585,8 @@ def _answer_format_for_style(subject: str, answer_style: str) -> str:
 
 def _requested_format_for_question(question: str, subject: str) -> str | None:
     normalized = re.sub(r"\s+", " ", question or "").strip().lower()
+    requested_count = _requested_item_count(question)
+    is_english_prompt = _is_english_prompt(question)
     hinglish_hindi_request = bool(
         re.search(
             r"\b(likho|likh|batao|samjhao|kya|kaise|ko|ke\s+liye|principal|principle|pradhanacharya|adhyaksh|school)\b",
@@ -551,9 +595,18 @@ def _requested_format_for_question(question: str, subject: str) -> str | None:
     )
     is_hindi_request = (
         bool(re.search(r"[\u0900-\u097f]", question or ""))
-        or (subject or "").lower() == "hindi"
-        or hinglish_hindi_request
+        or ((subject or "").lower() == "hindi" and not is_english_prompt)
+        or (hinglish_hindi_request and not is_english_prompt)
     )
+
+    if requested_count and re.search(r"\b(grammar|tense|voice|narration|correct|fill in|rewrite|change into|questions?|examples?|sentences?)\b|व्याकरण|काल|वाच्य|रिक्त|शुद्ध|प्रश्न|उदाहरण|वाक्य", normalized):
+        language_line = "Answer in English." if is_english_prompt else "उत्तर हिंदी में दें।"
+        return (
+            f"The student explicitly asked for {requested_count} items. {language_line}\n"
+            f"Give exactly {requested_count} numbered items, not fewer and not more.\n"
+            "If these are grammar questions, provide the requested grammar questions/exercises and include answers only if the student asks for answers.\n"
+            "Do not add summary, chapter explanation, unrelated Q&A, or extra practice."
+        )
 
     if re.search(r"\b(essay|assay|paragraph)\b|निबंध|अनुच्छेद", normalized):
         if is_hindi_request:
@@ -643,6 +696,14 @@ def _max_tokens_for_style(answer_style: str) -> int:
         "qa": 650,
         "exam": 650,
     }.get(style, 650)
+
+
+def _max_tokens_for_request(answer_style: str, question: str) -> int:
+    base = _max_tokens_for_style(answer_style)
+    requested_count = _requested_item_count(question)
+    if requested_count and requested_count >= 5:
+        return max(base, min(1200, 180 * requested_count))
+    return base
 
 
 def _coerce_answer_to_style(answer: str, subject: str, answer_style: str) -> str:
@@ -1058,9 +1119,10 @@ def _groq_answer(
     has_context = bool(context_blocks)
     subject_lower = (subject or "").lower()
     normalized_style = _normalize_answer_style(answer_style)
+    answer_language = "English" if _is_english_prompt(question) else ("English" if subject_lower == "english" else "Hindi")
     answer_instructions = (
         "Answer in clear English. Keep explanations exam-friendly for a Class 10 student."
-        if subject_lower == "english"
+        if answer_language == "English"
         else "Use simple Hindi with clear academic terms when needed."
     )
     requested_format = _requested_format_for_question(question, subject)
@@ -1075,6 +1137,8 @@ def _groq_answer(
         "Read the student's question carefully before choosing the final format. "
         "If the student asks for step-by-step solution, points, short note, topic-only explanation, letter, application, essay, grammar exercise, translation, or any specific format, follow that requested format first. "
         "If no specific format is requested, use the selected answer style. "
+        "The student's prompt has highest priority: if they ask in English, answer in English; if they ask in Hindi, answer in Hindi. "
+        "If the student asks for a specific number of questions/items, give exactly that number and never fewer. "
         "Do not announce the selected style with headings like '2-mark answer' or '5-mark answer'; simply write in that length and structure. "
         "For maths questions, solve carefully. For a single maths question, show enough working unless the student asks for only the final answer. "
         "If the student asks 2-3 maths questions together, or says 'just solve'/'only answer', give concise numbered solutions and final answers; add detailed explanation only when explicitly requested. "
@@ -1129,7 +1193,7 @@ def _groq_answer(
 
     def _fallback_from_context() -> str:
         if not context_blocks:
-            if subject_lower == "english":
+            if answer_language == "English":
                 return (
                     "**Answer**\n\n"
                     "The AI service is busy right now. Please try again after 15-20 seconds.\n\n"
@@ -1142,7 +1206,7 @@ def _groq_answer(
             )
 
         excerpt = _clean_fallback_excerpt(context_blocks[0])
-        if subject_lower == "english":
+        if answer_language == "English":
             excerpt = re.sub(r"\[Source:.*?\]\n", "", context_blocks[0]).strip()
             excerpt = re.sub(r"\s+", " ", excerpt)[:700]
             style = _normalize_answer_style(answer_style)
@@ -1217,7 +1281,7 @@ def _groq_answer(
             {"role": "user", "content": user_prompt},
         ],
         "temperature": 0.3,
-        "max_tokens": _max_tokens_for_style(answer_style),
+        "max_tokens": _max_tokens_for_request(answer_style, question),
     }
 
     last_status = None
