@@ -212,6 +212,16 @@ docker compose down             # stop
 docker compose up -d --build backend
 ```
 
+### Deploy latest changes on VPS
+
+Run these commands on the VPS:
+
+```bash
+cd /opt/vidyaai
+git pull origin main
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
 ### Frontend dev server
 
 ```bash
