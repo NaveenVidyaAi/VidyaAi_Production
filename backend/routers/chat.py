@@ -1,6 +1,8 @@
 import json
+import logging
 import os
 import re
+import hashlib
 from datetime import datetime
 from typing import Optional
 
@@ -8,12 +10,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from backend.config import settings
+from backend.models.qa_cache import QACache
+from backend.models.session import ChatSession
+from backend.models.student import Student as StudentModel
+from backend.models.weak_topic import WeakTopic
+from backend.routers.auth import get_db
 from backend.services.rag import _is_chapter_style_question, format_unit_selection_answer, get_unit_options, run_rag
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 in_memory_store = {
     "caches": {},
@@ -44,8 +53,17 @@ class FeedbackRequest(BaseModel):
 
 
 class SimpleStudent:
-    def __init__(self, student_id: str, class_level: str = "10", medium: str = "Hindi") -> None:
+    def __init__(
+        self,
+        student_id: str,
+        name: str = "Guest",
+        email: str = "guest@vidyaai.local",
+        class_level: str = "10",
+        medium: str = "Hindi",
+    ) -> None:
         self.id = student_id
+        self.name = name
+        self.email = email
         self.class_level = class_level
         self.medium = medium
 
@@ -132,10 +150,11 @@ def _feedback_log_path(student_id: str, session_id: int) -> str:
 
 
 def _record_feedback(session: dict, current_student, understood: bool) -> None:
+    feedback_student_id = str(session.get("db_student_id") or session.get("student_id") or current_student.id)
     entry = {
-        "feedback_id": f"{current_student.id}_{session['id']}",
+        "feedback_id": f"{feedback_student_id}_{session['id']}",
         "session_id": session["id"],
-        "student_id": current_student.id,
+        "student_id": feedback_student_id,
         "question": session.get("question", ""),
         "answer": session.get("answer", ""),
         "subject": session.get("subject", "General"),
@@ -150,6 +169,204 @@ def _record_feedback(session: dict, current_student, understood: bool) -> None:
         json.dump(entry, feedback_file, ensure_ascii=False, indent=2)
 
 
+def _db_student_id_for(raw_id: str) -> str:
+    raw_id = str(raw_id or "guest")
+    if len(raw_id) <= 36:
+        return raw_id
+    return f"u_{hashlib.sha1(raw_id.encode('utf-8')).hexdigest()[:32]}"
+
+
+async def _lookup_db_student_id(db, current_student) -> str | None:
+    if db is None:
+        return None
+
+    email = str(getattr(current_student, "email", "") or getattr(current_student, "id", "") or "guest@vidyaai.local")
+    raw_id = str(getattr(current_student, "id", "") or email)
+    safe_id = _db_student_id_for(raw_id)
+
+    result = await db.execute(select(StudentModel).where(StudentModel.email == email))
+    student = result.scalars().first()
+    if student:
+        return student.id
+
+    result = await db.execute(select(StudentModel).where(StudentModel.id == safe_id))
+    student = result.scalars().first()
+    return student.id if student else None
+
+
+async def _ensure_db_student(db, current_student) -> str | None:
+    if db is None:
+        return None
+
+    email = str(getattr(current_student, "email", "") or getattr(current_student, "id", "") or "guest@vidyaai.local")
+    name = str(getattr(current_student, "name", "") or email.split("@", 1)[0] or "Guest")
+    raw_id = str(getattr(current_student, "id", "") or email)
+    safe_id = _db_student_id_for(raw_id)
+
+    existing_id = await _lookup_db_student_id(db, current_student)
+    if existing_id:
+        return existing_id
+
+    student = StudentModel(
+        id=safe_id,
+        name=name,
+        email=email,
+        password_hash="",
+        class_level=str(getattr(current_student, "class_level", "10") or "10"),
+        medium=str(getattr(current_student, "medium", "Hindi") or "Hindi"),
+    )
+    db.add(student)
+    await db.flush()
+    return student.id
+
+
+async def _recent_student_history_from_db(db, current_student, question: str, limit: int = 2) -> list[dict[str, str]]:
+    if db is None:
+        return []
+
+    try:
+        db_student_id = await _lookup_db_student_id(db, current_student)
+        if not db_student_id:
+            return []
+
+        result = await db.execute(
+            select(ChatSession)
+            .where(ChatSession.student_id == db_student_id)
+            .order_by(ChatSession.created_at.desc(), ChatSession.id.desc())
+            .limit(limit + 2)
+        )
+        normalized_question = _normalize_question(question)
+        sessions = []
+        for session in result.scalars().all():
+            if _normalize_question(session.question) == normalized_question:
+                continue
+            sessions.append(
+                {
+                    "question": session.question,
+                    "answer": session.answer,
+                    "subject": session.subject,
+                }
+            )
+        return list(reversed(sessions[:limit]))
+    except Exception:
+        await db.rollback()
+        logger.exception("Failed to load recent chat history from database")
+        return []
+
+
+async def _persist_chat_session(db, current_student, session: dict) -> int | None:
+    if db is None:
+        return None
+
+    try:
+        db_student_id = await _ensure_db_student(db, current_student)
+        if not db_student_id:
+            return None
+        session["db_student_id"] = db_student_id
+
+        db_session = ChatSession(
+            student_id=db_student_id,
+            question=str(session.get("question", "")),
+            answer=str(session.get("answer", "")),
+            subject=str(session.get("subject", "General") or "General"),
+            topic=str(session.get("topic", "") or ""),
+            class_level=str(session.get("class_level", "10") or "10"),
+        )
+        db.add(db_session)
+        await db.flush()
+        await db.commit()
+        return int(db_session.id)
+    except Exception:
+        await db.rollback()
+        logger.exception("Failed to persist chat session")
+        return None
+
+
+async def _persist_cache_entry(
+    db,
+    *,
+    normalized_question: str,
+    original_question: str,
+    answer: str,
+    subject: str,
+    class_level: str,
+    answer_source: str,
+    sources: list[str],
+) -> None:
+    if db is None:
+        return
+
+    try:
+        result = await db.execute(
+            select(QACache).where(
+                QACache.normalized_question == normalized_question,
+                QACache.subject == subject,
+                QACache.class_level == class_level,
+            )
+        )
+        cache = result.scalars().first()
+        if cache:
+            cache.answer = answer
+            cache.source_type = answer_source
+            cache.sources_json = json.dumps(sources, ensure_ascii=False)
+            cache.hit_count = (cache.hit_count or 0) + 1
+            cache.last_used_at = datetime.utcnow()
+        else:
+            db.add(
+                QACache(
+                    normalized_question=normalized_question,
+                    original_question=original_question,
+                    answer=answer,
+                    subject=subject,
+                    class_level=class_level,
+                    source_type=answer_source,
+                    sources_json=json.dumps(sources, ensure_ascii=False),
+                    hit_count=1,
+                )
+            )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        logger.exception("Failed to persist QA cache entry")
+
+
+async def _persist_weak_topic(db, current_student, subject: str, topic: str) -> None:
+    if db is None:
+        return
+
+    try:
+        db_student_id = await _ensure_db_student(db, current_student)
+        if not db_student_id:
+            return
+
+        result = await db.execute(
+            select(WeakTopic).where(
+                WeakTopic.student_id == db_student_id,
+                WeakTopic.subject == subject,
+                WeakTopic.topic == topic,
+            )
+        )
+        weak_topic = result.scalars().first()
+        if weak_topic:
+            weak_topic.wrong_count = (weak_topic.wrong_count or 0) + 1
+            weak_topic.last_seen = datetime.utcnow()
+        else:
+            db.add(WeakTopic(student_id=db_student_id, subject=subject, topic=topic))
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        logger.exception("Failed to persist weak topic")
+
+
+async def _store_session(db, current_student, session: dict) -> int:
+    in_memory_store["sessions"].append(session)
+    db_session_id = await _persist_chat_session(db, current_student, session)
+    if db_session_id:
+        session["id"] = db_session_id
+        in_memory_store["next_session_id"] = max(in_memory_store["next_session_id"], db_session_id + 1)
+    return int(session["id"])
+
+
 async def get_current_student_or_guest(
     token: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> SimpleStudent:
@@ -158,7 +375,17 @@ async def get_current_student_or_guest(
             payload = jwt.decode(token.credentials, settings.jwt_secret, algorithms=["HS256"])
             student_id = payload.get("sub")
             if student_id:
-                return SimpleStudent(student_id=student_id)
+                email = payload.get("email") or student_id
+                name = payload.get("name") or str(email).split("@", 1)[0]
+                class_level = payload.get("class_level") or "10"
+                medium = payload.get("medium") or "Hindi"
+                return SimpleStudent(
+                    student_id=str(student_id),
+                    name=str(name),
+                    email=str(email),
+                    class_level=str(class_level),
+                    medium=str(medium),
+                )
         except JWTError:
             pass
 
@@ -166,7 +393,11 @@ async def get_current_student_or_guest(
 
 
 @router.post("/ask", response_model=AskResponse)
-async def ask(request: AskRequest, current_student=Depends(get_current_student_or_guest)) -> AskResponse:
+async def ask(
+    request: AskRequest,
+    current_student=Depends(get_current_student_or_guest),
+    db=Depends(get_db),
+) -> AskResponse:
     effective_question = request.question
     effective_subject = request.subject
     bare_section = _extract_bare_section(request.question)
@@ -187,21 +418,20 @@ async def ask(request: AskRequest, current_student=Depends(get_current_student_o
         answer = format_unit_selection_answer(option_subject, unit, chapter_options)
         session_id = in_memory_store["next_session_id"]
         in_memory_store["next_session_id"] += 1
-        in_memory_store["sessions"].append(
-            {
-                "id": session_id,
-                "student_id": current_student.id,
-                "question": request.question,
-                "answer": answer,
-                "subject": effective_subject,
-                "topic": "",
-                "class_level": current_student.class_level,
-                "source_type": "chapter_options",
-                "confidence": 1.0,
-                "answer_style": request.answer_style,
-                "created_at": created_at,
-            }
-        )
+        session = {
+            "id": session_id,
+            "student_id": current_student.id,
+            "question": request.question,
+            "answer": answer,
+            "subject": effective_subject,
+            "topic": "",
+            "class_level": current_student.class_level,
+            "source_type": "chapter_options",
+            "confidence": 1.0,
+            "answer_style": request.answer_style,
+            "created_at": created_at,
+        }
+        session_id = await _store_session(db, current_student, session)
         return AskResponse(
             answer=answer,
             sources=[],
@@ -210,7 +440,9 @@ async def ask(request: AskRequest, current_student=Depends(get_current_student_o
             chapter_options=chapter_options,
         )
 
-    recent_history = _history_for_question(current_student.id, effective_question)
+    recent_history = await _recent_student_history_from_db(db, current_student, effective_question)
+    if not recent_history:
+        recent_history = _history_for_question(current_student.id, effective_question)
     effective_question = _contextualize_followup_question(effective_question, recent_history)
     normalized_question = _normalize_question(effective_question)
     history_signature = tuple(
@@ -230,21 +462,30 @@ async def ask(request: AskRequest, current_student=Depends(get_current_student_o
         created_at = datetime.utcnow().isoformat()
         session_id = in_memory_store["next_session_id"]
         in_memory_store["next_session_id"] += 1
-        in_memory_store["sessions"].append(
-            {
-                "id": session_id,
-                "student_id": current_student.id,
-                "question": request.question,
-                "effective_question": effective_question,
-                "answer": cached_entry["answer"],
-                "subject": effective_subject,
-                "topic": "",
-                "class_level": current_student.class_level,
-                "source_type": cached_entry.get("source_type", "cache"),
-                "confidence": 0.97,
-                "answer_style": request.answer_style,
-                "created_at": created_at,
-            }
+        session = {
+            "id": session_id,
+            "student_id": current_student.id,
+            "question": request.question,
+            "effective_question": effective_question,
+            "answer": cached_entry["answer"],
+            "subject": effective_subject,
+            "topic": "",
+            "class_level": current_student.class_level,
+            "source_type": cached_entry.get("source_type", "cache"),
+            "confidence": 0.97,
+            "answer_style": request.answer_style,
+            "created_at": created_at,
+        }
+        session_id = await _store_session(db, current_student, session)
+        await _persist_cache_entry(
+            db,
+            normalized_question=normalized_question,
+            original_question=request.question,
+            answer=cached_entry["answer"],
+            subject=effective_subject,
+            class_level=current_student.class_level,
+            answer_source=cached_entry.get("source_type", "cache"),
+            sources=cached_entry.get("sources", []),
         )
         return AskResponse(answer=cached_entry["answer"], sources=cached_entry.get("sources", []), confidence=0.97, session_id=session_id)
 
@@ -264,47 +505,105 @@ async def ask(request: AskRequest, current_student=Depends(get_current_student_o
             "sources": sources,
             "source_type": answer_source,
         }
+        await _persist_cache_entry(
+            db,
+            normalized_question=normalized_question,
+            original_question=request.question,
+            answer=answer,
+            subject=effective_subject,
+            class_level=current_student.class_level,
+            answer_source=answer_source,
+            sources=sources,
+        )
 
     session_id = in_memory_store["next_session_id"]
     in_memory_store["next_session_id"] += 1
     confidence = 0.95 if answer_source == "groq" else 0.9
     created_at = datetime.utcnow().isoformat()
-    in_memory_store["sessions"].append(
-        {
-            "id": session_id,
-            "student_id": current_student.id,
-            "question": request.question,
-            "effective_question": effective_question,
-            "answer": answer,
-            "subject": effective_subject,
-            "topic": "",
-            "class_level": current_student.class_level,
-            "source_type": answer_source,
-            "confidence": confidence,
-            "answer_style": request.answer_style,
-            "created_at": created_at,
-        }
-    )
+    session = {
+        "id": session_id,
+        "student_id": current_student.id,
+        "question": request.question,
+        "effective_question": effective_question,
+        "answer": answer,
+        "subject": effective_subject,
+        "topic": "",
+        "class_level": current_student.class_level,
+        "source_type": answer_source,
+        "confidence": confidence,
+        "answer_style": request.answer_style,
+        "created_at": created_at,
+    }
+    session_id = await _store_session(db, current_student, session)
     return AskResponse(answer=answer, sources=sources, confidence=confidence, session_id=session_id)
 
 
 @router.post("/feedback")
-async def feedback(request: FeedbackRequest, current_student=Depends(get_current_student_or_guest)):
+async def feedback(
+    request: FeedbackRequest,
+    current_student=Depends(get_current_student_or_guest),
+    db=Depends(get_db),
+):
     session = next((item for item in in_memory_store["sessions"] if item["id"] == request.session_id), None)
     if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+        db_session = None
+        if db is not None:
+            result = await db.execute(select(ChatSession).where(ChatSession.id == request.session_id))
+            db_session = result.scalars().first()
+        if not db_session:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+        session = {
+            "id": db_session.id,
+            "student_id": current_student.id,
+            "question": db_session.question,
+            "answer": db_session.answer,
+            "subject": db_session.subject,
+            "topic": db_session.topic or "",
+            "class_level": db_session.class_level,
+            "source_type": "database",
+            "confidence": 0.0,
+            "created_at": db_session.created_at.isoformat() if db_session.created_at else datetime.utcnow().isoformat(),
+        }
     session["understood"] = request.understood
     session["feedback"] = "thumbs_up" if request.understood else "thumbs_down"
     session["feedback_at"] = datetime.utcnow().isoformat()
     _record_feedback(session, current_student, request.understood)
     if not request.understood:
         student_topics = in_memory_store["weak_topics"].setdefault(current_student.id, [])
-        student_topics.append(session.get("subject", "General"))
+        weak_subject = session.get("subject", "General")
+        student_topics.append(weak_subject)
+        await _persist_weak_topic(db, current_student, weak_subject, session.get("topic") or weak_subject)
     return {"success": True}
 
 
 @router.get("/history")
-async def history(current_student=Depends(get_current_student_or_guest)):
+async def history(current_student=Depends(get_current_student_or_guest), db=Depends(get_db)):
+    if db is not None:
+        try:
+            db_student_id = await _lookup_db_student_id(db, current_student)
+            if db_student_id:
+                result = await db.execute(
+                    select(ChatSession)
+                    .where(ChatSession.student_id == db_student_id)
+                    .order_by(ChatSession.created_at.desc(), ChatSession.id.desc())
+                    .limit(20)
+                )
+                sessions = result.scalars().all()
+                if sessions:
+                    return [
+                        {
+                            "id": session.id,
+                            "question": session.question,
+                            "answer": session.answer,
+                            "subject": session.subject,
+                            "created_at": session.created_at.isoformat() if session.created_at else "now",
+                        }
+                        for session in sessions
+                    ]
+        except Exception:
+            await db.rollback()
+            logger.exception("Failed to load chat history from database")
+
     student_sessions = [
         item for item in in_memory_store["sessions"] if item["student_id"] == current_student.id
     ]

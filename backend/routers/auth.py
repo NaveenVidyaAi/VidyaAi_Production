@@ -8,6 +8,7 @@ import bcrypt
 from pydantic import BaseModel
 
 from backend.config import settings, is_admin_email
+from backend.database import AsyncSessionLocal
 
 router = APIRouter()
 
@@ -53,7 +54,12 @@ class StudentResponse(BaseModel):
     is_admin: bool = False
 
 async def get_db():
-    yield None
+    if AsyncSessionLocal is None:
+        yield None
+        return
+
+    async with AsyncSessionLocal() as session:
+        yield session
 
 async def get_current_student(token: str = Depends(oauth2_scheme), db=Depends(get_db)) -> Student:
     credentials_exception = HTTPException(

@@ -57,6 +57,18 @@ CLASS_10_SCIENCE_CHAPTER_KEYWORDS = {
 
 MENDEL_TERMS = ["mendel", "mendal", "मेंडल", "मेण्डल", "मेन्डल"]
 
+MATH_KEYWORD_PATTERN = re.compile(
+    r"\b("
+    r"maths?|mathematics|ganit|solve|calculate|simplify|factor(?:ise|ize)?|equation|"
+    r"find|value|root|roots|quadratic|linear|algebra|geometry|trigonometry|"
+    r"percentage|percent|ratio|profit|loss|interest|area|perimeter|volume"
+    r")\b"
+    r"|गणित|हल\s*(?:कर|कीजिए|करो|करें)?|सरलीकरण|समीकरण|मान\s+ज्ञात|"
+    r"मूल\s+ज्ञात|जोड़|घटाव|गुणा|भाग|प्रतिशत|अनुपात|लाभ|हानि|ब्याज|"
+    r"क्षेत्रफल|परिमाप|आयतन|त्रिकोणमिति|बीजगणित",
+    flags=re.IGNORECASE,
+)
+
 CLASS_10_HINDI_UNITS = {
     "1": [
         {"section": "1.1", "title": "चन्द्रगहना से लौटती बेर"},
@@ -106,6 +118,9 @@ CLASS_10_ENGLISH_UNITS = {
 
 
 def _is_chapter_style_question(question: str) -> bool:
+    if _is_math_problem_request(question):
+        return False
+
     q = question.lower()
     markers = [
         "chapter",
@@ -131,6 +146,27 @@ def _is_chapter_style_question(question: str) -> bool:
         for item in units
     ]
     return any(_normalize_for_match(title) in normalized_q for title in known_titles)
+
+
+def _is_math_problem_request(question: str) -> bool:
+    text = question or ""
+    normalized = re.sub(r"\s+", " ", text).strip().lower()
+    if not normalized:
+        return False
+
+    has_math_keyword = bool(MATH_KEYWORD_PATTERN.search(normalized))
+    has_digit = bool(re.search(r"\d", normalized))
+    has_equation = bool(re.search(r"(?:\d|[a-z])\s*[+\-*/÷×=^]\s*(?:\d|[a-z])", normalized))
+    has_fraction_or_power = bool(re.search(r"\d+\s*/\s*\d+|[a-z]\s*(?:\^|²|³)", normalized))
+    multiple_math_items = len(re.findall(r"(?:^|\s)(?:q\.?|प्रश्न)?\s*\d{1,2}\s*[).]", normalized)) >= 2
+
+    if has_math_keyword and (has_digit or has_equation or has_fraction_or_power):
+        return True
+    if has_equation or has_fraction_or_power:
+        return True
+    if multiple_math_items and has_math_keyword:
+        return True
+    return False
 
 
 def _clean_fallback_excerpt(text: str) -> str:
@@ -220,6 +256,8 @@ def _is_english_subject(subject: str, question: str) -> bool:
 
 
 def get_hindi_unit_options(subject: str, question: str, class_level: str) -> list[dict[str, str]]:
+    if _is_math_problem_request(question):
+        return []
     if str(class_level) != "10" or not _is_hindi_subject(subject, question):
         return []
     if _extract_section_hint(question, allow_bare=True):
@@ -242,6 +280,8 @@ def get_hindi_unit_options(subject: str, question: str, class_level: str) -> lis
 
 
 def get_english_unit_options(subject: str, question: str, class_level: str) -> list[dict[str, str]]:
+    if _is_math_problem_request(question):
+        return []
     if str(class_level) != "10" or not _is_english_subject(subject, question):
         return []
     if _extract_section_hint(question, allow_bare=False):
@@ -684,6 +724,8 @@ def _science_chapter_2_fallback(contexts: list[str], answer_style: str) -> str:
 def _infer_subject(subject: str, question: str) -> str:
     def detect(text: str) -> str | None:
         raw = (text or "").lower()
+        if _is_math_problem_request(raw):
+            return "Math"
         if "english" in raw:
             return "English"
         if "हिंदी" in raw or "हिन्दी" in raw or "hindi" in raw:
@@ -1178,36 +1220,40 @@ async def run_rag(
 
     class_level = str(getattr(student, "class_level", "10"))
     inferred_subject = _infer_subject(subject, question)
+    math_problem_intent = inferred_subject.lower() == "math" and _is_math_problem_request(question)
     allow_bare_section = class_level == "10" and inferred_subject.lower() == "hindi"
     section_hint = _normalize_section_hint_for_subject(
-        _extract_section_hint(question, allow_bare=allow_bare_section),
+        None if math_problem_intent else _extract_section_hint(question, allow_bare=allow_bare_section),
         inferred_subject,
     )
-    chapter_hint = None if section_hint else _extract_chapter_number(question)
+    chapter_hint = None if section_hint or math_problem_intent else _extract_chapter_number(question)
 
-    try:
-        context_with_sources = _retrieve_context(
-            question=question,
-            subject=inferred_subject,
-            class_level=class_level,
-            weak_topics=weak_topics,
-            chapter_hint=chapter_hint,
-            section_hint=section_hint,
-        )
-    except Exception:
-        logger.exception(
-            "RAG retrieval failed for subject=%s class=%s question=%r",
-            inferred_subject,
-            class_level,
-            question,
-        )
+    if math_problem_intent:
         context_with_sources = []
+    else:
+        try:
+            context_with_sources = _retrieve_context(
+                question=question,
+                subject=inferred_subject,
+                class_level=class_level,
+                weak_topics=weak_topics,
+                chapter_hint=chapter_hint,
+                section_hint=section_hint,
+            )
+        except Exception:
+            logger.exception(
+                "RAG retrieval failed for subject=%s class=%s question=%r",
+                inferred_subject,
+                class_level,
+                question,
+            )
+            context_with_sources = []
     contexts = [f"[Source: {item[3]}]\n{item[0]}" for item in context_with_sources]
     sources = [item[3] for item in context_with_sources]
 
     top_score = context_with_sources[0][2] if context_with_sources else 0.0
     has_strong_match = bool(context_with_sources and top_score >= 2.5)
-    chapter_intent = _is_chapter_style_question(question)
+    chapter_intent = False if math_problem_intent else _is_chapter_style_question(question)
 
     # Chapter/title requests must be grounded in retrieved textbook context.
     # Do not let the LLM invent chapter facts when retrieval is weak or empty.
@@ -1257,7 +1303,7 @@ async def run_rag(
             answer = _science_chapter_2_overview(answer_style)
             answer_source = "fallback-topic-guard"
 
-    if not has_strong_match and not context_with_sources and answer_source != "groq":
+    if not math_problem_intent and not has_strong_match and not context_with_sources and answer_source != "groq":
         if inferred_subject.lower() == "english":
             answer = (
                 "**Note:** Chapter context is limited for this question, but I am still answering from an exam point of view.\n\n"

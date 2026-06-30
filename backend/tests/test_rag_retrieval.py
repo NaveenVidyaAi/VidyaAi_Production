@@ -30,6 +30,71 @@ class RAGRetrievalTests(unittest.TestCase):
             "English",
         )
 
+    def test_math_problem_prompt_overrides_selected_subject(self):
+        self.assertEqual(
+            rag._infer_subject("Hindi", "Solve 2x + 3 = 11 and 5x - 4 = 16"),
+            "Math",
+        )
+        self.assertEqual(
+            rag._infer_subject("Hindi", "इन 2 प्रश्नों को हल करो: 2x + 3 = 11, 5x - 4 = 16"),
+            "Math",
+        )
+
+    def test_math_prompt_does_not_trigger_hindi_unit_options(self):
+        options = rag.get_unit_options(
+            subject="Hindi",
+            question="Solve 2-3 maths questions: 2x + 3 = 11 and 5x - 4 = 16",
+            class_level="10",
+        )
+
+        self.assertEqual(options, [])
+
+    def test_math_problem_bypasses_retrieval_context(self):
+        class Student:
+            class_level = "10"
+
+        original_retrieve = rag._retrieve_context
+        original_answer = rag._groq_answer
+        calls = {"retrieved": False, "subject": None, "contexts": None}
+
+        def fake_retrieve(**kwargs):
+            calls["retrieved"] = True
+            return [
+                (
+                    "पाठ 3.2 कन्यादान मां और बेटी के संबंध पर आधारित है।",
+                    "hindi-lesson",
+                    20.0,
+                    "Hindi | Chapter: 3.2",
+                )
+            ]
+
+        def fake_answer(question, context_blocks, subject, class_level, answer_style="exam", recent_history=None):
+            calls["subject"] = subject
+            calls["contexts"] = context_blocks
+            return ("1. x = 4\n2. x = 4", "groq")
+
+        try:
+            rag._retrieve_context = fake_retrieve
+            rag._groq_answer = fake_answer
+            answer, sources, answer_source = asyncio.run(
+                rag.run_rag(
+                    Student(),
+                    "Hindi",
+                    "Solve 2 questions: 2x + 3 = 11 and 5x - 4 = 16",
+                    [],
+                )
+            )
+        finally:
+            rag._retrieve_context = original_retrieve
+            rag._groq_answer = original_answer
+
+        self.assertFalse(calls["retrieved"])
+        self.assertEqual(calls["subject"], "Math")
+        self.assertEqual(calls["contexts"], [])
+        self.assertEqual(sources, [])
+        self.assertEqual(answer_source, "groq")
+        self.assertIn("x = 4", answer)
+
     def test_english_chapter_request_shows_english_unit_options(self):
         options = rag.get_unit_options(
             subject="Hindi",
