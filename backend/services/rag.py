@@ -2,6 +2,8 @@ import os
 import re
 import time
 import logging
+import ast
+import operator
 from typing import List, Tuple
 
 import requests
@@ -154,6 +156,9 @@ def _is_math_problem_request(question: str) -> bool:
     if not normalized:
         return False
 
+    if _is_bare_arithmetic_expression(normalized):
+        return True
+
     has_math_keyword = bool(MATH_KEYWORD_PATTERN.search(normalized))
     has_digit = bool(re.search(r"\d", normalized))
     has_equation = bool(re.search(r"(?:\d|[a-z])\s*[+\-*/÷×=^]\s*(?:\d|[a-z])", normalized))
@@ -167,6 +172,58 @@ def _is_math_problem_request(question: str) -> bool:
     if multiple_math_items and has_math_keyword:
         return True
     return False
+
+
+def _is_bare_arithmetic_expression(text: str) -> bool:
+    normalized = (text or "").strip()
+    if not normalized:
+        return False
+    normalized = normalized.replace("−", "-").replace("×", "*").replace("÷", "/")
+    if re.fullmatch(r"\d+(?:\.\d+)?", normalized):
+        return False
+    return bool(re.fullmatch(r"[\d\s+\-*/().]+", normalized) and re.search(r"\d\s*[+\-*/]\s*\d", normalized))
+
+
+def _format_number(value: float) -> str:
+    if abs(value - int(value)) < 1e-10:
+        return str(int(value))
+    return f"{value:.10f}".rstrip("0").rstrip(".")
+
+
+def _safe_eval_arithmetic(expression: str) -> float:
+    operators = {
+        ast.Add: operator.add,
+        ast.Sub: operator.sub,
+        ast.Mult: operator.mul,
+        ast.Div: operator.truediv,
+        ast.USub: operator.neg,
+        ast.UAdd: operator.pos,
+    }
+
+    def evaluate(node):
+        if isinstance(node, ast.Expression):
+            return evaluate(node.body)
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            return float(node.value)
+        if isinstance(node, ast.BinOp) and type(node.op) in operators:
+            return operators[type(node.op)](evaluate(node.left), evaluate(node.right))
+        if isinstance(node, ast.UnaryOp) and type(node.op) in operators:
+            return operators[type(node.op)](evaluate(node.operand))
+        raise ValueError("Unsupported arithmetic expression")
+
+    tree = ast.parse(expression, mode="eval")
+    return evaluate(tree)
+
+
+def _answer_simple_arithmetic(question: str) -> str | None:
+    expression = (question or "").strip()
+    expression = expression.replace("−", "-").replace("×", "*").replace("÷", "/")
+    if not _is_bare_arithmetic_expression(expression):
+        return None
+    try:
+        return _format_number(_safe_eval_arithmetic(expression))
+    except (SyntaxError, ValueError, ZeroDivisionError):
+        return None
 
 
 def _clean_fallback_excerpt(text: str) -> str:
@@ -1221,6 +1278,10 @@ async def run_rag(
     class_level = str(getattr(student, "class_level", "10"))
     inferred_subject = _infer_subject(subject, question)
     math_problem_intent = inferred_subject.lower() == "math" and _is_math_problem_request(question)
+    simple_math_answer = _answer_simple_arithmetic(question) if math_problem_intent else None
+    if simple_math_answer is not None:
+        return simple_math_answer, [], "math-direct"
+
     allow_bare_section = class_level == "10" and inferred_subject.lower() == "hindi"
     section_hint = _normalize_section_hint_for_subject(
         None if math_problem_intent else _extract_section_hint(question, allow_bare=allow_bare_section),

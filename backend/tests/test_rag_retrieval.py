@@ -39,6 +39,7 @@ class RAGRetrievalTests(unittest.TestCase):
             rag._infer_subject("Hindi", "इन 2 प्रश्नों को हल करो: 2x + 3 = 11, 5x - 4 = 16"),
             "Math",
         )
+        self.assertEqual(rag._infer_subject("Hindi", "2-3"), "Math")
 
     def test_math_prompt_does_not_trigger_hindi_unit_options(self):
         options = rag.get_unit_options(
@@ -48,6 +49,47 @@ class RAGRetrievalTests(unittest.TestCase):
         )
 
         self.assertEqual(options, [])
+
+    def test_bare_arithmetic_does_not_trigger_hindi_unit_options(self):
+        options = rag.get_unit_options(
+            subject="Hindi",
+            question="2-3",
+            class_level="10",
+        )
+
+        self.assertEqual(options, [])
+
+    def test_bare_arithmetic_returns_direct_answer(self):
+        class Student:
+            class_level = "10"
+
+        original_retrieve = rag._retrieve_context
+        original_answer = rag._groq_answer
+        calls = {"retrieved": False, "llm": False}
+
+        def fake_retrieve(**kwargs):
+            calls["retrieved"] = True
+            return []
+
+        def fake_answer(*args, **kwargs):
+            calls["llm"] = True
+            return ("wrong", "groq")
+
+        try:
+            rag._retrieve_context = fake_retrieve
+            rag._groq_answer = fake_answer
+            answer, sources, answer_source = asyncio.run(
+                rag.run_rag(Student(), "Hindi", "2-3", [])
+            )
+        finally:
+            rag._retrieve_context = original_retrieve
+            rag._groq_answer = original_answer
+
+        self.assertEqual(answer, "-1")
+        self.assertEqual(sources, [])
+        self.assertEqual(answer_source, "math-direct")
+        self.assertFalse(calls["retrieved"])
+        self.assertFalse(calls["llm"])
 
     def test_math_problem_bypasses_retrieval_context(self):
         class Student:
