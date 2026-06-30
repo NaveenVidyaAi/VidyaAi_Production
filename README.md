@@ -218,7 +218,18 @@ Run these commands on the VPS:
 
 ```bash
 cd /opt/vidyaai
+bash deploy.sh
+```
+
+If you deploy manually instead of using `deploy.sh`, rebuild the static frontend before restarting Docker/Nginx:
+
+```bash
+cd /opt/vidyaai
 git pull origin main
+cd frontend
+npm install
+VITE_API_URL=/api npm run build
+cd ..
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
