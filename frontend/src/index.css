@@ -654,6 +654,12 @@ select:focus-visible {
   transform: translateY(-1px);
 }
 
+.icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  transform: none;
+}
+
 .feedback-icon.positive.active {
   border-color: rgba(18, 107, 82, 0.34);
   background: var(--brand-soft);
@@ -934,6 +940,11 @@ select:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.dashboard-message-row.student .message-signs,
+.chat-bubble.student .message-signs {
+  justify-content: flex-end;
 }
 
 .typing-bubble {

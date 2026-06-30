@@ -67,6 +67,32 @@ def _is_cacheable_answer_source(answer_source: str) -> bool:
     return answer_source in {"groq", "fallback-topic-guard"} or answer_source.startswith("rag")
 
 
+def _recent_student_history(student_id: str, limit: int = 2) -> list[dict[str, str]]:
+    student_sessions = [
+        item
+        for item in in_memory_store["sessions"]
+        if item.get("student_id") == student_id and item.get("answer")
+    ]
+    recent_sessions = sorted(student_sessions, key=lambda item: item["id"], reverse=True)[:limit]
+    return [
+        {
+            "question": str(session.get("question", "")),
+            "answer": str(session.get("answer", "")),
+            "subject": str(session.get("subject", "")),
+        }
+        for session in reversed(recent_sessions)
+    ]
+
+
+def _history_for_question(student_id: str, question: str, limit: int = 2) -> list[dict[str, str]]:
+    normalized_question = _normalize_question(question)
+    return [
+        item
+        for item in _recent_student_history(student_id, limit=limit + 2)
+        if _normalize_question(item.get("question", "")) != normalized_question
+    ][-limit:]
+
+
 def _feedback_log_path(student_id: str, session_id: int) -> str:
     safe_student_id = re.sub(r"[^a-zA-Z0-9_.-]", "_", str(student_id or "guest"))
     feedback_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "feedback_logs"))
@@ -154,7 +180,17 @@ async def ask(request: AskRequest, current_student=Depends(get_current_student_o
             chapter_options=chapter_options,
         )
 
-    cache_key = (normalized_question, effective_subject, current_student.class_level, request.answer_style)
+    recent_history = _history_for_question(current_student.id, effective_question)
+    history_signature = tuple(
+        _normalize_question(item.get("question", "")) for item in recent_history
+    )
+    cache_key = (
+        normalized_question,
+        effective_subject,
+        current_student.class_level,
+        request.answer_style,
+        history_signature,
+    )
     chapter_request = _is_chapter_style_question(effective_question)
     cached_entry = None if chapter_request else in_memory_store["caches"].get(cache_key)
 
@@ -186,6 +222,7 @@ async def ask(request: AskRequest, current_student=Depends(get_current_student_o
         effective_question,
         weak_topics,
         answer_style=request.answer_style,
+        recent_history=recent_history,
     )
 
     if not chapter_request and _is_cacheable_answer_source(answer_source) and sources:

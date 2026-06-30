@@ -381,10 +381,19 @@ export default function Dashboard() {
     if (!currentQuestion || isLoading) return;
 
     recordStudyActivity();
+    const outgoingSubject = subjectOverride || selectedSubject || inferSubject(currentQuestion);
     setQuestion("");
     setIsLoading(true);
-    setMessages((prev) => [...prev, { role: "student", text: currentQuestion }]);
-    const outgoingSubject = subjectOverride || selectedSubject || inferSubject(currentQuestion);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "student",
+        text: currentQuestion,
+        question: currentQuestion,
+        subject: outgoingSubject,
+        answerStyle,
+      },
+    ]);
 
     try {
       const response = await api.post("/chat/ask", {
@@ -443,7 +452,7 @@ export default function Dashboard() {
   };
 
   const handleRetry = async (message) => {
-    const retryQuestion = message.question || [...messages].reverse().find((item) => item.role === "student")?.text;
+    const retryQuestion = message.question || message.text || [...messages].reverse().find((item) => item.role === "student")?.text;
     if (!retryQuestion) return;
     if (message.answerStyle) {
       setAnswerStyle(message.answerStyle);
@@ -660,6 +669,16 @@ export default function Dashboard() {
                         </div>
                       )}
                     </div>
+                    {message.role === "student" && (
+                      <div className="message-signs">
+                        <button type="button" className="icon-btn" onClick={() => handleRetry(message)} title="Re-ask question" disabled={isLoading}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+                        </button>
+                        <button type="button" className="icon-btn" onClick={() => handleCopy(message.text)} title="Copy question">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        </button>
+                      </div>
+                    )}
                     {message.role === "assistant" && (
                       <div className="message-signs">
                         <button type="button" className="icon-btn" onClick={() => handleCopy(message.text)} title="Copy">

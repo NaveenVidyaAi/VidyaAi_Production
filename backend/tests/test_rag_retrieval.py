@@ -2,6 +2,7 @@ import unittest
 import asyncio
 
 from backend.services import rag
+from backend.routers import chat
 
 
 class FakePoint:
@@ -79,6 +80,138 @@ class RAGRetrievalTests(unittest.TestCase):
         self.assertIn("1. First important point", answer)
         self.assertIn("2. Second important point", answer)
         self.assertNotIn("Extra point", answer)
+
+    def test_recent_history_keeps_last_two_student_questions(self):
+        original_sessions = chat.in_memory_store["sessions"]
+        chat.in_memory_store["sessions"] = [
+            {"id": 1, "student_id": "s1", "question": "Q1", "answer": "A1", "subject": "Maths"},
+            {"id": 2, "student_id": "s2", "question": "Other", "answer": "Other answer", "subject": "Hindi"},
+            {"id": 3, "student_id": "s1", "question": "Q2", "answer": "A2", "subject": "Maths"},
+            {"id": 4, "student_id": "s1", "question": "Q3", "answer": "A3", "subject": "Maths"},
+        ]
+        try:
+            history = chat._recent_student_history("s1")
+        finally:
+            chat.in_memory_store["sessions"] = original_sessions
+
+        self.assertEqual([item["question"] for item in history], ["Q2", "Q3"])
+
+    def test_exact_repeat_question_is_removed_from_followup_history(self):
+        original_sessions = chat.in_memory_store["sessions"]
+        chat.in_memory_store["sessions"] = [
+            {"id": 1, "student_id": "s1", "question": "class 10 hindi chapter 3.1 माटीवाली", "answer": "First answer", "subject": "Hindi"},
+            {"id": 2, "student_id": "s1", "question": "कन्यादान समझाओ", "answer": "Second answer", "subject": "Hindi"},
+            {"id": 3, "student_id": "s1", "question": " class 10 hindi chapter 3.1 माटीवाली ", "answer": "Repeated answer", "subject": "Hindi"},
+        ]
+        try:
+            history = chat._history_for_question("s1", "class 10 hindi chapter 3.1 माटीवाली")
+        finally:
+            chat.in_memory_store["sessions"] = original_sessions
+
+        self.assertEqual([item["question"] for item in history], ["कन्यादान समझाओ"])
+
+    def test_groq_prompt_prioritizes_student_format_and_recent_history(self):
+        original_api_key = rag.settings.groq_api_key
+        original_post = rag.requests.post
+        captured_payload = {}
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"choices": [{"message": {"content": "Step 1: solve carefully."}}]}
+
+        def fake_post(url, headers, json, timeout):
+            captured_payload.update(json)
+            return FakeResponse()
+
+        rag.settings.groq_api_key = "test-key"
+        rag.requests.post = fake_post
+        try:
+            answer, source = rag._groq_answer(
+                question="Solve this step by step",
+                context_blocks=["linear equation context"],
+                subject="Maths",
+                class_level="10",
+                answer_style="two",
+                recent_history=[{"question": "What is x?", "answer": "x is unknown."}],
+            )
+        finally:
+            rag.settings.groq_api_key = original_api_key
+            rag.requests.post = original_post
+
+        prompt_text = "\n".join(message["content"] for message in captured_payload["messages"])
+        self.assertEqual(source, "groq")
+        self.assertIn("student's requested format or wording has priority", prompt_text)
+        self.assertIn("Recent conversation context", prompt_text)
+        self.assertIn("Previous Q1: What is x?", prompt_text)
+        self.assertIn("maths questions, solve carefully step by step", prompt_text.lower())
+        self.assertIn("Step 1", answer)
+
+    def test_essay_request_replaces_standard_exam_template(self):
+        original_api_key = rag.settings.groq_api_key
+        original_post = rag.requests.post
+        captured_payload = {}
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"choices": [{"message": {"content": "The Cow\n\nThe cow is a useful domestic animal."}}]}
+
+        def fake_post(url, headers, json, timeout):
+            captured_payload.update(json)
+            return FakeResponse()
+
+        rag.settings.groq_api_key = "test-key"
+        rag.requests.post = fake_post
+        try:
+            answer, source = rag._groq_answer(
+                question="write me an essay on cow",
+                context_blocks=[],
+                subject="English",
+                class_level="10",
+                answer_style="exam",
+            )
+        finally:
+            rag.settings.groq_api_key = original_api_key
+            rag.requests.post = original_post
+
+        user_prompt = captured_payload["messages"][1]["content"]
+        self.assertEqual(source, "groq")
+        self.assertIn("The student asked for an essay/paragraph", user_prompt)
+        self.assertIn("Do not add summary, key points, Q&A, practice questions", user_prompt)
+        self.assertNotIn("Exam-friendly Q&A", user_prompt)
+        self.assertNotIn("Quick practice", user_prompt)
+        self.assertIn("The Cow", answer)
+
+    def test_fallback_text_does_not_show_fallback_label(self):
+        original_api_key = rag.settings.groq_api_key
+        original_post = rag.requests.post
+
+        class FakeResponse:
+            status_code = 500
+
+            def json(self):
+                return {}
+
+        rag.settings.groq_api_key = "test-key"
+        rag.requests.post = lambda *args, **kwargs: FakeResponse()
+        try:
+            answer, source = rag._groq_answer(
+                question="Explain acid",
+                context_blocks=["Acids turn blue litmus red."],
+                subject="Science",
+                class_level="10",
+                answer_style="exam",
+            )
+        finally:
+            rag.settings.groq_api_key = original_api_key
+            rag.requests.post = original_post
+
+        self.assertEqual(source, "fallback")
+        self.assertNotIn("Fallback", answer)
+        self.assertNotIn("fallback", answer.lower())
 
     def test_hindi_unit_options_for_plain_chapter_request(self):
         original_detector = rag._detect_hindi_unit_options
