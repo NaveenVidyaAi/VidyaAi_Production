@@ -464,10 +464,55 @@ def _normalize_answer_style(answer_style: str | None) -> str:
 
 
 def _is_english_prompt(question: str) -> bool:
+    return _detect_prompt_language(question) == "english"
+
+
+def _detect_prompt_language(question: str) -> str:
     text = question or ""
+    normalized = re.sub(r"\s+", " ", text).strip().lower()
     if re.search(r"[\u0900-\u097f]", text):
-        return False
-    return bool(re.search(r"[a-zA-Z]", text))
+        return "hindi"
+
+    hinglish_terms = (
+        "likho",
+        "likh",
+        "batao",
+        "bataiye",
+        "samjhao",
+        "samjhaiye",
+        "kya",
+        "kaise",
+        "kyon",
+        "kyu",
+        "kise",
+        "kahte",
+        "hota",
+        "hai",
+        "hain",
+        "mein",
+        "mai",
+        "me",
+        "ko",
+        "ke liye",
+        "ka",
+        "ki",
+        "se",
+        "par",
+        "prashn",
+        "sawal",
+        "uttar",
+        "nibandh",
+        "patra",
+        "avedan",
+        "pradhanacharya",
+        "adhyaksh",
+    )
+    if any(re.search(rf"\b{re.escape(term)}\b", normalized) for term in hinglish_terms):
+        return "hindi"
+
+    if re.search(r"[a-zA-Z]", text):
+        return "english"
+    return "hindi"
 
 
 def _requested_item_count(question: str) -> int | None:
@@ -505,9 +550,12 @@ def _requested_item_count(question: str) -> int | None:
     return None
 
 
-def _answer_format_for_style(subject: str, answer_style: str) -> str:
+def _answer_format_for_style(subject: str, answer_style: str, answer_language: str | None = None) -> str:
     style = _normalize_answer_style(answer_style)
-    is_english = (subject or "").lower() == "english"
+    is_english = (
+        (answer_language or "").lower() == "english"
+        or ((subject or "").lower() == "english" and (answer_language or "").lower() != "hindi")
+    )
 
     if is_english:
         formats = {
@@ -541,7 +589,8 @@ def _answer_format_for_style(subject: str, answer_style: str) -> str:
                 "2) Summary (2-3 lines)\n"
                 "3) Key points (4-6 bullet points)\n"
                 "4) Exam-friendly Q&A (3 short Q&A from this chapter)\n"
-                "5) Quick practice (1 question)"
+                "5) Quick practice (1 question)\n"
+                "Use clean spelling, clear headings, and board-exam style wording."
             ),
         }
     else:
@@ -572,11 +621,12 @@ def _answer_format_for_style(subject: str, answer_style: str) -> str:
                 "3) उत्तर textbook context पर आधारित रखें"
             ),
             "exam": (
-                "1) Short title\n"
-                "2) सारांश (2-3 lines)\n"
-                "3) मुख्य बिंदु (4-6 bullet points)\n"
-                "4) परीक्षा-मित्र प्रश्नोत्तर (3 short Q&A from this chapter)\n"
-                "5) त्वरित अभ्यास (1 question)"
+                "1) छोटा शीर्षक\n"
+                "2) सारांश (2-3 साफ पंक्तियां)\n"
+                "3) मुख्य बिंदु (4-6 बिंदु)\n"
+                "4) परीक्षा-मित्र प्रश्नोत्तर (इस अध्याय/विषय से 3 छोटे प्रश्नोत्तर)\n"
+                "5) त्वरित अभ्यास (1 प्रश्न)\n"
+                "हिंदी वर्तनी, मात्राएं और व्याकरण सही रखें। उत्तर बोर्ड-परीक्षा शैली में साफ headings के साथ दें।"
             ),
         }
 
@@ -1117,16 +1167,16 @@ def _groq_answer(
         return "LLM is not configured. Add GROQ_API_KEY in .env to enable real answers.", "no-llm"
 
     has_context = bool(context_blocks)
-    subject_lower = (subject or "").lower()
     normalized_style = _normalize_answer_style(answer_style)
-    answer_language = "English" if _is_english_prompt(question) else ("English" if subject_lower == "english" else "Hindi")
+    prompt_language = _detect_prompt_language(question)
+    answer_language = "English" if prompt_language == "english" else "Hindi"
     answer_instructions = (
-        "Answer in clear English. Keep explanations exam-friendly for a Class 10 student."
+        "Answer in clear English. Keep spelling, grammar, headings, and explanations exam-friendly for a Class 10 student."
         if answer_language == "English"
-        else "Use simple Hindi with clear academic terms when needed."
+        else "Use simple, correct Hindi with clear academic terms when needed. Pay close attention to spelling, matras, and grammar."
     )
     requested_format = _requested_format_for_question(question, subject)
-    answer_format = requested_format or _answer_format_for_style(subject, answer_style)
+    answer_format = requested_format or _answer_format_for_style(subject, answer_style, answer_language)
     conversation_context = _format_conversation_context(recent_history)
     conversation_section = (
         f"Recent conversation context (use only for follow-up references):\n{conversation_context}\n\n"
@@ -1139,13 +1189,16 @@ def _groq_answer(
         "If no specific format is requested, use the selected answer style. "
         "The student's prompt has highest priority: if they ask in English, answer in English; if they ask in Hindi, answer in Hindi. "
         "If the student asks for a specific number of questions/items, give exactly that number and never fewer. "
+        "Formatting has high priority: use clear headings, numbered steps, bullet points, or school-writing layout as the answer type requires. "
+        "Unless the student asks for something else, shape every answer as a board-exam-ready response. "
         "Do not announce the selected style with headings like '2-mark answer' or '5-mark answer'; simply write in that length and structure. "
         "For maths questions, solve carefully. For a single maths question, show enough working unless the student asks for only the final answer. "
         "If the student asks 2-3 maths questions together, or says 'just solve'/'only answer', give concise numbered solutions and final answers; add detailed explanation only when explicitly requested. "
-        "Understand Hinglish requests such as 'application likho principal ko' as Hindi school-writing tasks unless English is explicitly requested. "
+        "Understand Hinglish or romanized Hindi requests such as 'application likho principal ko', 'samjhao', or 'kya hai' as Hindi tasks unless English is explicitly requested. "
         "For definitions, start with a proper definition sentence and keep it precise. "
         "For English or Hindi letter, application, essay, or grammar tasks, answer in the proper school format requested by the question. "
-        "When the student says 'this chapter' or similar, use the recent conversation context to identify the chapter/topic."
+        "When the student says 'this chapter' or similar, use the recent conversation context to identify the chapter/topic. "
+        "If the question is too unclear to answer accurately, ask the student to write a clearer prompt with subject, chapter/topic, and expected answer type."
     )
 
     if has_context:
@@ -1174,7 +1227,8 @@ def _groq_answer(
     else:
         # General knowledge mode for out-of-syllabus queries without textbook context.
         system_prompt = (
-            "You are VidyaAI, a concise and accurate Hindi tutor assistant. "
+            f"You are VidyaAI, a concise and accurate Class {class_level} tutor assistant. "
+            f"{answer_instructions} "
             f"{question_sensitive_rules} "
             "If the user asks a factual general-knowledge/current-affairs question, answer directly in 1-3 lines first. "
             "Then optionally add 2-3 short bullet points for clarity. "

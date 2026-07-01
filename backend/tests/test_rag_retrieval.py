@@ -212,6 +212,13 @@ class RAGRetrievalTests(unittest.TestCase):
         self.assertIn("Hindi school format", requested)
         self.assertIn("सेवा में", requested)
 
+    def test_prompt_language_detection_handles_english_hindi_and_hinglish(self):
+        self.assertEqual(rag._detect_prompt_language("Explain photosynthesis"), "english")
+        self.assertEqual(rag._detect_prompt_language("प्रकाश संश्लेषण समझाइए"), "hindi")
+        self.assertEqual(rag._detect_prompt_language("photosynthesis kya hai"), "hindi")
+        self.assertTrue(rag._is_english_prompt("Explain photosynthesis"))
+        self.assertFalse(rag._is_english_prompt("photosynthesis kya hai"))
+
     def test_definition_request_gets_definition_format(self):
         requested = rag._requested_format_for_question("प्रकाश संश्लेषण किसे कहते हैं", "Science")
 
@@ -286,6 +293,79 @@ class RAGRetrievalTests(unittest.TestCase):
         self.assertIn("for maths questions, solve carefully", prompt_text.lower())
         self.assertIn("2-3 maths questions together", prompt_text.lower())
         self.assertIn("Step 1", answer)
+
+    def test_groq_prompt_uses_english_exam_format_for_english_question(self):
+        original_api_key = rag.settings.groq_api_key
+        original_post = rag.requests.post
+        captured_payload = {}
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"choices": [{"message": {"content": "Photosynthesis is the process by which green plants prepare food."}}]}
+
+        def fake_post(url, headers, json, timeout):
+            captured_payload.update(json)
+            return FakeResponse()
+
+        rag.settings.groq_api_key = "test-key"
+        rag.requests.post = fake_post
+        try:
+            answer, source = rag._groq_answer(
+                question="Explain photosynthesis",
+                context_blocks=[],
+                subject="Science",
+                class_level="10",
+                answer_style="exam",
+            )
+        finally:
+            rag.settings.groq_api_key = original_api_key
+            rag.requests.post = original_post
+
+        prompt_text = "\n".join(message["content"] for message in captured_payload["messages"])
+        self.assertEqual(source, "groq")
+        self.assertIn("Answer in clear English", prompt_text)
+        self.assertIn("Summary (2-3 lines)", prompt_text)
+        self.assertIn("board-exam-ready", prompt_text)
+        self.assertIn("ask the student to write a clearer prompt", prompt_text)
+        self.assertIn("Photosynthesis", answer)
+
+    def test_groq_prompt_uses_hindi_exam_format_for_hinglish_question(self):
+        original_api_key = rag.settings.groq_api_key
+        original_post = rag.requests.post
+        captured_payload = {}
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"choices": [{"message": {"content": "प्रकाश संश्लेषण वह प्रक्रिया है..."}}]}
+
+        def fake_post(url, headers, json, timeout):
+            captured_payload.update(json)
+            return FakeResponse()
+
+        rag.settings.groq_api_key = "test-key"
+        rag.requests.post = fake_post
+        try:
+            answer, source = rag._groq_answer(
+                question="photosynthesis samjhao",
+                context_blocks=[],
+                subject="Science",
+                class_level="10",
+                answer_style="exam",
+            )
+        finally:
+            rag.settings.groq_api_key = original_api_key
+            rag.requests.post = original_post
+
+        prompt_text = "\n".join(message["content"] for message in captured_payload["messages"])
+        self.assertEqual(source, "groq")
+        self.assertIn("Use simple, correct Hindi", prompt_text)
+        self.assertIn("हिंदी वर्तनी", prompt_text)
+        self.assertIn("romanized Hindi", prompt_text)
+        self.assertIn("प्रकाश संश्लेषण", answer)
 
     def test_essay_request_replaces_standard_exam_template(self):
         original_api_key = rag.settings.groq_api_key
