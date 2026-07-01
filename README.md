@@ -226,11 +226,28 @@ If you deploy manually instead of using `deploy.sh`, rebuild the static frontend
 ```bash
 cd /opt/vidyaai
 git pull origin main
+
 cd frontend
 npm install
 VITE_API_URL=/api npm run build
+
 cd ..
 docker compose -f docker-compose.prod.yml up -d --build
+```
+
+To rebuild only the backend on the VPS:
+
+```bash
+cd /opt/vidyaai
+git pull origin main
+docker compose -f docker-compose.prod.yml up -d --build backend
+```
+
+To check production containers and backend logs:
+
+```bash
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs -f backend
 ```
 
 ### Frontend dev server
