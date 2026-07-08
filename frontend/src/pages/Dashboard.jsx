@@ -172,11 +172,11 @@ const subjectQuestionSamples = {
 };
 
 const answerStyles = [
-  { id: "exam", hi: "परीक्षा-मित्र", en: "Exam-ready" },
   { id: "summary", hi: "सारांश", en: "Summary" },
   { id: "two", hi: "2 अंक", en: "2 marks" },
   { id: "five", hi: "5 अंक", en: "5 marks" },
   { id: "qa", hi: "प्रश्नोत्तर", en: "Q&A" },
+  { id: "exam", hi: "मॉक टेस्ट", en: "Mock test" },
 ];
 
 const suggestionChips = [
@@ -588,15 +588,6 @@ export default function Dashboard() {
   const handleNewChat = () => {
     setMessages([{ role: "assistant", text: t.newChatMsg }]);
     setQuestion("");
-  };
-
-  const handleShare = async () => {
-    const transcript = messages.map((m) => `${m.role === "assistant" ? "VidyaAI" : studentName}: ${m.text}`).join("\n\n");
-    if (navigator.share) {
-      try { await navigator.share({ title: "VidyaAI Chat", text: transcript }); } catch {}
-    } else {
-      await handleCopy(transcript);
-    }
   };
 
   const handleLogout = () => {
@@ -1030,6 +1021,16 @@ export default function Dashboard() {
                       Admin Panel
                     </button>
                   )}
+                  <button
+                    type="button"
+                    className="profile-menu-action"
+                    onClick={() => {
+                      setLang((currentLang) => currentLang === "hi" ? "en" : "hi");
+                      setShowProfileMenu(false);
+                    }}
+                  >
+                    {lang === "hi" ? "English" : "हिंदी"}
+                  </button>
                   {isGuest ? (
                     <button type="button" onClick={() => { setShowProfileMenu(false); navigate("/login"); }}>
                       Login
@@ -1043,24 +1044,10 @@ export default function Dashboard() {
               )}
             </div>
 
-            <button type="button" className="icon-btn top-icon-btn" onClick={() => setLang((l) => l === "hi" ? "en" : "hi")} title="Switch Language">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-              <span className="icon-btn-label">{lang === "hi" ? "EN" : "हिं"}</span>
-            </button>
-
-            <button type="button" className="icon-btn top-icon-btn" onClick={handleShare} title="Share Chat">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-            </button>
-
-            {isGuest ? (
-              <button type="button" className="icon-btn top-icon-btn" onClick={() => navigate("/login")} title="Login">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-              </button>
-            ) : (
-              <button type="button" className="icon-btn top-icon-btn" onClick={handleLogout} title="Logout">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-              </button>
-            )}
+            <div className="header-status-chips" aria-label="study status">
+              <span>📅 {daysToExam} {t.countdownUnit}</span>
+              <span title="Daily active streak">🔥 {streak.count || 0} {lang === "hi" ? "दिन streak" : "day streak"}</span>
+            </div>
           </div>
         </header>
 
@@ -1098,7 +1085,7 @@ export default function Dashboard() {
 
         {activeSection === "chat" && (
         <div className="answer-style-bar">
-          <span>उत्तर शैली:</span>
+          <span>{lang === "hi" ? "परीक्षा-मित्र टूल्स" : "Exam-friendly tools"}</span>
           {answerStyles.map((style) => (
             <button
               key={style.id}
