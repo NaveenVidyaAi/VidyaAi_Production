@@ -599,11 +599,12 @@ export default function Dashboard() {
     navigate("/login");
   };
 
-  const askQuestion = async (currentQuestion, subjectOverride = null) => {
+  const askQuestion = async (currentQuestion, subjectOverride = null, answerStyleOverride = null) => {
     if (!currentQuestion || isLoading) return;
 
     recordStudyActivity();
     const outgoingSubject = subjectOverride || selectedSubject || inferSubject(currentQuestion);
+    const outgoingAnswerStyle = answerStyleOverride || answerStyle;
     setQuestion("");
     setIsLoading(true);
     setMessages((prev) => [
@@ -613,7 +614,7 @@ export default function Dashboard() {
         text: currentQuestion,
         question: currentQuestion,
         subject: outgoingSubject,
-        answerStyle,
+        answerStyle: outgoingAnswerStyle,
       },
     ]);
 
@@ -621,7 +622,7 @@ export default function Dashboard() {
       const response = await api.post("/chat/ask", {
         question: currentQuestion,
         subject: outgoingSubject,
-        answer_style: answerStyle,
+        answer_style: outgoingAnswerStyle,
       });
       const assistantMessage = {
         role: "assistant",
@@ -629,7 +630,7 @@ export default function Dashboard() {
         sessionId: response?.data?.session_id,
         question: currentQuestion,
         subject: outgoingSubject,
-        answerStyle,
+        answerStyle: outgoingAnswerStyle,
         chapterOptions: response?.data?.chapter_options || [],
         feedback: null,
       };
@@ -783,6 +784,18 @@ export default function Dashboard() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     await askQuestion(question.trim());
+  };
+
+  const handleAnswerStyleClick = async (style) => {
+    setAnswerStyle(style.id);
+    if (style.id !== "exam" || isLoading) return;
+
+    const subjectLabel = subjects.find((subject) => subject.id === selectedSubject)?.[lang] || selectedSubject;
+    const mockPrompt = lang === "hi"
+      ? `कक्षा ${classLevel} ${subjectLabel} (${medium} माध्यम) के लिए बोर्ड परीक्षा जैसा छोटा मॉक टेस्ट बनाइए। 2 अंक, 5 अंक और एक प्रश्नोत्तर/व्याख्या वाला प्रश्न दीजिए। उत्तर अभी मत दीजिए, पहले सवाल पूछिए।`
+      : `Create a short board-exam style mock test for Class ${classLevel} ${subjectLabel} (${medium} medium). Include 2-mark, 5-mark, and one explanation/Q&A question. Do not give answers yet; ask the questions first.`;
+
+    await askQuestion(mockPrompt, selectedSubject, style.id);
   };
 
   const handleChapterOption = async (option) => {
@@ -1091,7 +1104,8 @@ export default function Dashboard() {
               key={style.id}
               type="button"
               className={answerStyle === style.id ? "active" : ""}
-              onClick={() => setAnswerStyle(style.id)}
+              onClick={() => handleAnswerStyleClick(style)}
+              disabled={style.id === "exam" && isLoading}
             >
               {style[lang]}
             </button>
