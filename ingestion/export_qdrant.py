@@ -7,12 +7,14 @@ from qdrant_client import QdrantClient
 from ingestion.ingest import COLLECTION_NAME
 
 
-def _client(host: str, port: int) -> QdrantClient:
+def _client(host: str, port: int, path: str | None = None) -> QdrantClient:
+    if path:
+        return QdrantClient(path=path)
     return QdrantClient(host=host, port=port, timeout=30)
 
 
-def export_points(output: str, host: str, port: int, source_files: list[str]) -> None:
-    client = _client(host, port)
+def export_points(output: str, host: str, port: int, source_files: list[str], path: str | None = None) -> None:
+    client = _client(host, port, path)
     source_filter = set(source_files)
     count = 0
     output_path = Path(output)
@@ -55,9 +57,10 @@ def main() -> None:
     parser.add_argument("--output", required=True, help="JSONL output path.")
     parser.add_argument("--host", default="qdrant")
     parser.add_argument("--port", type=int, default=6333)
+    parser.add_argument("--path", default=None, help="Local Qdrant persistence path. If set, host/port are ignored.")
     parser.add_argument("--source-file", action="append", default=[], help="Only export this source_file. Repeatable.")
     args = parser.parse_args()
-    export_points(args.output, args.host, args.port, args.source_file)
+    export_points(args.output, args.host, args.port, args.source_file, args.path)
 
 
 if __name__ == "__main__":

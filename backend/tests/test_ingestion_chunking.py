@@ -1,6 +1,6 @@
 import unittest
 
-from ingestion.ingest import chunk_text_with_metadata, normalize_hindi_text
+from ingestion.ingest import _metadata_from_filename, chunk_text_with_metadata, normalize_hindi_text
 
 
 class IngestionChunkingTests(unittest.TestCase):
@@ -48,6 +48,27 @@ class IngestionChunkingTests(unittest.TestCase):
         self.assertEqual(reading_chunks[0][1]["topic"], "Patriotism")
         self.assertEqual(reading_chunks[-1][1]["chapter"], "1-B")
         self.assertIn("Little Kite", reading_chunks[-1][1]["topic"])
+
+    def test_extracts_pyq_metadata_from_filename(self):
+        metadata = _metadata_from_filename(
+            "ingestion/data/Previous_Year_Questions/class_10_hindi_PYQ25_SET_B.pdf"
+        )
+
+        self.assertEqual(metadata["class"], "10")
+        self.assertEqual(metadata["subject"], "Hindi")
+        self.assertEqual(metadata["content_type"], "previous_year_question")
+        self.assertEqual(metadata["year"], "2025")
+        self.assertEqual(metadata["set"], "B")
+        self.assertEqual(metadata["subtopic"], "Set B")
+
+    def test_extracts_sanskrit_pyq_subject_from_filename(self):
+        metadata = _metadata_from_filename(
+            "ingestion/data/Previous_Year_Questions_For_Ingestion/class_10_sanskrit_pyq.pdf"
+        )
+
+        self.assertEqual(metadata["class"], "10")
+        self.assertEqual(metadata["subject"], "Sanskrit")
+        self.assertEqual(metadata["content_type"], "previous_year_question")
 
 
 if __name__ == "__main__":

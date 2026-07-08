@@ -49,6 +49,10 @@ const translations = {
     streakTitle: "Study streak",
     streakUnit: "दिन",
     streakNote: "आज एक लक्ष्य पूरा करके streak बचाएं।",
+    navChat: "Chat",
+    navQuiz: "Quiz",
+    navPyq: "PYQ",
+    navPlan: "Study Plan",
     papersTitle: "Previous Year Papers",
     papersNote: "एक पेपर चुनें और VidyaAI से practice शुरू कराएं।",
     startPaper: "Practice",
@@ -97,6 +101,10 @@ const translations = {
     streakTitle: "Study streak",
     streakUnit: "days",
     streakNote: "Complete one target today to protect it.",
+    navChat: "Chat",
+    navQuiz: "Quiz",
+    navPyq: "PYQ",
+    navPlan: "Study Plan",
     papersTitle: "Previous Year Papers",
     papersNote: "Choose a paper and let VidyaAI start practice.",
     startPaper: "Practice",
@@ -178,6 +186,207 @@ const suggestionChips = [
   { hi: "परीक्षा टिप्स", en: "Exam tips" },
 ];
 
+const importantTopicsBySubject = {
+  Hindi: ["गद्य-पद्य सारांश", "कवि/लेखक परिचय", "केंद्रीय भाव", "2 और 5 अंक प्रश्न", "व्याकरण अभ्यास"],
+  Science: ["रासायनिक अभिक्रियाएं", "अम्ल क्षार और लवण", "धातु-अधातु", "प्रकाश", "विद्युत", "जीव विज्ञान के आरेख"],
+  Math: ["वास्तविक संख्याएं", "बहुपद", "द्विघात समीकरण", "समांतर श्रेणी", "त्रिकोणमिति", "क्षेत्रमिति"],
+  "Social Science": ["इतिहास की महत्वपूर्ण घटनाएं", "भूगोल मानचित्र", "नागरिक शास्त्र", "अर्थशास्त्र", "लघु और दीर्घ उत्तर"],
+  English: ["Prose and poetry summary", "Theme and character sketch", "Grammar", "Letter/application", "Writing section"],
+  Sanskrit: ["अनुवाद", "संधि", "समास", "श्लोक अर्थ", "लघु उत्तरीय प्रश्न"],
+};
+
+const pyqPapers = [
+  {
+    title: "Class 10 English PYQ 2026 Set A",
+    classLevel: "10",
+    subject: "English",
+    year: "2026",
+    set: "A",
+    medium: "English",
+    fileUrl: "/pyq/class_10_english_PYQ26_SET_A.pdf",
+  },
+  {
+    title: "Class 10 English PYQ 2025 Set A",
+    classLevel: "10",
+    subject: "English",
+    year: "2025",
+    set: "A",
+    medium: "English",
+    fileUrl: "/pyq/class_10_english_PYQ25_SET_A.pdf",
+  },
+  {
+    title: "Class 10 Hindi PYQ 2025 Set B",
+    classLevel: "10",
+    subject: "Hindi",
+    year: "2025",
+    set: "B",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_hindi_PYQ25_SET_B.pdf",
+  },
+  {
+    title: "Class 10 Hindi PYQ 2025 Set C",
+    classLevel: "10",
+    subject: "Hindi",
+    year: "2025",
+    set: "C",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_hindi_PYQ25_SET_C.pdf",
+  },
+  {
+    title: "Class 10 Math PYQ 2025 Set A",
+    classLevel: "10",
+    subject: "Math",
+    year: "2025",
+    set: "A",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_math_PYQ25_SET_A.pdf",
+  },
+  {
+    title: "Class 10 Sanskrit PYQ 2025 Set A",
+    classLevel: "10",
+    subject: "Sanskrit",
+    year: "2025",
+    set: "A",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_sanskrit_PYQ25_SET_A.pdf",
+  },
+  {
+    title: "Class 10 Science PYQ 2025 Set A",
+    classLevel: "10",
+    subject: "Science",
+    year: "2025",
+    set: "A",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_science_PYQ25_SET_A.pdf",
+  },
+  {
+    title: "Class 10 Social Science PYQ 2025 Set A",
+    classLevel: "10",
+    subject: "Social Science",
+    year: "2025",
+    set: "A",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_social_science_PYQ25_SET_A.pdf",
+  },
+  {
+    title: "Class 10 Hindi PYQ 2024 Set A",
+    classLevel: "10",
+    subject: "Hindi",
+    year: "2024",
+    set: "A",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_hindi_PYQ24_SET_A.pdf",
+  },
+  {
+    title: "Class 10 Hindi PYQ 2024 Set A 2",
+    classLevel: "10",
+    subject: "Hindi",
+    year: "2024",
+    set: "A 2",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_hindi_PYQ24_SET_A_2.pdf",
+  },
+  {
+    title: "Class 10 Hindi PYQ 2024 Set B",
+    classLevel: "10",
+    subject: "Hindi",
+    year: "2024",
+    set: "B",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_hindi_PYQ24_SET_B.pdf",
+  },
+  {
+    title: "Class 10 Hindi PYQ 2024 Set C",
+    classLevel: "10",
+    subject: "Hindi",
+    year: "2024",
+    set: "C",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_hindi_PYQ24_SET_C.pdf",
+  },
+  {
+    title: "Class 10 Math PYQ 2024 Set A",
+    classLevel: "10",
+    subject: "Math",
+    year: "2024",
+    set: "A",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_math_PYQ24_SET_A.pdf",
+  },
+  {
+    title: "Class 10 Science PYQ 2024 Set A",
+    classLevel: "10",
+    subject: "Science",
+    year: "2024",
+    set: "A",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_science_PYQ24_SET_A.pdf",
+  },
+  {
+    title: "Class 10 Social Science PYQ 2024 Set C",
+    classLevel: "10",
+    subject: "Social Science",
+    year: "2024",
+    set: "C",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_social_science_PYQ24_SET_C.pdf",
+  },
+  {
+    title: "Class 10 Hindi PYQ 2023 Set A",
+    classLevel: "10",
+    subject: "Hindi",
+    year: "2023",
+    set: "A",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_hindi_PYQ23_SET_A.pdf",
+  },
+  {
+    title: "Class 10 Hindi PYQ 2023 Set A 2",
+    classLevel: "10",
+    subject: "Hindi",
+    year: "2023",
+    set: "A 2",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_hindi_PYQ23_SET_A_2.pdf",
+  },
+  {
+    title: "Class 10 Hindi PYQ 2023 Set B",
+    classLevel: "10",
+    subject: "Hindi",
+    year: "2023",
+    set: "B",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_hindi_PYQ23_SET_B.pdf",
+  },
+  {
+    title: "Class 10 Math PYQ 2023 Set A",
+    classLevel: "10",
+    subject: "Math",
+    year: "2023",
+    set: "A",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_math_PYQ23_SET_A.pdf",
+  },
+  {
+    title: "Class 10 Science PYQ 2023 Set A",
+    classLevel: "10",
+    subject: "Science",
+    year: "2023",
+    set: "A",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_science_PYQ23_SET_A.pdf",
+  },
+  {
+    title: "Class 10 Social Science PYQ 2023 Set A",
+    classLevel: "10",
+    subject: "Social Science",
+    year: "2023",
+    set: "A",
+    medium: "Hindi",
+    fileUrl: "/pyq/class_10_social_science_PYQ23_SET_A.pdf",
+  },
+];
+
 const dateKey = (date = new Date()) => date.toISOString().slice(0, 10);
 
 const addDays = (date, days) => {
@@ -216,6 +425,11 @@ export default function Dashboard() {
   const [selectedSubject, setSelectedSubject] = useState("Hindi");
   const [answerStyle, setAnswerStyle] = useState("exam");
   const [quizLoading, setQuizLoading] = useState(false);
+  const [activeSection, setActiveSection] = useState("chat");
+  const [standaloneQuiz, setStandaloneQuiz] = useState(null);
+  const [quizSubject, setQuizSubject] = useState("Hindi");
+  const [studyHours, setStudyHours] = useState(3);
+  const [studyPlan, setStudyPlan] = useState([]);
   const windowRef = useRef(null);
   const messagesEndRef = useRef(null);
   const profileMenuRef = useRef(null);
@@ -233,6 +447,8 @@ export default function Dashboard() {
     : suggestionChips.map((chip) => chip[lang]);
   const learningSubjects = studentProfile?.subject_activity || [];
   const maxSubjectQuestions = Math.max(...learningSubjects.map((item) => item.questions || 0), 1);
+  const classLevel = studentProfile?.class_level || "10";
+  const medium = studentProfile?.medium || "Hindi";
 
   const inferSubject = (text) => {
     const q = (text || "").toLowerCase();
@@ -431,9 +647,6 @@ export default function Dashboard() {
         ...prev,
         assistantMessage,
       ]);
-      if (assistantMessage.sessionId && !assistantMessage.chapterOptions.length) {
-        await generateActivityQuiz(assistantMessage);
-      }
     } catch (err) {
       const status = err?.response?.status;
       setMessages((prev) => [
@@ -476,10 +689,52 @@ export default function Dashboard() {
     }
   };
 
+  const generateSubjectQuiz = async (subject = quizSubject) => {
+    if (quizLoading) return;
+    setQuizLoading(true);
+    setStandaloneQuiz(null);
+    const topics = importantTopicsBySubject[subject] || importantTopicsBySubject.Hindi;
+    try {
+      const response = await api.post("/quiz/generate", {
+        subject,
+        chapter: null,
+        topic: `${subject} important topics`,
+        source_question: `Create Class ${classLevel} ${subject} MCQ practice from important board exam topics.`,
+        source_answer: `Important topics for Class ${classLevel} ${subject}: ${topics.join(", ")}. Medium: ${medium}. Ask exam-oriented concept questions from these topics.`,
+        quiz_type: "subject",
+        count: 5,
+      });
+      setStandaloneQuiz({
+        role: "quiz",
+        text: `${subject} MCQ Practice`,
+        quiz: response.data,
+        selectedAnswers: {},
+        result: null,
+        status: "started",
+      });
+      setActiveSection("quiz");
+    } catch (err) {
+      setStandaloneQuiz({
+        role: "quiz",
+        text: "Quiz unavailable",
+        error: "Quiz service is not ready. Please login and try again after the backend database is available.",
+        quiz: null,
+        selectedAnswers: {},
+        result: null,
+        status: "error",
+      });
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
   const updateQuizMessage = (quizId, updater) => {
     setMessages((prev) => prev.map((message) => (
       message.role === "quiz" && message.quiz?.quiz_id === quizId ? updater(message) : message
     )));
+    setStandaloneQuiz((message) => (
+      message?.role === "quiz" && message.quiz?.quiz_id === quizId ? updater(message) : message
+    ));
   };
 
   const handleQuizOption = (quizId, questionId, optionIndex) => {
@@ -508,6 +763,32 @@ export default function Dashboard() {
     }
   };
 
+  const buildStudyPlan = () => {
+    const parsedHours = Math.min(4, Math.max(3, Number(studyHours) || 3));
+    const days = Math.max(Math.ceil((new Date(examDate) - new Date()) / 86400000), 1);
+    const planLength = Math.min(days, 14);
+    const allSubjects = subjects.map((subject) => subject.id);
+    const totalMinutes = parsedHours * 60;
+    const nextPlan = Array.from({ length: planLength }, (_, index) => {
+      const subject = allSubjects[index % allSubjects.length];
+      const topics = importantTopicsBySubject[subject] || [];
+      const topicA = topics[index % topics.length] || "Important questions";
+      const topicB = topics[(index + 1) % topics.length] || "Revision";
+      return {
+        day: index + 1,
+        subject,
+        hours: parsedHours,
+        blocks: [
+          `${Math.round(totalMinutes * 0.45)} min: ${topicA}`,
+          `${Math.round(totalMinutes * 0.35)} min: ${topicB}`,
+          `${Math.round(totalMinutes * 0.2)} min: short notes + 5 MCQs`,
+        ],
+      };
+    });
+    setStudyPlan(nextPlan);
+    setActiveSection("plan");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     await askQuestion(question.trim());
@@ -517,6 +798,72 @@ export default function Dashboard() {
     const optionSubject = option.subject || selectedSubject || "Hindi";
     setSelectedSubject(optionSubject);
     await askQuestion(option.prompt || `class 10 ${optionSubject} chapter ${option.section}`, optionSubject);
+  };
+
+  const renderQuizCard = (message) => {
+    if (message?.error) {
+      return <p className="quiz-status">{message.error}</p>;
+    }
+    if (!message?.quiz) {
+      return <p className="quiz-status">Choose a subject to start MCQ practice.</p>;
+    }
+    return (
+      <div className="quiz-card">
+        <div className="quiz-card-head">
+          <div>
+            <strong>{message.text || "MCQ Practice"}</strong>
+            <span>{message.quiz?.subject} · {message.quiz?.topic}</span>
+          </div>
+          {message.status === "started" && (
+            <button type="button" className="quiz-skip-btn" onClick={() => handleQuizSkip(message.quiz.quiz_id)}>
+              Skip
+            </button>
+          )}
+        </div>
+        {message.status === "skipped" ? (
+          <p className="quiz-status">Skipped. You can continue studying.</p>
+        ) : (
+          <>
+            <div className="quiz-question-list">
+              {message.quiz?.questions?.map((quizQuestion, qIndex) => {
+                const selected = message.selectedAnswers?.[quizQuestion.id];
+                const detail = message.result?.details?.find((item) => item.id === quizQuestion.id);
+                return (
+                  <div key={quizQuestion.id} className="quiz-question">
+                    <p>{qIndex + 1}. {quizQuestion.prompt}</p>
+                    <div className="quiz-options">
+                      {quizQuestion.options.map((option, optionIndex) => (
+                        <button
+                          key={option}
+                          type="button"
+                          className={[
+                            selected === optionIndex ? "selected" : "",
+                            detail?.correct_option === optionIndex ? "correct" : "",
+                            detail && selected === optionIndex && !detail.is_correct ? "wrong" : "",
+                          ].filter(Boolean).join(" ")}
+                          onClick={() => handleQuizOption(message.quiz.quiz_id, quizQuestion.id, optionIndex)}
+                          disabled={Boolean(message.result)}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                    {detail?.explanation && <small>{detail.explanation}</small>}
+                  </div>
+                );
+              })}
+            </div>
+            {message.result ? (
+              <p className="quiz-status">Score: {message.result.correct}/{message.result.total} ({message.result.score_percent}%)</p>
+            ) : (
+              <button type="button" className="quiz-submit-btn" onClick={() => handleQuizSubmit(message.quiz.quiz_id, message.selectedAnswers)}>
+                Submit MCQ
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    );
   };
 
   const handleFeedback = async (messageIndex, sessionId, understood) => {
@@ -562,6 +909,25 @@ export default function Dashboard() {
           <p>{t.quickPromptsTitle}</p>
           {t.quickPrompts.map((prompt, index) => (
             <button key={index} type="button" className="plain-list-button" onClick={() => setQuestion(prompt)}>{prompt}</button>
+          ))}
+        </div>
+
+        <div className="sidebar-section">
+          <p>Study Tools</p>
+          {[
+            { id: "chat", label: t.navChat },
+            { id: "quiz", label: t.navQuiz },
+            { id: "pyq", label: t.navPyq },
+            { id: "plan", label: t.navPlan },
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`plain-list-button ${activeSection === item.id ? "active" : ""}`}
+              onClick={() => setActiveSection(item.id)}
+            >
+              {item.label}
+            </button>
           ))}
         </div>
 
@@ -699,6 +1065,23 @@ export default function Dashboard() {
         </header>
 
         <div className="mobile-study-controls" aria-label="study-controls">
+          <div className="mobile-tool-strip">
+            {[
+              { id: "chat", label: t.navChat },
+              { id: "quiz", label: t.navQuiz },
+              { id: "pyq", label: t.navPyq },
+              { id: "plan", label: t.navPlan },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={activeSection === item.id ? "active" : ""}
+                onClick={() => setActiveSection(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
           <div className="mobile-subject-strip">
             {subjects.map((subject) => (
               <button
@@ -713,6 +1096,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {activeSection === "chat" && (
         <div className="answer-style-bar">
           <span>उत्तर शैली:</span>
           {answerStyles.map((style) => (
@@ -726,6 +1110,7 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
+        )}
 
         {isAdmin && adminStats?.summary && (
           <section className="dashboard-overview" aria-label="admin-analytics">
@@ -753,6 +1138,7 @@ export default function Dashboard() {
         )}
 
         <div className="dashboard-chat-stage">
+          {activeSection === "chat" && (
           <div className="dashboard-chat-panel">
             <div className="chat-panel-header">
               <div>
@@ -782,61 +1168,7 @@ export default function Dashboard() {
                     <div className={`dashboard-message-bubble ${message.role === "student" ? "student" : "assistant"}${message.role === "quiz" ? " quiz-bubble" : ""}`}>
                       {message.role !== "quiz" && <ReactMarkdown>{message.text}</ReactMarkdown>}
                       {message.role === "quiz" && (
-                        <div className="quiz-card">
-                          <div className="quiz-card-head">
-                            <div>
-                              <strong>Quick MCQ Practice</strong>
-                              <span>{message.quiz?.subject} · {message.quiz?.topic}</span>
-                            </div>
-                            {message.status === "started" && (
-                              <button type="button" className="quiz-skip-btn" onClick={() => handleQuizSkip(message.quiz.quiz_id)}>
-                                Skip
-                              </button>
-                            )}
-                          </div>
-                          {message.status === "skipped" ? (
-                            <p className="quiz-status">Skipped. You can continue studying.</p>
-                          ) : (
-                            <>
-                              <div className="quiz-question-list">
-                                {message.quiz?.questions?.map((quizQuestion, qIndex) => {
-                                  const selected = message.selectedAnswers?.[quizQuestion.id];
-                                  const detail = message.result?.details?.find((item) => item.id === quizQuestion.id);
-                                  return (
-                                    <div key={quizQuestion.id} className="quiz-question">
-                                      <p>{qIndex + 1}. {quizQuestion.prompt}</p>
-                                      <div className="quiz-options">
-                                        {quizQuestion.options.map((option, optionIndex) => (
-                                          <button
-                                            key={option}
-                                            type="button"
-                                            className={[
-                                              selected === optionIndex ? "selected" : "",
-                                              detail?.correct_option === optionIndex ? "correct" : "",
-                                              detail && selected === optionIndex && !detail.is_correct ? "wrong" : "",
-                                            ].filter(Boolean).join(" ")}
-                                            onClick={() => handleQuizOption(message.quiz.quiz_id, quizQuestion.id, optionIndex)}
-                                            disabled={Boolean(message.result)}
-                                          >
-                                            {option}
-                                          </button>
-                                        ))}
-                                      </div>
-                                      {detail?.explanation && <small>{detail.explanation}</small>}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {message.result ? (
-                                <p className="quiz-status">Score: {message.result.correct}/{message.result.total} ({message.result.score_percent}%)</p>
-                              ) : (
-                                <button type="button" className="quiz-submit-btn" onClick={() => handleQuizSubmit(message.quiz.quiz_id, message.selectedAnswers)}>
-                                  Submit MCQ
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </div>
+                        renderQuizCard(message)
                       )}
                       {message.role === "assistant" && message.chapterOptions?.length > 0 && (
                         <div className="chapter-option-list">
@@ -935,6 +1267,142 @@ export default function Dashboard() {
               </button>
             </form>
           </div>
+          )}
+
+          {activeSection === "quiz" && (
+            <div className="study-tool-panel">
+              <div className="tool-panel-head">
+                <div>
+                  <h2>Subject Quizzes</h2>
+                  <p>Choose a subject and take optional MCQ practice when you are ready.</p>
+                </div>
+                <span>{studentProfile?.quiz?.avg_score ?? 0}% avg</span>
+              </div>
+
+              <div className="tool-subject-grid">
+                {subjects.map((subject) => (
+                  <button
+                    key={subject.id}
+                    type="button"
+                    className={quizSubject === subject.id ? "active" : ""}
+                    onClick={() => {
+                      setQuizSubject(subject.id);
+                      setSelectedSubject(subject.id);
+                    }}
+                  >
+                    <strong>{subject[lang]}</strong>
+                    <small>{(importantTopicsBySubject[subject.id] || []).slice(0, 2).join(" · ")}</small>
+                  </button>
+                ))}
+              </div>
+
+              <div className="tool-action-row">
+                <button type="button" className="primary-tool-btn" onClick={() => generateSubjectQuiz(quizSubject)} disabled={quizLoading}>
+                  {quizLoading ? "Creating quiz..." : `Start ${quizSubject} Quiz`}
+                </button>
+              </div>
+
+              <div className="standalone-quiz-wrap">
+                {standaloneQuiz ? renderQuizCard(standaloneQuiz) : (
+                  <div className="empty-tool-state">
+                    <strong>No quiz started</strong>
+                    <span>Your chat will no longer be interrupted by MCQs. Start one here whenever you want practice.</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeSection === "pyq" && (
+            <div className="study-tool-panel">
+              <div className="tool-panel-head">
+                <div>
+                  <h2>{t.papersTitle}</h2>
+                  <p>{t.papersNote}</p>
+                </div>
+                <span>Class {classLevel}</span>
+              </div>
+
+              {pyqPapers.length > 0 ? (
+                <div className="pyq-list">
+                  {pyqPapers.map((paper) => (
+                    <article key={paper.fileUrl} className="pyq-row">
+                      <div>
+                        <strong>{paper.title}</strong>
+                        <span>{paper.subject} · {paper.year} · {paper.medium}</span>
+                      </div>
+                      <div className="pyq-actions">
+                        <a href={paper.fileUrl} target="_blank" rel="noreferrer">Open</a>
+                        <a href={paper.fileUrl} download>Download</a>
+                        <button type="button" onClick={() => {
+                          setSelectedSubject(paper.subject);
+                          setQuestion(`Class ${classLevel} ${paper.subject} ${paper.year} PYQ paper solve करवाइए`);
+                          setActiveSection("chat");
+                        }}>
+                          {t.startPaper}
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-tool-state">
+                  <strong>PYQ papers are ready for upload</strong>
+                  <span>Add PDFs under frontend/public/pyq and register them in the PYQ catalog to enable open/download buttons.</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeSection === "plan" && (
+            <div className="study-tool-panel">
+              <div className="tool-panel-head">
+                <div>
+                  <h2>Study Plan</h2>
+                  <p>Simple subject-wise preparation plan from probable exam date and 3-4 hours daily study time.</p>
+                </div>
+                <span>{daysToExam} {t.countdownUnit}</span>
+              </div>
+
+              <div className="plan-controls">
+                <label>
+                  Probable exam date
+                  <input type="date" value={examDate} onChange={(e) => setExamDate(e.target.value || defaultExamDate())} />
+                </label>
+                <label>
+                  Daily study time
+                  <select value={studyHours} onChange={(e) => setStudyHours(e.target.value)}>
+                    <option value="3">3 hours/day</option>
+                    <option value="4">4 hours/day</option>
+                  </select>
+                </label>
+                <button type="button" className="primary-tool-btn" onClick={buildStudyPlan}>
+                  Create Plan
+                </button>
+              </div>
+
+              {studyPlan.length > 0 ? (
+                <div className="study-plan-list">
+                  {studyPlan.map((day) => (
+                    <article key={day.day} className="study-plan-day">
+                      <div>
+                        <strong>Day {day.day}</strong>
+                        <span>{day.subject} · {day.hours} hours</span>
+                      </div>
+                      <ul>
+                        {day.blocks.map((block) => <li key={block}>{block}</li>)}
+                      </ul>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-tool-state">
+                  <strong>No plan created yet</strong>
+                  <span>Use your probable exam date and choose 3 or 4 hours/day. Class and medium are already taken from login.</span>
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
       </section>

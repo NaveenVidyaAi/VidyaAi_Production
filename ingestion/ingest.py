@@ -3,13 +3,19 @@ import hashlib
 import logging
 import os
 import re
+import sys
 import unicodedata
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import pdfplumber
 import pytesseract
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import FieldCondition, Filter, MatchValue, PointStruct
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from backend.config import settings
 from backend.services.embeddings import embedding_service
@@ -116,6 +122,7 @@ def _metadata_from_filename(path: str) -> Dict[str, str]:
     name = os.path.basename(path)
     base, _ = os.path.splitext(name)
     normalized = base.replace("-", "_").replace(" ", "_")
+    lower_path = path.lower()
 
     meta = {
         "class": "",
@@ -125,18 +132,28 @@ def _metadata_from_filename(path: str) -> Dict[str, str]:
         "subtopic": "",
     }
 
+    is_pyq = bool(
+        re.search(r"(?:^|_)pyq(?:_|$|\d)", normalized, flags=re.IGNORECASE)
+        or "previous_year" in lower_path
+        or "previous year" in lower_path
+    )
+    if is_pyq:
+        meta["content_type"] = "previous_year_question"
+        meta["topic"] = "Previous Year Questions"
+
     class_match = re.search(r"class[_\s]*(x|ix|viii|\d{1,2})", normalized, flags=re.IGNORECASE)
     if class_match:
         raw_class = class_match.group(1).upper()
         roman_map = {"X": "10", "IX": "9", "VIII": "8"}
         meta["class"] = roman_map.get(raw_class, raw_class)
 
-    subject_match = re.search(r"(hindi|english|maths?|science|vigyan|ganit|social(?:_science)?)", normalized, flags=re.IGNORECASE)
+    subject_match = re.search(r"(hindi|english|sanskrit|maths?|science|vigyan|ganit|social(?:_science)?)", normalized, flags=re.IGNORECASE)
     if subject_match:
         raw = subject_match.group(1).lower().replace("_", " ")
         subject_map = {
             "hindi": "Hindi",
             "english": "English",
+            "sanskrit": "Sanskrit",
             "math": "Math",
             "maths": "Math",
             "ganit": "Math",
@@ -151,9 +168,21 @@ def _metadata_from_filename(path: str) -> Dict[str, str]:
     if chapter_match:
         meta["chapter"] = chapter_match.group(1)
 
+    if is_pyq:
+        year_match = re.search(r"pyq[_\s]*(\d{2,4})", normalized, flags=re.IGNORECASE)
+        if year_match:
+            raw_year = year_match.group(1)
+            meta["year"] = f"20{raw_year}" if len(raw_year) == 2 else raw_year
+            meta["topic"] = f"Previous Year Questions {meta['year']}"
+        set_match = re.search(r"set[_\s]*([a-z0-9]+)", normalized, flags=re.IGNORECASE)
+        if set_match:
+            meta["set"] = set_match.group(1).upper()
+            meta["subtopic"] = f"Set {meta['set']}"
+        return meta
+
     topic = normalized
     topic = re.sub(r"class[_\s]*(x|ix|viii|\d{1,2})", "", topic, flags=re.IGNORECASE)
-    topic = re.sub(r"(hindi|english|maths?|ganit|science|vigyan|social[_\s]*science)", "", topic, flags=re.IGNORECASE)
+    topic = re.sub(r"(hindi|english|sanskrit|maths?|ganit|science|vigyan|social[_\s]*science)", "", topic, flags=re.IGNORECASE)
     topic = re.sub(r"chapter[_\s]*\d{1,2}", "", topic, flags=re.IGNORECASE)
     topic = re.sub(r"_+", " ", topic).strip(" _")
     generic_topics = {"credits", "subject", "class subject", "ganit", "vigyan"}
@@ -161,6 +190,12 @@ def _metadata_from_filename(path: str) -> Dict[str, str]:
         meta["topic"] = topic.title()
 
     return meta
+
+
+def _resolve_ingest_path(file_arg: str) -> str:
+    if os.path.isabs(file_arg) or os.path.exists(file_arg):
+        return file_arg
+    return os.path.join(os.path.dirname(__file__), "data", "textbooks", file_arg)
 
 
 def extract_text_from_pdf(path: str, enable_ocr: bool = False) -> str:
@@ -433,11 +468,11 @@ def ingest_file(path: str, enable_ocr: bool = False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Ingest CGBSE textbook PDF into Qdrant.")
-    parser.add_argument("--file", required=True, help="Path to textbook PDF under ingestion/data/textbooks")
+    parser = argparse.ArgumentParser(description="Ingest CGBSE PDF into Qdrant.")
+    parser.add_argument("--file", required=True, help="PDF path, or a filename under ingestion/data/textbooks")
     parser.add_argument("--enable-ocr", action="store_true", help="Render pages and OCR garbled text. Uses much more memory.")
     args = parser.parse_args()
-    ingest_file(os.path.join(os.path.dirname(__file__), "data", "textbooks", args.file), enable_ocr=args.enable_ocr)
+    ingest_file(_resolve_ingest_path(args.file), enable_ocr=args.enable_ocr)
 
 
 if __name__ == "__main__":

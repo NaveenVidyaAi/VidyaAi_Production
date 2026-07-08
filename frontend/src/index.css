@@ -829,6 +829,204 @@ select:focus-visible {
   outline: 0;
 }
 
+.mobile-tool-strip {
+  display: none;
+}
+
+.plain-list-button.active {
+  color: var(--brand);
+  border-color: rgba(18, 107, 82, 0.22);
+  background: #eef8f4;
+}
+
+.study-tool-panel {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 28px clamp(22px, 4vw, 42px);
+}
+
+.tool-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tool-panel-head h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.tool-panel-head p {
+  max-width: 680px;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.tool-panel-head > span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: var(--surface);
+  color: var(--brand);
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.tool-subject-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.tool-subject-grid button,
+.pyq-row,
+.study-plan-day,
+.empty-tool-state {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.tool-subject-grid button {
+  min-height: 96px;
+  padding: 14px;
+  text-align: left;
+}
+
+.tool-subject-grid button.active {
+  border-color: rgba(18, 107, 82, 0.34);
+  background: #eef8f4;
+}
+
+.tool-subject-grid strong,
+.pyq-row strong,
+.study-plan-day strong,
+.empty-tool-state strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.98rem;
+}
+
+.tool-subject-grid small,
+.pyq-row span,
+.study-plan-day span,
+.empty-tool-state span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.tool-action-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 18px 0;
+}
+
+.primary-tool-btn,
+.pyq-actions a,
+.pyq-actions button {
+  border: 0;
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  padding: 10px 14px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.primary-tool-btn:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.standalone-quiz-wrap {
+  margin-top: 16px;
+}
+
+.pyq-list,
+.study-plan-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.pyq-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+}
+
+.pyq-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pyq-actions a:nth-child(2),
+.pyq-actions button {
+  background: var(--blue);
+}
+
+.plan-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-top: 22px;
+}
+
+.plan-controls label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.plan-controls input,
+.plan-controls select {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 10px;
+  font: inherit;
+}
+
+.study-plan-day {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+}
+
+.study-plan-day ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text);
+  line-height: 1.65;
+}
+
+.empty-tool-state {
+  display: grid;
+  gap: 4px;
+  padding: 24px;
+  margin-top: 20px;
+}
+
 .dashboard-chatgpt-window {
   display: grid;
   align-content: start;
@@ -2106,6 +2304,7 @@ select:focus-visible {
     padding: 10px 18px 12px;
   }
 
+  .mobile-tool-strip,
   .mobile-subject-strip {
     display: flex;
     gap: 8px;
@@ -2114,11 +2313,13 @@ select:focus-visible {
   }
 
   .mobile-subject-strip::-webkit-scrollbar,
+  .mobile-tool-strip::-webkit-scrollbar,
   .answer-style-bar::-webkit-scrollbar,
   .suggestion-strip::-webkit-scrollbar {
     display: none;
   }
 
+  .mobile-tool-strip button,
   .mobile-subject-strip button {
     flex: 0 0 auto;
     border: 1px solid var(--line);
@@ -2127,16 +2328,30 @@ select:focus-visible {
     font-weight: 900;
   }
 
+  .mobile-tool-strip button,
   .mobile-subject-strip button {
     min-height: 40px;
     border-radius: 999px;
     padding: 8px 13px;
   }
 
+  .mobile-tool-strip button.active,
   .mobile-subject-strip button.active {
     border-color: rgba(18, 107, 82, 0.34);
     background: var(--brand-soft);
     color: var(--brand);
+  }
+
+  .tool-subject-grid,
+  .plan-controls,
+  .study-plan-day {
+    grid-template-columns: 1fr;
+  }
+
+  .pyq-row,
+  .tool-panel-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
