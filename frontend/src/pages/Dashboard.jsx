@@ -195,6 +195,76 @@ const importantTopicsBySubject = {
   Sanskrit: ["अनुवाद", "संधि", "समास", "श्लोक अर्थ", "लघु उत्तरीय प्रश्न"],
 };
 
+const chapterPlanner = {
+  Hindi: [
+    { chapter: "गद्य खंड", topics: ["लेखक परिचय", "मुख्य घटना", "चरित्र चित्रण"], practice: "2 अंक के 3 प्रश्न और 5 अंक का 1 उत्तर लिखें" },
+    { chapter: "पद्य खंड", topics: ["केंद्रीय भाव", "काव्य सौंदर्य", "व्याख्या"], practice: "एक पद्यांश की व्याख्या और 2 PYQ प्रश्न करें" },
+    { chapter: "व्याकरण", topics: ["संधि", "समास", "मुहावरे"], practice: "10 वस्तुनिष्ठ/लघु प्रश्न हल करें" },
+  ],
+  Science: [
+    { chapter: "रासायनिक अभिक्रियाएं", topics: ["संतुलित समीकरण", "ऑक्सीकरण-अपचयन", "दैनिक जीवन उदाहरण"], practice: "PYQ से 2 अंक और 5 अंक के प्रश्न करें" },
+    { chapter: "अम्ल, क्षार और लवण", topics: ["pH", "लवण", "सूचक"], practice: "कारण सहित 5 छोटे उत्तर लिखें" },
+    { chapter: "प्रकाश", topics: ["परावर्तन", "अपवर्तन", "लेंस आरेख"], practice: "2 ray diagram और 3 numericals करें" },
+    { chapter: "विद्युत", topics: ["ओम का नियम", "श्रृंखला/समांतर", "विद्युत शक्ति"], practice: "सूत्र आधारित 5 प्रश्न हल करें" },
+  ],
+  Math: [
+    { chapter: "द्विघात समीकरण", topics: ["गुणनखंड", "सूत्र विधि", "प्रकृति"], practice: "PYQ से 5 questions step-by-step हल करें" },
+    { chapter: "समांतर श्रेणी", topics: ["nth term", "sum", "word problems"], practice: "कम से कम 6 mixed questions करें" },
+    { chapter: "त्रिकोणमिति", topics: ["identity", "height-distance", "values"], practice: "formula recall + 4 board questions" },
+    { chapter: "क्षेत्रमिति", topics: ["surface area", "volume", "combined solids"], practice: "3 long numericals timed mode में करें" },
+  ],
+  "Social Science": [
+    { chapter: "इतिहास", topics: ["राष्ट्रीय आंदोलन", "महत्वपूर्ण तिथियां", "कारण-परिणाम"], practice: "5 अंक के 2 उत्तर point-wise लिखें" },
+    { chapter: "भूगोल", topics: ["संसाधन", "मानचित्र", "कृषि/उद्योग"], practice: "map practice + 3 short answers" },
+    { chapter: "नागरिक शास्त्र", topics: ["लोकतंत्र", "संविधान", "शक्तियां"], practice: "कारण सहित 4 प्रश्न करें" },
+    { chapter: "अर्थशास्त्र", topics: ["विकास", "मुद्रा", "वैश्वीकरण"], practice: "definitions + examples वाले उत्तर लिखें" },
+  ],
+  English: [
+    { chapter: "Prose", topics: ["theme", "character", "value points"], practice: "2 short answers + 1 long answer" },
+    { chapter: "Poetry", topics: ["central idea", "poetic devices", "stanza explanation"], practice: "one stanza explanation and 3 PYQ questions" },
+    { chapter: "Writing", topics: ["letter", "application", "paragraph"], practice: "one timed writing task" },
+    { chapter: "Grammar", topics: ["tenses", "modals", "editing"], practice: "15 grammar questions" },
+  ],
+  Sanskrit: [
+    { chapter: "पाठ अनुवाद", topics: ["शब्दार्थ", "भावार्थ", "प्रश्नोत्तर"], practice: "एक गद्यांश का हिंदी अनुवाद करें" },
+    { chapter: "व्याकरण", topics: ["संधि", "समास", "कारक"], practice: "10 रूप/व्याकरण प्रश्न करें" },
+    { chapter: "श्लोक", topics: ["अर्थ", "अन्वय", "व्याख्या"], practice: "2 श्लोक अर्थ सहित लिखें" },
+  ],
+};
+
+const pyqStyleQuestionsBySubject = {
+  Hindi: [
+    { marks: "2 अंक", topic: "केंद्रीय भाव", question: "किसी पाठ/कविता का केंद्रीय भाव अपने शब्दों में लिखिए।" },
+    { marks: "5 अंक", topic: "चरित्र/व्याख्या", question: "मुख्य पात्र/कवि के विचारों को उदाहरण सहित समझाइए।" },
+    { marks: "प्रश्नोत्तर", topic: "पद्यांश", question: "दिए गए पद्यांश की प्रसंग सहित व्याख्या कीजिए।" },
+  ],
+  Science: [
+    { marks: "2 अंक", topic: "अम्ल क्षार और लवण", question: "pH मान का दैनिक जीवन में महत्व दो उदाहरण सहित लिखिए।" },
+    { marks: "3 अंक", topic: "प्रकाश", question: "उत्तल लेंस द्वारा प्रतिबिंब बनने की स्थिति ray diagram से समझाइए।" },
+    { marks: "5 अंक", topic: "विद्युत", question: "श्रृंखला और समांतर संयोजन में अंतर लिखकर एक numerical हल कीजिए।" },
+  ],
+  Math: [
+    { marks: "2 अंक", topic: "द्विघात समीकरण", question: "x² - 5x + 6 = 0 के मूल ज्ञात कीजिए।" },
+    { marks: "3 अंक", topic: "समांतर श्रेणी", question: "AP में a = 3, d = 4 हो तो 20वां पद और पहले 20 पदों का योग ज्ञात कीजिए।" },
+    { marks: "5 अंक", topic: "क्षेत्रमिति", question: "एक संयुक्त ठोस का आयतन और पृष्ठीय क्षेत्रफल निकालने वाला प्रश्न हल कीजिए।" },
+  ],
+  "Social Science": [
+    { marks: "2 अंक", topic: "इतिहास", question: "राष्ट्रीय आंदोलन में किसी एक प्रमुख घटना का महत्व लिखिए।" },
+    { marks: "3 अंक", topic: "भूगोल", question: "संसाधन संरक्षण क्यों आवश्यक है? तीन कारण लिखिए।" },
+    { marks: "5 अंक", topic: "नागरिक शास्त्र", question: "लोकतंत्र की प्रमुख विशेषताएं उदाहरण सहित समझाइए।" },
+  ],
+  English: [
+    { marks: "2 marks", topic: "Poetry", question: "Write the central idea of a poem you have studied." },
+    { marks: "3 marks", topic: "Grammar", question: "Attempt a short editing/omission question with correct answers." },
+    { marks: "5 marks", topic: "Writing", question: "Write an application/letter in proper board-exam format." },
+  ],
+  Sanskrit: [
+    { marks: "2 अंक", topic: "अनुवाद", question: "किसी पाठ के दो वाक्यों का हिंदी अनुवाद कीजिए।" },
+    { marks: "3 अंक", topic: "व्याकरण", question: "संधि/समास के तीन उदाहरण हल कीजिए।" },
+    { marks: "5 अंक", topic: "श्लोक", question: "किसी श्लोक का अर्थ और भावार्थ लिखिए।" },
+  ],
+};
+
 const pyqPapers = [
   {
     title: "Class 10 English PYQ 2026 Set A",
@@ -758,27 +828,60 @@ export default function Dashboard() {
   const buildStudyPlan = () => {
     const parsedHours = Math.min(4, Math.max(3, Number(studyHours) || 3));
     const days = Math.max(Math.ceil((new Date(examDate) - new Date()) / 86400000), 1);
-    const planLength = Math.min(days, 14);
+    const planLength = Math.min(days, 21);
     const allSubjects = subjects.map((subject) => subject.id);
     const totalMinutes = parsedHours * 60;
     const nextPlan = Array.from({ length: planLength }, (_, index) => {
-      const subject = allSubjects[index % allSubjects.length];
-      const topics = importantTopicsBySubject[subject] || [];
-      const topicA = topics[index % topics.length] || "Important questions";
-      const topicB = topics[(index + 1) % topics.length] || "Revision";
+      const subject = index % 5 === 0 ? selectedSubject : allSubjects[index % allSubjects.length];
+      const subjectPlan = chapterPlanner[subject] || chapterPlanner.Hindi;
+      const chapter = subjectPlan[index % subjectPlan.length];
+      const secondSubject = allSubjects[(index + 2) % allSubjects.length];
+      const secondPlan = chapterPlanner[secondSubject] || chapterPlanner.Hindi;
+      const secondChapter = secondPlan[index % secondPlan.length];
+      const revisionMinutes = Math.round(totalMinutes * 0.45);
+      const practiceMinutes = Math.round(totalMinutes * 0.35);
+      const testMinutes = totalMinutes - revisionMinutes - practiceMinutes;
       return {
         day: index + 1,
         subject,
+        chapter: chapter.chapter,
+        topics: chapter.topics,
+        secondarySubject: secondSubject,
         hours: parsedHours,
         blocks: [
-          `${Math.round(totalMinutes * 0.45)} min: ${topicA}`,
-          `${Math.round(totalMinutes * 0.35)} min: ${topicB}`,
-          `${Math.round(totalMinutes * 0.2)} min: short notes + 5 MCQs`,
+          `${revisionMinutes} min: ${subject} - ${chapter.chapter}: ${chapter.topics.join(", ")}`,
+          `${practiceMinutes} min: ${chapter.practice}`,
+          `${testMinutes} min: ${secondSubject} quick revision - ${secondChapter.chapter}`,
+          "Last 10 min: mistakes notebook update + tomorrow's weak topic mark करें",
         ],
       };
     });
     setStudyPlan(nextPlan);
     setActiveSection("plan");
+  };
+
+  const buildMockTestText = (subject) => {
+    const subjectLabel = subjects.find((item) => item.id === subject)?.[lang] || subject;
+    const questions = pyqStyleQuestionsBySubject[subject] || pyqStyleQuestionsBySubject.Hindi;
+    const topicHint = importantTopicsBySubject[subject]?.[0] || "important topic";
+    if (lang === "hi") {
+      return [
+        `## ${subjectLabel} मॉक टेस्ट`,
+        `**फोकस टॉपिक:** ${topicHint}`,
+        "",
+        "पहले ये सवाल खुद लिखकर हल करें। उत्तर लिखने के बाद मुझे भेजें, मैं जांचकर सुधार बताऊंगा।",
+        "",
+        ...questions.slice(0, 3).map((item, index) => `${index + 1}. **${item.marks} | ${item.topic}:** ${item.question}`),
+      ].join("\n");
+    }
+    return [
+      `## ${subjectLabel} Mock Test`,
+      `**Focus topic:** ${topicHint}`,
+      "",
+      "Attempt these first. Send your answer afterwards and I will check it with improvements.",
+      "",
+      ...questions.slice(0, 3).map((item, index) => `${index + 1}. **${item.marks} | ${item.topic}:** ${item.question}`),
+    ].join("\n");
   };
 
   const handleSubmit = async (e) => {
@@ -790,12 +893,19 @@ export default function Dashboard() {
     setAnswerStyle(style.id);
     if (style.id !== "exam" || isLoading) return;
 
-    const subjectLabel = subjects.find((subject) => subject.id === selectedSubject)?.[lang] || selectedSubject;
-    const mockPrompt = lang === "hi"
-      ? `कक्षा ${classLevel} ${subjectLabel} (${medium} माध्यम) के लिए बोर्ड परीक्षा जैसा छोटा मॉक टेस्ट बनाइए। 2 अंक, 5 अंक और एक प्रश्नोत्तर/व्याख्या वाला प्रश्न दीजिए। उत्तर अभी मत दीजिए, पहले सवाल पूछिए।`
-      : `Create a short board-exam style mock test for Class ${classLevel} ${subjectLabel} (${medium} medium). Include 2-mark, 5-mark, and one explanation/Q&A question. Do not give answers yet; ask the questions first.`;
-
-    await askQuestion(mockPrompt, selectedSubject, style.id);
+    recordStudyActivity();
+    setActiveSection("chat");
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        text: buildMockTestText(selectedSubject),
+        question: "Mock test",
+        subject: selectedSubject,
+        answerStyle: style.id,
+        feedback: null,
+      },
+    ]);
   };
 
   const handleChapterOption = async (option) => {
@@ -949,7 +1059,7 @@ export default function Dashboard() {
       </aside>
 
       <section className="dashboard-main-chat">
-        <header className="dashboard-main-top">
+        <header className={`dashboard-main-top ${showProfileMenu ? "profile-menu-open" : ""}`}>
           <div className="dashboard-title-block">
             <h1>{t.greeting(studentName)}</h1>
             <div className="student-tags">
@@ -958,10 +1068,10 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="top-actions">
+          <div className="top-actions" ref={profileMenuRef}>
             <div className="mobile-brand-mark" aria-label="VidyaAI">वि</div>
 
-            <div className="mobile-profile-wrap" ref={profileMenuRef}>
+            <div className="mobile-profile-wrap">
               <button type="button" className="mobile-profile-chip" onClick={() => setShowProfileMenu((open) => !open)} title={t.profileTitle} aria-expanded={showProfileMenu}>
                 <span className="mobile-profile-avatar" aria-hidden="true">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
@@ -971,96 +1081,95 @@ export default function Dashboard() {
                   <small>कक्षा {studentProfile?.class_level || "10"} • {studentProfile?.medium || "Hindi"}</small>
                 </span>
               </button>
-
-              {showProfileMenu && (
-                <div className="mobile-profile-menu">
-                  <div className="mobile-profile-menu-head">
-                    <strong>{studentName}</strong>
-                    <span>{isGuest ? t.profileLabels.guest : t.profileLabels.loggedIn}</span>
-                  </div>
-                  <dl>
-                    <div><dt>{t.profileLabels.class}</dt><dd>{studentProfile?.class_level || "10"}</dd></div>
-                    <div><dt>{t.profileLabels.medium}</dt><dd>{studentProfile?.medium || "Hindi"}</dd></div>
-                    <div><dt>Board</dt><dd>CGBSE</dd></div>
-                  </dl>
-                  <div className="mobile-learning-panel">
-                    <div className="mobile-learning-head">
-                      <strong>Learning Tracker</strong>
-                      <span>{studentProfile?.quiz?.completed ?? 0}/{studentProfile?.quiz?.started ?? 0} quizzes</span>
-                    </div>
-                    <div className="mobile-learning-grid">
-                      <div><span>Quiz Avg</span><strong>{studentProfile?.quiz?.avg_score ?? 0}%</strong></div>
-                      <div><span>Improve</span><strong>{studentProfile?.quiz?.improvement ?? 0}%</strong></div>
-                      <div><span>Subjects</span><strong>{learningSubjects.length}</strong></div>
-                      <div><span>Weak</span><strong>{studentProfile?.weak_topics?.length ?? 0}</strong></div>
-                    </div>
-                    {learningSubjects.length > 0 && (
-                      <div className="mobile-learning-subjects">
-                        {learningSubjects.slice(0, 3).map((item) => (
-                          <button
-                            key={item.subject}
-                            type="button"
-                            onClick={() => {
-                              setShowProfileMenu(false);
-                              setSelectedSubject(item.subject);
-                              setQuestion(`${item.subject} revision कराइए`);
-                            }}
-                          >
-                            <span>{item.subject}</span>
-                            <small>{item.questions} Q · {item.quiz_attempts} quiz · {item.avg_quiz_score || 0}%</small>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {studentProfile?.weak_topics?.length > 0 && (
-                      <div className="mobile-weak-topics">
-                        {studentProfile.weak_topics.slice(0, 3).map((topic) => (
-                          <button
-                            key={`${topic.subject}-${topic.topic}`}
-                            type="button"
-                            onClick={() => {
-                              setShowProfileMenu(false);
-                              setQuestion(`${topic.subject} ${topic.topic} revise कराइए`);
-                            }}
-                          >
-                            {topic.topic}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {isAdmin && (
-                    <button type="button" onClick={() => { setShowProfileMenu(false); navigate("/admin"); }}>
-                      Admin Panel
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="profile-menu-action"
-                    onClick={() => {
-                      setLang((currentLang) => currentLang === "hi" ? "en" : "hi");
-                      setShowProfileMenu(false);
-                    }}
-                  >
-                    {lang === "hi" ? "English" : "हिंदी"}
-                  </button>
-                  {isGuest ? (
-                    <button type="button" onClick={() => { setShowProfileMenu(false); navigate("/login"); }}>
-                      Login
-                    </button>
-                  ) : (
-                    <button type="button" onClick={handleLogout}>
-                      Logout
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
 
             <div className="header-status-chips" aria-label="study status">
-              <span>📅 {daysToExam} {t.countdownUnit}</span>
               <span title="Daily active streak">🔥 {streak.count || 0} {lang === "hi" ? "दिन streak" : "day streak"}</span>
             </div>
+
+            {showProfileMenu && (
+              <div className="mobile-profile-menu">
+                <div className="mobile-profile-menu-head">
+                  <strong>{studentName}</strong>
+                  <span>{isGuest ? t.profileLabels.guest : t.profileLabels.loggedIn}</span>
+                </div>
+                <dl>
+                  <div><dt>{t.profileLabels.class}</dt><dd>{studentProfile?.class_level || "10"}</dd></div>
+                  <div><dt>{t.profileLabels.medium}</dt><dd>{studentProfile?.medium || "Hindi"}</dd></div>
+                  <div><dt>Board</dt><dd>CGBSE</dd></div>
+                </dl>
+                <div className="mobile-learning-panel">
+                  <div className="mobile-learning-head">
+                    <strong>Learning Tracker</strong>
+                    <span>{studentProfile?.quiz?.completed ?? 0}/{studentProfile?.quiz?.started ?? 0} quizzes</span>
+                  </div>
+                  <div className="mobile-learning-grid">
+                    <div><span>Quiz Avg</span><strong>{studentProfile?.quiz?.avg_score ?? 0}%</strong></div>
+                    <div><span>Improve</span><strong>{studentProfile?.quiz?.improvement ?? 0}%</strong></div>
+                    <div><span>Subjects</span><strong>{learningSubjects.length}</strong></div>
+                    <div><span>Weak</span><strong>{studentProfile?.weak_topics?.length ?? 0}</strong></div>
+                  </div>
+                  {learningSubjects.length > 0 && (
+                    <div className="mobile-learning-subjects">
+                      {learningSubjects.slice(0, 3).map((item) => (
+                        <button
+                          key={item.subject}
+                          type="button"
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setSelectedSubject(item.subject);
+                            setQuestion(`${item.subject} revision कराइए`);
+                          }}
+                        >
+                          <span>{item.subject}</span>
+                          <small>{item.questions} Q · {item.quiz_attempts} quiz · {item.avg_quiz_score || 0}%</small>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {studentProfile?.weak_topics?.length > 0 && (
+                    <div className="mobile-weak-topics">
+                      {studentProfile.weak_topics.slice(0, 3).map((topic) => (
+                        <button
+                          key={`${topic.subject}-${topic.topic}`}
+                          type="button"
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setQuestion(`${topic.subject} ${topic.topic} revise कराइए`);
+                          }}
+                        >
+                          {topic.topic}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {isAdmin && (
+                  <button type="button" onClick={() => { setShowProfileMenu(false); navigate("/admin"); }}>
+                    Admin Panel
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="profile-menu-action"
+                  onClick={() => {
+                    setLang((currentLang) => currentLang === "hi" ? "en" : "hi");
+                    setShowProfileMenu(false);
+                  }}
+                >
+                  {lang === "hi" ? "English" : "हिंदी"}
+                </button>
+                {isGuest ? (
+                  <button type="button" onClick={() => { setShowProfileMenu(false); navigate("/login"); }}>
+                    Login
+                  </button>
+                ) : (
+                  <button type="button" onClick={handleLogout}>
+                    Logout
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </header>
 
@@ -1388,7 +1497,7 @@ export default function Dashboard() {
                     <article key={day.day} className="study-plan-day">
                       <div>
                         <strong>Day {day.day}</strong>
-                        <span>{day.subject} · {day.hours} hours</span>
+                        <span>{day.subject} · {day.chapter} · {day.hours} hours</span>
                       </div>
                       <ul>
                         {day.blocks.map((block) => <li key={block}>{block}</li>)}

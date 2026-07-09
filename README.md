@@ -218,8 +218,35 @@ Run these commands on the VPS:
 
 ```bash
 cd /opt/vidyaai
+git pull origin main
 bash deploy.sh
 ```
+
+### Import prepared PYQ Qdrant chunks on VPS
+
+Use this after pulling/deploying when PYQ chunks were already exported locally. This imports vectors directly into Qdrant and does **not** run OCR on the VPS.
+
+```bash
+cd /opt/vidyaai
+git pull origin main
+bash deploy.sh
+
+docker compose -f docker-compose.prod.yml exec backend \
+  python -m ingestion.import_qdrant \
+  --input ingestion/qdrant_exports/pyq_previous_year_questions_points.jsonl \
+  --host qdrant \
+  --port 6333
+```
+
+To verify the import, check the backend can still reach Qdrant and inspect logs:
+
+```bash
+cd /opt/vidyaai
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs -f backend
+```
+
+Do not run `ingestion.ingest --enable-ocr` on the VPS for these PYQ files unless you intentionally want to reprocess PDFs from scratch.
 
 If you deploy manually instead of using `deploy.sh`, rebuild the static frontend before restarting Docker/Nginx:
 
