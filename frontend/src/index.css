@@ -381,7 +381,7 @@ select:focus-visible {
 /* Student Dashboard */
 .dashboard-app-shell {
   display: grid;
-  grid-template-columns: 310px minmax(0, 1fr) 330px;
+  grid-template-columns: minmax(260px, 20vw) minmax(0, 1fr) minmax(300px, 22vw);
   gap: 0;
   width: 100%;
   max-width: none;
@@ -589,6 +589,8 @@ select:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-width: 0;
+  flex-wrap: wrap;
   gap: 18px;
   background: linear-gradient(135deg, var(--navy), var(--navy-2));
   color: #fff;
@@ -601,9 +603,11 @@ select:focus-visible {
   font-size: clamp(1.65rem, 2.25vw, 2.45rem);
   line-height: 1.12;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-title-block {
+  flex: 1 1 300px;
   min-width: 0;
 }
 
@@ -637,7 +641,9 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   min-width: 0;
 }
 
@@ -649,8 +655,10 @@ select:focus-visible {
   position: relative;
   display: grid;
   order: 2;
-  width: min(280px, 30vw);
-  min-width: 210px;
+  flex: 1 1 190px;
+  width: clamp(170px, 22vw, 280px);
+  min-width: 0;
+  max-width: 280px;
 }
 
 .mobile-profile-chip {
@@ -710,11 +718,10 @@ select:focus-visible {
 }
 
 .mobile-profile-menu {
-  position: absolute;
+  position: static;
   z-index: 80;
-  top: calc(100% + 9px);
-  right: 0;
-  width: min(340px, 88vw);
+  width: 100%;
+  margin-top: 9px;
   max-height: min(70vh, 520px);
   overflow-y: auto;
   display: grid;
@@ -956,6 +963,7 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1 1 180px;
   flex-wrap: wrap;
   justify-content: flex-end;
   order: 1;
@@ -1088,8 +1096,13 @@ select:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
   padding: 26px clamp(22px, 4vw, 42px) 10px;
+}
+
+.chat-panel-header > * {
+  min-width: 0;
 }
 
 .assistant-card-title {
@@ -1125,6 +1138,9 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 0 1 250px;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(255, 250, 240, 0.9);
@@ -1135,6 +1151,8 @@ select:focus-visible {
 }
 
 .chat-exam-date input {
+  width: 100%;
+  min-width: 0;
   max-width: 148px;
   border: 0;
   background: transparent;
