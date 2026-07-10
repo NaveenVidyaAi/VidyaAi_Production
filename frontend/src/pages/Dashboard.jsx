@@ -1061,7 +1061,7 @@ export default function Dashboard() {
         <div className="sidebar-section sidebar-tool-section">
           <p>Study Tools</p>
           {[
-            { id: "recent", label: t.recentChatsTitle, helper: lang === "hi" ? "Recent questions" : "Recent questions" },
+            { id: "chat", label: t.navChat, helper: lang === "hi" ? "मुख्य चैट" : "Main chat" },
             { id: "pyq", label: t.navPyq, helper: lang === "hi" ? "Previous papers" : "Previous papers" },
             { id: "plan", label: t.navPlan, helper: lang === "hi" ? "Daily roadmap" : "Daily roadmap" },
             { id: "quiz", label: t.navQuiz, helper: lang === "hi" ? "MCQ practice" : "MCQ practice" },
@@ -1069,13 +1069,8 @@ export default function Dashboard() {
             <button
               key={item.id}
               type="button"
-              className={`plain-list-button ${item.id === "recent" ? (showRecentPanel ? "active" : "") : activeSection === item.id ? "active" : ""}`}
+              className={`plain-list-button ${activeSection === item.id ? "active" : ""}`}
               onClick={() => {
-                if (item.id === "recent") {
-                  setActiveSection("chat");
-                  setShowRecentPanel((open) => !open);
-                  return;
-                }
                 setActiveSection(item.id);
                 setShowRecentPanel(false);
               }}
@@ -1083,37 +1078,38 @@ export default function Dashboard() {
               aria-label={item.label}
             >
               <span className={`nav-icon nav-icon-${item.id}`} aria-hidden="true">
-                {item.id === "recent" && (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8Z" />
-                    <path d="M8 8h8" />
-                    <path d="M8 12h6" />
+                {item.id === "chat" && (
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4.5 10.4 12 4l7.5 6.4v8.1A1.5 1.5 0 0 1 18 20h-3.2v-5.2H9.2V20H6a1.5 1.5 0 0 1-1.5-1.5v-8.1Z" fill="currentColor" opacity="0.28" />
+                    <path d="M3.4 11.2 12 3.85l8.6 7.35" stroke="currentColor" strokeWidth="2.35" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M6 10.6v7.8h3.2v-4.9h5.6v4.9H18v-7.8" stroke="currentColor" strokeWidth="2.15" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
                 {item.id === "pyq" && (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
-                    <path d="M8 7h8" />
-                    <path d="M8 11h6" />
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M5.5 4.5h5.1c.8 0 1.4.6 1.4 1.4v13.6c-.5-.8-1.3-1.2-2.3-1.2H5.5A1.5 1.5 0 0 1 4 16.8V6a1.5 1.5 0 0 1 1.5-1.5Z" fill="currentColor" opacity="0.24" />
+                    <path d="M18.5 4.5h-5.1c-.8 0-1.4.6-1.4 1.4v13.6c.5-.8 1.3-1.2 2.3-1.2h4.2a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5Z" fill="currentColor" opacity="0.24" />
+                    <path d="M12 6.1v13.4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                    <path d="M7.4 9h2.1M7.4 12.2h2.1M14.5 9h2.1M14.5 12.2h2.1" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+                    <path d="M5.5 4.5h5.1c.8 0 1.4.6 1.4 1.4v13.6c-.5-.8-1.3-1.2-2.3-1.2H5.5A1.5 1.5 0 0 1 4 16.8V6a1.5 1.5 0 0 1 1.5-1.5ZM18.5 4.5h-5.1c-.8 0-1.4.6-1.4 1.4v13.6c.5-.8 1.3-1.2 2.3-1.2h4.2a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5Z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
                   </svg>
                 )}
                 {item.id === "plan" && (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M8 2v4" />
-                    <path d="M16 2v4" />
-                    <rect x="3" y="4" width="18" height="18" rx="2" />
-                    <path d="M3 10h18" />
-                    <path d="M8 14h.01" />
-                    <path d="M12 14h.01" />
-                    <path d="M16 14h.01" />
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="4" y="5.5" width="16" height="15" rx="3" fill="currentColor" opacity="0.24" />
+                    <path d="M8 3.5v4M16 3.5v4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                    <path d="M4.5 10.2h15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M9 15.1 11 17l4-4.5" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
+                    <rect x="4" y="5.5" width="16" height="15" rx="3" stroke="currentColor" strokeWidth="2" />
                   </svg>
                 )}
                 {item.id === "quiz" && (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 11 11 13 15 9" />
-                    <path d="M20 6 9 17l-5-5" />
-                    <path d="M4 4h16v16H4z" />
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="5" y="3.5" width="14" height="17" rx="3" fill="currentColor" opacity="0.24" />
+                    <path d="M9 8h6" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
+                    <path d="m8.5 13 1.8 1.8 4.4-5" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M9 17h4.8" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
+                    <rect x="5" y="3.5" width="14" height="17" rx="3" stroke="currentColor" strokeWidth="2" />
                   </svg>
                 )}
               </span>
@@ -1159,15 +1155,7 @@ export default function Dashboard() {
       <section className="dashboard-main-chat">
         <header className={`dashboard-main-top ${showProfileMenu ? "profile-menu-open" : ""}`}>
           <div className="header-left-cluster">
-            <button
-              type="button"
-              className={`header-language-switch ${lang === "en" ? "english" : "hindi"}`}
-              onClick={() => setLang((currentLang) => currentLang === "hi" ? "en" : "hi")}
-              aria-label={lang === "hi" ? "Switch to English" : "हिंदी में बदलें"}
-            >
-              <span>अ</span>
-              <span>A</span>
-            </button>
+            <div className="top-wordmark">Vidya AI</div>
 
             <div className="dashboard-title-block">
               <div className="lesson-breadcrumb">
@@ -1242,6 +1230,16 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+
+            <button
+              type="button"
+              className={`header-language-switch ${lang === "en" ? "english" : "hindi"}`}
+              onClick={() => setLang((currentLang) => currentLang === "hi" ? "en" : "hi")}
+              aria-label={lang === "hi" ? "Switch to English" : "हिंदी में बदलें"}
+            >
+              <span>अ</span>
+              <span>A</span>
+            </button>
 
             <div className="mobile-profile-wrap">
               <button type="button" className="mobile-profile-chip" onClick={() => setShowProfileMenu((open) => !open)} title={t.profileTitle} aria-expanded={showProfileMenu}>
