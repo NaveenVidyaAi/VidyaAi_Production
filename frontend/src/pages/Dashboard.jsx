@@ -498,8 +498,11 @@ export default function Dashboard() {
   const [activeSection, setActiveSection] = useState("chat");
   const [standaloneQuiz, setStandaloneQuiz] = useState(null);
   const [quizSubject, setQuizSubject] = useState("Hindi");
+  const [pyqSubject, setPyqSubject] = useState("Hindi");
   const [studyHours, setStudyHours] = useState(3);
   const [studyPlan, setStudyPlan] = useState([]);
+  const [showSubjectMenu, setShowSubjectMenu] = useState(false);
+  const [showRecentPanel, setShowRecentPanel] = useState(false);
   const windowRef = useRef(null);
   const messagesEndRef = useRef(null);
   const profileMenuRef = useRef(null);
@@ -519,6 +522,14 @@ export default function Dashboard() {
   const maxSubjectQuestions = Math.max(...learningSubjects.map((item) => item.questions || 0), 1);
   const classLevel = studentProfile?.class_level || "10";
   const medium = studentProfile?.medium || "Hindi";
+  const pyqSubjects = subjects
+    .map((subject) => ({
+      subject,
+      count: pyqPapers.filter((paper) => paper.subject === subject.id).length,
+    }))
+    .filter((group) => group.count > 0);
+  const selectedPyqSubjectMeta = subjects.find((subject) => subject.id === pyqSubject) || subjects[0];
+  const selectedPyqPapers = pyqPapers.filter((paper) => paper.subject === pyqSubject);
 
   const inferSubject = (text) => {
     const q = (text || "").toLowerCase();
@@ -598,6 +609,19 @@ export default function Dashboard() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [showProfileMenu]);
+
+  useEffect(() => {
+    if (!showSubjectMenu) return;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setShowSubjectMenu(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showSubjectMenu]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -1007,52 +1031,126 @@ export default function Dashboard() {
     <div className="page-shell dashboard-app-shell">
       <aside className="dashboard-left-nav">
         <div className="sidebar-brand">
-          <div className="sidebar-brand-mark" aria-hidden="true">वि</div>
+          <div className="sidebar-brand-mark" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 4.5 9.8 19.5h4.4L20 4.5h-4.1L12 15.4 8.1 4.5H4Z" fill="currentColor" />
+              <path d="M8.5 4.5h7" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" opacity="0.72" />
+            </svg>
+          </div>
           <div className="sidebar-brand-copy">
             <strong>VidyaAI</strong>
             <p>{t.sidebarTagline}</p>
           </div>
         </div>
 
-        <button type="button" className="nav-action primary" onClick={handleNewChat}>{t.newChat}</button>
+        <button type="button" className="nav-action primary" onClick={handleNewChat}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          <span>{t.newChat.replace("+ ", "")}</span>
+        </button>
         {isAdmin && (
           <button type="button" className="nav-action nav-action-admin" onClick={() => navigate("/admin")}>Admin Panel</button>
         )}
 
-        <div className="sidebar-section">
+        <div className="sidebar-section quick-prompt-section">
           <p>{t.quickPromptsTitle}</p>
           {t.quickPrompts.map((prompt, index) => (
             <button key={index} type="button" className="plain-list-button" onClick={() => setQuestion(prompt)}>{prompt}</button>
           ))}
         </div>
 
-        <div className="sidebar-section">
+        <div className="sidebar-section sidebar-tool-section">
           <p>Study Tools</p>
           {[
-            { id: "chat", label: t.navChat },
-            { id: "quiz", label: t.navQuiz },
-            { id: "pyq", label: t.navPyq },
-            { id: "plan", label: t.navPlan },
+            { id: "recent", label: t.recentChatsTitle, helper: lang === "hi" ? "Recent questions" : "Recent questions" },
+            { id: "pyq", label: t.navPyq, helper: lang === "hi" ? "Previous papers" : "Previous papers" },
+            { id: "plan", label: t.navPlan, helper: lang === "hi" ? "Daily roadmap" : "Daily roadmap" },
+            { id: "quiz", label: t.navQuiz, helper: lang === "hi" ? "MCQ practice" : "MCQ practice" },
           ].map((item) => (
             <button
               key={item.id}
               type="button"
-              className={`plain-list-button ${activeSection === item.id ? "active" : ""}`}
-              onClick={() => setActiveSection(item.id)}
+              className={`plain-list-button ${item.id === "recent" ? (showRecentPanel ? "active" : "") : activeSection === item.id ? "active" : ""}`}
+              onClick={() => {
+                if (item.id === "recent") {
+                  setActiveSection("chat");
+                  setShowRecentPanel((open) => !open);
+                  return;
+                }
+                setActiveSection(item.id);
+                setShowRecentPanel(false);
+              }}
+              title={item.label}
+              aria-label={item.label}
             >
-              {item.label}
+              <span className={`nav-icon nav-icon-${item.id}`} aria-hidden="true">
+                {item.id === "recent" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8Z" />
+                    <path d="M8 8h8" />
+                    <path d="M8 12h6" />
+                  </svg>
+                )}
+                {item.id === "pyq" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
+                    <path d="M8 7h8" />
+                    <path d="M8 11h6" />
+                  </svg>
+                )}
+                {item.id === "plan" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M8 2v4" />
+                    <path d="M16 2v4" />
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <path d="M3 10h18" />
+                    <path d="M8 14h.01" />
+                    <path d="M12 14h.01" />
+                    <path d="M16 14h.01" />
+                  </svg>
+                )}
+                {item.id === "quiz" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 11 11 13 15 9" />
+                    <path d="M20 6 9 17l-5-5" />
+                    <path d="M4 4h16v16H4z" />
+                  </svg>
+                )}
+              </span>
+              <span className="nav-label-copy">
+                <strong>{item.label}</strong>
+                <small>{item.helper}</small>
+              </span>
             </button>
           ))}
         </div>
 
-        {recentQuestions.length > 0 && (
-          <div className="sidebar-section">
-            <p>{t.recentChatsTitle}</p>
-            {recentQuestions.map((message, index) => (
-              <button key={`${message.text}-${index}`} type="button" className="recent-item active" onClick={() => setQuestion(message.text)}>
-                {message.text}
+        {showRecentPanel && (
+          <div className="recent-chat-popover">
+            <div className="recent-chat-popover-head">
+              <strong>{t.recentChatsTitle}</strong>
+              <button type="button" onClick={() => setShowRecentPanel(false)} aria-label="Close recent chats">
+                ×
               </button>
-            ))}
+            </div>
+            {recentQuestions.length > 0 ? (
+              <div className="recent-chat-popover-list">
+                {recentQuestions.map((message, index) => (
+                  <button
+                    key={`${message.text}-${index}`}
+                    type="button"
+                    onClick={() => {
+                      setQuestion(message.text);
+                      setShowRecentPanel(false);
+                    }}
+                  >
+                    {message.text}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p>{lang === "hi" ? "अभी कोई recent सवाल नहीं है।" : "No recent questions yet."}</p>
+            )}
           </div>
         )}
 
@@ -1060,16 +1158,90 @@ export default function Dashboard() {
 
       <section className="dashboard-main-chat">
         <header className={`dashboard-main-top ${showProfileMenu ? "profile-menu-open" : ""}`}>
-          <div className="dashboard-title-block">
-            <h1>{t.greeting(studentName)}</h1>
-            <div className="student-tags">
-              <span>कक्षा {studentProfile?.class_level || "10"}</span>
-              <span>{studentProfile?.medium || "Hindi"} माध्यम</span>
+          <div className="header-left-cluster">
+            <button
+              type="button"
+              className={`header-language-switch ${lang === "en" ? "english" : "hindi"}`}
+              onClick={() => setLang((currentLang) => currentLang === "hi" ? "en" : "hi")}
+              aria-label={lang === "hi" ? "Switch to English" : "हिंदी में बदलें"}
+            >
+              <span>अ</span>
+              <span>A</span>
+            </button>
+
+            <div className="dashboard-title-block">
+              <div className="lesson-breadcrumb">
+                <span>{subjects.find((subject) => subject.id === selectedSubject)?.en || selectedSubject}</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+                <strong>{selectedSubject === "Science" ? "Light Reflection" : lang === "hi" ? "Board Prep" : "Board Prep"}</strong>
+              </div>
+              <h1>{lang === "hi" ? "नमस्ते, " : "Hello, "}<span>{studentName}</span></h1>
+              <div className="student-tags">
+                <span>कक्षा {studentProfile?.class_level || "10"}</span>
+                <span>{studentProfile?.medium || "Hindi"} माध्यम</span>
+              </div>
             </div>
           </div>
 
           <div className="top-actions" ref={profileMenuRef}>
-            <div className="mobile-brand-mark" aria-label="VidyaAI">वि</div>
+            <div className="mobile-brand-mark" aria-label="VidyaAI">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m3 10 9-5 9 5-9 5-9-5Z" />
+                <path d="M7 12v4.5c0 .8 2.2 2.5 5 2.5s5-1.7 5-2.5V12" />
+                <path d="M21 10v5" />
+              </svg>
+            </div>
+
+            <div className="header-status-chips" aria-label="study status">
+              <span title="Study streak">
+                <b className="streak-flame" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M13.3 2.2c.4 2.5-.2 4.1-1.3 5.6-.9 1.2-2 2.4-2.1 4.3 0 1.1.5 2.1 1.5 2.8-.1-1.5.5-2.6 1.5-3.7.9 1 1.8 2.3 1.8 4 0 2.1-1.7 3.8-3.8 3.8-2.8 0-5-2.2-5-5 0-2.2 1-4.1 2.7-5.9 1.4-1.5 2.3-3.2 1.9-5.2 4 1.7 7.6 5.6 7.6 10.3 0 4.7-3.8 8.5-8.5 8.5S1.7 18 1.7 13.3c0-2.9 1.4-5.4 3.7-7.2-.6 1.2-.9 2.3-.8 3.4.3-1.6 1.2-2.9 2.4-4.1 1.8-1.8 3.4-3.2 6.3-3.2Z" />
+                  </svg>
+                </b>
+                <strong className="streak-count-mobile">{streak.count || 0}</strong>
+                <strong className="streak-count-desktop">{streak.count || 0} {lang === "hi" ? "दिन" : "days"}</strong>
+                <small>{lang === "hi" ? "स्ट्रीक" : "streak"}</small>
+              </span>
+            </div>
+
+            <div className="subject-menu-wrap">
+              <button
+                type="button"
+                className="header-subject-button"
+                onClick={() => setShowSubjectMenu((open) => !open)}
+                aria-haspopup="listbox"
+                aria-expanded={showSubjectMenu}
+              >
+                <span>{subjects.find((subject) => subject.id === selectedSubject)?.[lang] || selectedSubject}</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {showSubjectMenu && (
+                <div className="subject-menu" role="listbox" aria-label="Select subject">
+                  {subjects.map((subject) => (
+                    <button
+                      key={subject.id}
+                      type="button"
+                      className={selectedSubject === subject.id ? "active" : ""}
+                      onClick={() => {
+                        setSelectedSubject(subject.id);
+                        setQuizSubject(subject.id);
+                        setShowSubjectMenu(false);
+                      }}
+                      role="option"
+                      aria-selected={selectedSubject === subject.id}
+                    >
+                      <span>{subject[lang]}</span>
+                      <small>Class {classLevel}</small>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="mobile-profile-wrap">
               <button type="button" className="mobile-profile-chip" onClick={() => setShowProfileMenu((open) => !open)} title={t.profileTitle} aria-expanded={showProfileMenu}>
@@ -1080,11 +1252,8 @@ export default function Dashboard() {
                   <strong>{studentName}</strong>
                   <small>कक्षा {studentProfile?.class_level || "10"} • {studentProfile?.medium || "Hindi"}</small>
                 </span>
+                <svg className="profile-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
               </button>
-            </div>
-
-            <div className="header-status-chips" aria-label="study status">
-              <span title="Daily active streak">🔥 {streak.count || 0} {lang === "hi" ? "दिन streak" : "day streak"}</span>
             </div>
 
             {showProfileMenu && (
@@ -1207,7 +1376,7 @@ export default function Dashboard() {
 
         {activeSection === "chat" && (
         <div className="answer-style-bar">
-          <span>{lang === "hi" ? "परीक्षा-मित्र टूल्स" : "Exam-friendly tools"}</span>
+          <span>{lang === "hi" ? "परीक्षा-मित्र" : "Exam mode"}</span>
           {answerStyles.map((style) => (
             <button
               key={style.id}
@@ -1314,13 +1483,14 @@ export default function Dashboard() {
                         <button type="button" className="icon-btn" onClick={() => handleRetry(message)} title="Retry">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
                         </button>
-                        {message.sessionId && !message.chapterOptions?.length && (
+                        {message.role === "assistant" && !message.chapterOptions?.length && (
                           <>
                             <button
                               type="button"
                               className={`icon-btn feedback-icon positive${message.feedback === "up" ? " active" : ""}`}
                               onClick={() => handleFeedback(index, message.sessionId, true)}
                               title="Good answer"
+                              disabled={!message.sessionId}
                             >
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v11"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>
                             </button>
@@ -1329,6 +1499,7 @@ export default function Dashboard() {
                               className={`icon-btn feedback-icon negative${message.feedback === "down" ? " active" : ""}`}
                               onClick={() => handleFeedback(index, message.sessionId, false)}
                               title="Needs improvement"
+                              disabled={!message.sessionId}
                             >
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V3"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>
                             </button>
@@ -1367,13 +1538,30 @@ export default function Dashboard() {
             </div>
 
             <form className="dashboard-chatgpt-form sticky-input" onSubmit={handleSubmit}>
+              <button type="button" className="composer-icon-btn composer-attach-btn" title="Add attachment" aria-label="Add attachment">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m21.44 11.05-8.49 8.49a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 1 1-2.83-2.83l8.49-8.48" />
+                </svg>
+              </button>
               <input
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 placeholder={t.placeholder}
               />
+              <button type="button" className="composer-icon-btn composer-mic-btn" title="Voice input" aria-label="Voice input">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" />
+                  <path d="M19 11a7 7 0 0 1-14 0" />
+                  <path d="M12 18v4" />
+                  <path d="M8 22h8" />
+                </svg>
+              </button>
               <button type="submit" disabled={isLoading}>
-                {isLoading ? t.loading : t.submit}
+                <span className="send-label">{isLoading ? t.loading : t.submit}</span>
+                <svg className="send-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 19V5" />
+                  <path d="m5 12 7-7 7 7" />
+                </svg>
               </button>
             </form>
           </div>
@@ -1433,27 +1621,53 @@ export default function Dashboard() {
                 <span>Class {classLevel}</span>
               </div>
 
-              {pyqPapers.length > 0 ? (
-                <div className="pyq-list">
-                  {pyqPapers.map((paper) => (
-                    <article key={paper.fileUrl} className="pyq-row">
+              {pyqSubjects.length > 0 ? (
+                <div className="pyq-subject-browser">
+                  <div className="pyq-subject-picker" role="tablist" aria-label="PYQ subject">
+                    {pyqSubjects.map((group) => (
+                      <button
+                        key={group.subject.id}
+                        type="button"
+                        className={pyqSubject === group.subject.id ? "active" : ""}
+                        onClick={() => setPyqSubject(group.subject.id)}
+                        role="tab"
+                        aria-selected={pyqSubject === group.subject.id}
+                      >
+                        <span>{group.subject[lang]}</span>
+                        <small>{group.count}</small>
+                      </button>
+                    ))}
+                  </div>
+
+                  <section className="pyq-subject-section">
+                    <div className="pyq-subject-head">
                       <div>
-                        <strong>{paper.title}</strong>
-                        <span>{paper.subject} · {paper.year} · {paper.medium}</span>
+                        <strong>{selectedPyqSubjectMeta?.[lang] || pyqSubject}</strong>
+                        <span>{selectedPyqPapers.length} papers</span>
                       </div>
-                      <div className="pyq-actions">
-                        <a href={paper.fileUrl} target="_blank" rel="noreferrer">Open</a>
-                        <a href={paper.fileUrl} download>Download</a>
-                        <button type="button" onClick={() => {
-                          setSelectedSubject(paper.subject);
-                          setQuestion(`Class ${classLevel} ${paper.subject} ${paper.year} PYQ paper solve करवाइए`);
-                          setActiveSection("chat");
-                        }}>
-                          {t.startPaper}
-                        </button>
-                      </div>
-                    </article>
-                  ))}
+                    </div>
+                    <div className="pyq-list">
+                      {selectedPyqPapers.map((paper) => (
+                        <article key={paper.fileUrl} className="pyq-row">
+                          <div>
+                            <strong>{paper.title}</strong>
+                            <span>{paper.year} · Set {paper.set} · {paper.medium}</span>
+                          </div>
+                          <div className="pyq-actions">
+                            <a className="pyq-open-action" href={paper.fileUrl} target="_blank" rel="noreferrer">Open</a>
+                            <a className="pyq-download-action" href={paper.fileUrl} download>Download</a>
+                            <button type="button" onClick={() => {
+                              setSelectedSubject(paper.subject);
+                              setQuestion(`Class ${classLevel} ${paper.subject} ${paper.year} PYQ paper solve करवाइए`);
+                              setActiveSection("chat");
+                            }}>
+                              {t.startPaper}
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
                 </div>
               ) : (
                 <div className="empty-tool-state">
