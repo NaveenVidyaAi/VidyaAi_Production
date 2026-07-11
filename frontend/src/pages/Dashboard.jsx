@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import api from "../api/client";
-import BrandMark from "../components/BrandMark";
 
 const translations = {
   hi: {
@@ -501,7 +500,6 @@ export default function Dashboard() {
   const [pyqSubject, setPyqSubject] = useState("Hindi");
   const [studyHours, setStudyHours] = useState(3);
   const [studyPlan, setStudyPlan] = useState([]);
-  const [showSubjectMenu, setShowSubjectMenu] = useState(false);
   const [showRecentPanel, setShowRecentPanel] = useState(false);
   const windowRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -609,19 +607,6 @@ export default function Dashboard() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [showProfileMenu]);
-
-  useEffect(() => {
-    if (!showSubjectMenu) return;
-
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        setShowSubjectMenu(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [showSubjectMenu]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -1058,6 +1043,24 @@ export default function Dashboard() {
           ))}
         </div>
 
+        <div className="sidebar-section recent-sidebar-section">
+          <p>{t.recentChatsTitle}</p>
+          {recentQuestions.length > 0 ? (
+            recentQuestions.map((message, index) => (
+              <button
+                key={`${message.text}-${index}`}
+                type="button"
+                className="plain-list-button recent-question-button"
+                onClick={() => setQuestion(message.text)}
+              >
+                {message.text}
+              </button>
+            ))
+          ) : (
+            <span className="sidebar-empty-note">{lang === "hi" ? "अभी कोई सवाल नहीं है।" : "No questions yet."}</span>
+          )}
+        </div>
+
         <div className="sidebar-section sidebar-tool-section">
           <p>Study Tools</p>
           {[
@@ -1119,6 +1122,26 @@ export default function Dashboard() {
               </span>
             </button>
           ))}
+        </div>
+
+        <div className="sidebar-section desktop-subject-section">
+          <p>{lang === "hi" ? "विषय" : "Subjects"}</p>
+          <div className="desktop-subject-list">
+            {subjects.map((subject) => (
+              <button
+                key={subject.id}
+                type="button"
+                className={selectedSubject === subject.id ? "active" : ""}
+                onClick={() => {
+                  setSelectedSubject(subject.id);
+                  setQuizSubject(subject.id);
+                  setPyqSubject(subject.id);
+                }}
+              >
+                <span>{subject[lang]}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {showRecentPanel && (
@@ -1186,49 +1209,20 @@ export default function Dashboard() {
               <span title="Study streak">
                 <b className="streak-flame" aria-hidden="true">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M13.3 2.2c.4 2.5-.2 4.1-1.3 5.6-.9 1.2-2 2.4-2.1 4.3 0 1.1.5 2.1 1.5 2.8-.1-1.5.5-2.6 1.5-3.7.9 1 1.8 2.3 1.8 4 0 2.1-1.7 3.8-3.8 3.8-2.8 0-5-2.2-5-5 0-2.2 1-4.1 2.7-5.9 1.4-1.5 2.3-3.2 1.9-5.2 4 1.7 7.6 5.6 7.6 10.3 0 4.7-3.8 8.5-8.5 8.5S1.7 18 1.7 13.3c0-2.9 1.4-5.4 3.7-7.2-.6 1.2-.9 2.3-.8 3.4.3-1.6 1.2-2.9 2.4-4.1 1.8-1.8 3.4-3.2 6.3-3.2Z" />
+                    <defs>
+                      <linearGradient id="streakFireGradient" x1="7" x2="17" y1="21" y2="2" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#facc15" />
+                        <stop offset="0.48" stopColor="#fb923c" />
+                        <stop offset="1" stopColor="#ef4444" />
+                      </linearGradient>
+                    </defs>
+                    <path fill="url(#streakFireGradient)" d="M13.3 2.2c.4 2.5-.2 4.1-1.3 5.6-.9 1.2-2 2.4-2.1 4.3 0 1.1.5 2.1 1.5 2.8-.1-1.5.5-2.6 1.5-3.7.9 1 1.8 2.3 1.8 4 0 2.1-1.7 3.8-3.8 3.8-2.8 0-5-2.2-5-5 0-2.2 1-4.1 2.7-5.9 1.4-1.5 2.3-3.2 1.9-5.2 4 1.7 7.6 5.6 7.6 10.3 0 4.7-3.8 8.5-8.5 8.5S1.7 18 1.7 13.3c0-2.9 1.4-5.4 3.7-7.2-.6 1.2-.9 2.3-.8 3.4.3-1.6 1.2-2.9 2.4-4.1 1.8-1.8 3.4-3.2 6.3-3.2Z" />
                   </svg>
                 </b>
                 <strong className="streak-count-mobile">{streak.count || 0}</strong>
                 <strong className="streak-count-desktop">{streak.count || 0} {lang === "hi" ? "दिन" : "days"}</strong>
                 <small>{lang === "hi" ? "स्ट्रीक" : "streak"}</small>
               </span>
-            </div>
-
-            <div className="subject-menu-wrap">
-              <button
-                type="button"
-                className="header-subject-button"
-                onClick={() => setShowSubjectMenu((open) => !open)}
-                aria-haspopup="listbox"
-                aria-expanded={showSubjectMenu}
-              >
-                <span>{subjects.find((subject) => subject.id === selectedSubject)?.[lang] || selectedSubject}</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </button>
-              {showSubjectMenu && (
-                <div className="subject-menu" role="listbox" aria-label="Select subject">
-                  {subjects.map((subject) => (
-                    <button
-                      key={subject.id}
-                      type="button"
-                      className={selectedSubject === subject.id ? "active" : ""}
-                      onClick={() => {
-                        setSelectedSubject(subject.id);
-                        setQuizSubject(subject.id);
-                        setShowSubjectMenu(false);
-                      }}
-                      role="option"
-                      aria-selected={selectedSubject === subject.id}
-                    >
-                      <span>{subject[lang]}</span>
-                      <small>Class {classLevel}</small>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
 
             <button
@@ -1437,7 +1431,45 @@ export default function Dashboard() {
               </label>
             </div>
 
-            <div ref={windowRef} className="dashboard-chatgpt-window">
+            {askedQuestions.length === 0 && !isLoading && (
+              <div className="study-welcome" aria-label="VidyaAI study home">
+                <div className="study-welcome-copy">
+                  <span className="study-welcome-kicker">{lang === "hi" ? "CGBSE board prep" : "CGBSE board prep"}</span>
+                  <h2>{lang === "hi" ? "आज किस टॉपिक को मजबूत करना है?" : "What should we strengthen today?"}</h2>
+                  <p>
+                    {lang === "hi"
+                      ? "अध्याय समझें, उत्तर लिखवाएं, PYQ practice करें और कमजोर टॉपिक पर तुरंत revision शुरू करें."
+                      : "Understand chapters, draft exam answers, practice PYQs, and revise weak topics from one focused workspace."}
+                  </p>
+                  <div className="study-welcome-actions">
+                    {chatSuggestions.slice(0, 3).map((suggestion) => (
+                      <button key={suggestion} type="button" onClick={() => setQuestion(suggestion)}>
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="study-welcome-board" aria-hidden="true">
+                  <div className="board-card main">
+                    <span>{subjects.find((subject) => subject.id === selectedSubject)?.[lang] || selectedSubject}</span>
+                    <strong>{answerStyles.find((style) => style.id === answerStyle)?.[lang] || "Exam-ready"}</strong>
+                    <small>{daysToExam} {t.countdownUnit} · {completedCount}/{todaysTargets.length} targets</small>
+                  </div>
+                  <div className="board-card mini">
+                    <span>{lang === "hi" ? "आज" : "Today"}</span>
+                    <strong>{askedQuestions.length}</strong>
+                    <small>{lang === "hi" ? "प्रश्न पूछे" : "questions asked"}</small>
+                  </div>
+                  <div className="board-card mini accent">
+                    <span>{lang === "hi" ? "स्ट्रीक" : "Streak"}</span>
+                    <strong>{streak.count || 0}</strong>
+                    <small>{t.streakUnit}</small>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={windowRef} className={`dashboard-chatgpt-window ${askedQuestions.length === 0 && !isLoading ? "empty-reference" : ""}`}>
               {messages.map((message, index) => (
                 <div key={index} className={`dashboard-message-row ${message.role === "student" ? "student" : "assistant"}`}>
                   <div className="dashboard-message-stack">
@@ -1837,21 +1869,6 @@ export default function Dashboard() {
         </section>
 
         <section className="right-section">
-          <p className="rail-heading">विषय चुनें</p>
-          <div className="subject-list">
-            {subjects.map((subject) => (
-              <button
-                key={subject.id}
-                type="button"
-                className={selectedSubject === subject.id ? "active" : ""}
-                onClick={() => setSelectedSubject(subject.id)}
-              >
-                <span>{subject[lang]}</span>
-                <small>{selectedSubject === subject.id ? "चुना गया" : "कक्षा 10"}</small>
-              </button>
-            ))}
-          </div>
-
           <div className="question-sample-panel">
             <div className="sample-panel-head">
               <strong>{lang === "hi" ? "कैसे पूछें?" : "How to ask"}</strong>

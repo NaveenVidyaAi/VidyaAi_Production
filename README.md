@@ -10,6 +10,7 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
+- [Local Runtime Versions](#local-runtime-versions)
 - [Environment Variables](#environment-variables)
 - [Running the Application](#running-the-application)
 - [PDF Ingestion](#pdf-ingestion)
@@ -139,6 +140,86 @@ AI_Assistant_cgbse/
 - Node.js 18+ and npm
 - Python 3.11 (for ingestion only — backend runs in Docker)
 - A Groq API key (free at [console.groq.com](https://console.groq.com))
+
+---
+
+## Local Runtime Versions
+
+Use these exact local runtimes when working from this machine. This avoids Python-version drift and dependency issues.
+
+### Backend Python
+
+Always use the backend Python 3.11 virtual environment:
+
+```bash
+/Users/naveenchandrawanshi/Applications/AI_Assistant_cgbse/backend/.venv311/bin/python --version
+# Python 3.11.4
+```
+
+Recommended backend commands:
+
+```bash
+cd /Users/naveenchandrawanshi/Applications/AI_Assistant_cgbse
+
+# Import/smoke-check the FastAPI app
+backend/.venv311/bin/python -c "from backend.main import app; print(app.title); print(len(app.routes))"
+
+# Compile-check backend source only
+backend/.venv311/bin/python -m compileall \
+  backend/main.py backend/config.py backend/database.py \
+  backend/routers backend/services backend/models backend/tests
+```
+
+Do **not** use these Python interpreters for backend app checks:
+
+```bash
+/Users/naveenchandrawanshi/Applications/AI_Assistant_cgbse/.venv/bin/python --version
+# Python 3.13.2
+
+python3 --version
+# Python 3.14.6
+```
+
+Reason: the root `.venv` / system Python versions are newer than the backend stack expects. The root `.venv` hit a SQLAlchemy import compatibility error, and system `python3` does not have the project test tools installed.
+
+### Backend Tests
+
+The backend test command is:
+
+```bash
+backend/.venv311/bin/python -m pytest backend/tests
+```
+
+At the time of this note, `pytest` is not installed inside `backend/.venv311`, so install the test dependency before expecting this command to run:
+
+```bash
+backend/.venv311/bin/python -m pip install pytest
+```
+
+Do not install test dependencies into the root `.venv`; keep backend dependencies in `backend/.venv311`.
+
+### Frontend Node
+
+Use the local Node/npm versions that currently build the React app:
+
+```bash
+node --version
+# v22.14.0
+
+npm --version
+# 10.9.2
+```
+
+Recommended frontend commands:
+
+```bash
+cd /Users/naveenchandrawanshi/Applications/AI_Assistant_cgbse/frontend
+npm install
+npm run build
+npm run dev -- --host 127.0.0.1
+```
+
+Vite normally starts on `5173`, but if that port is occupied it can move to `5174`, `5175`, or `5176`. The backend CORS allowlist includes those local development ports for both `localhost` and `127.0.0.1`.
 
 ### 1. Clone and configure
 
