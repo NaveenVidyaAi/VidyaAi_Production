@@ -1124,26 +1124,6 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <div className="sidebar-section desktop-subject-section">
-          <p>{lang === "hi" ? "विषय" : "Subjects"}</p>
-          <div className="desktop-subject-list">
-            {subjects.map((subject) => (
-              <button
-                key={subject.id}
-                type="button"
-                className={selectedSubject === subject.id ? "active" : ""}
-                onClick={() => {
-                  setSelectedSubject(subject.id);
-                  setQuizSubject(subject.id);
-                  setPyqSubject(subject.id);
-                }}
-              >
-                <span>{subject[lang]}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {showRecentPanel && (
           <div className="recent-chat-popover">
             <div className="recent-chat-popover-head">
@@ -1431,45 +1411,45 @@ export default function Dashboard() {
               </label>
             </div>
 
-            {askedQuestions.length === 0 && !isLoading && (
-              <div className="study-welcome" aria-label="VidyaAI study home">
-                <div className="study-welcome-copy">
-                  <span className="study-welcome-kicker">{lang === "hi" ? "CGBSE board prep" : "CGBSE board prep"}</span>
-                  <h2>{lang === "hi" ? "आज किस टॉपिक को मजबूत करना है?" : "What should we strengthen today?"}</h2>
-                  <p>
-                    {lang === "hi"
-                      ? "अध्याय समझें, उत्तर लिखवाएं, PYQ practice करें और कमजोर टॉपिक पर तुरंत revision शुरू करें."
-                      : "Understand chapters, draft exam answers, practice PYQs, and revise weak topics from one focused workspace."}
-                  </p>
-                  <div className="study-welcome-actions">
-                    {chatSuggestions.slice(0, 3).map((suggestion) => (
-                      <button key={suggestion} type="button" onClick={() => setQuestion(suggestion)}>
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="study-welcome-board" aria-hidden="true">
-                  <div className="board-card main">
-                    <span>{subjects.find((subject) => subject.id === selectedSubject)?.[lang] || selectedSubject}</span>
-                    <strong>{answerStyles.find((style) => style.id === answerStyle)?.[lang] || "Exam-ready"}</strong>
-                    <small>{daysToExam} {t.countdownUnit} · {completedCount}/{todaysTargets.length} targets</small>
-                  </div>
-                  <div className="board-card mini">
-                    <span>{lang === "hi" ? "आज" : "Today"}</span>
-                    <strong>{askedQuestions.length}</strong>
-                    <small>{lang === "hi" ? "प्रश्न पूछे" : "questions asked"}</small>
-                  </div>
-                  <div className="board-card mini accent">
-                    <span>{lang === "hi" ? "स्ट्रीक" : "Streak"}</span>
-                    <strong>{streak.count || 0}</strong>
-                    <small>{t.streakUnit}</small>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div ref={windowRef} className={`dashboard-chatgpt-window ${askedQuestions.length === 0 && !isLoading ? "empty-reference" : ""}`}>
+              {askedQuestions.length === 0 && !isLoading && (
+                <div className="study-welcome" aria-label="VidyaAI study home">
+                  <div className="study-welcome-copy">
+                    <span className="study-welcome-kicker">{lang === "hi" ? "CGBSE board prep" : "CGBSE board prep"}</span>
+                    <h2>{lang === "hi" ? "आज किस टॉपिक को मजबूत करना है?" : "What should we strengthen today?"}</h2>
+                    <p>
+                      {lang === "hi"
+                        ? "अध्याय समझें, उत्तर लिखवाएं, PYQ practice करें और कमजोर टॉपिक पर तुरंत revision शुरू करें."
+                        : "Understand chapters, draft exam answers, practice PYQs, and revise weak topics from one focused workspace."}
+                    </p>
+                    <div className="study-welcome-actions">
+                      {chatSuggestions.slice(0, 3).map((suggestion) => (
+                        <button key={suggestion} type="button" onClick={() => setQuestion(suggestion)}>
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="study-welcome-board" aria-hidden="true">
+                    <div className="board-card main">
+                      <span>{subjects.find((subject) => subject.id === selectedSubject)?.[lang] || selectedSubject}</span>
+                      <strong>{answerStyles.find((style) => style.id === answerStyle)?.[lang] || "Exam-ready"}</strong>
+                      <small>{daysToExam} {t.countdownUnit} · {completedCount}/{todaysTargets.length} targets</small>
+                    </div>
+                    <div className="board-card mini">
+                      <span>{lang === "hi" ? "आज" : "Today"}</span>
+                      <strong>{askedQuestions.length}</strong>
+                      <small>{lang === "hi" ? "प्रश्न पूछे" : "questions asked"}</small>
+                    </div>
+                    <div className="board-card mini accent">
+                      <span>{lang === "hi" ? "स्ट्रीक" : "Streak"}</span>
+                      <strong>{streak.count || 0}</strong>
+                      <small>{t.streakUnit}</small>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {messages.map((message, index) => (
                 <div key={index} className={`dashboard-message-row ${message.role === "student" ? "student" : "assistant"}`}>
                   <div className="dashboard-message-stack">
@@ -1763,22 +1743,25 @@ export default function Dashboard() {
 
       <aside className="dashboard-right-rail">
         <section className="right-section">
-          <p className="rail-heading">{t.profileTitle}</p>
-          <div className="profile-summary-card">
-            <div className="profile-card-head">
-              <div className="profile-avatar-large" aria-hidden="true">
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21a8 8 0 0 0-16 0" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              </div>
-              <h3>{studentName}</h3>
+          <p className="rail-heading">{lang === "hi" ? "विषय" : "Subjects"}</p>
+          <div className="subject-picker-card">
+            <div className="desktop-subject-list right-subject-list">
+              {subjects.map((subject) => (
+                <button
+                  key={subject.id}
+                  type="button"
+                  className={selectedSubject === subject.id ? "active" : ""}
+                  onClick={() => {
+                    setSelectedSubject(subject.id);
+                    setQuizSubject(subject.id);
+                    setPyqSubject(subject.id);
+                  }}
+                >
+                  <span>{subject[lang]}</span>
+                  <small>{(importantTopicsBySubject[subject.id] || []).slice(0, 2).join(" · ")}</small>
+                </button>
+              ))}
             </div>
-            <dl>
-              <div><dt>{t.profileLabels.class}</dt><dd>{studentProfile?.class_level || "10"}</dd></div>
-              <div><dt>{t.profileLabels.medium}</dt><dd>{studentProfile?.medium || "Hindi"}</dd></div>
-              <div><dt>बोर्ड</dt><dd>CGBSE</dd></div>
-            </dl>
           </div>
         </section>
 
@@ -1861,10 +1844,6 @@ export default function Dashboard() {
           <div className="mini-stat-row">
             <span>{t.countdownTitle}</span>
             <strong>{daysToExam} {t.countdownUnit}</strong>
-          </div>
-          <div className="mini-stat-row">
-            <span>{t.streakTitle}</span>
-            <strong>{streak.count || 0} {t.streakUnit}</strong>
           </div>
         </section>
 
