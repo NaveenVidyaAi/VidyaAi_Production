@@ -503,6 +503,58 @@ button:disabled {
   gap: 8px;
 }
 
+.desktop-account-actions {
+  display: grid;
+  gap: 9px;
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.desktop-account-summary {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.desktop-account-avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 1000;
+}
+
+.desktop-account-summary div {
+  display: grid;
+  min-width: 0;
+}
+
+.desktop-account-summary strong,
+.desktop-account-summary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-account-summary strong { color: var(--ink); font-size: 0.86rem; }
+.desktop-account-summary small { color: var(--muted); font-size: 0.72rem; font-weight: 800; }
+
+.desktop-logout-action {
+  border-color: rgba(220, 38, 38, 0.18);
+  background: #fff7f7;
+  color: #b91c1c;
+}
+
+.desktop-logout-action:hover {
+  border-color: rgba(220, 38, 38, 0.32);
+  background: #fef2f2;
+}
+
 .sidebar-empty-note {
   border: 1px dashed var(--line-strong);
   border-radius: 12px;

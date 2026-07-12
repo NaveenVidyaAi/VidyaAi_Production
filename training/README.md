@@ -463,3 +463,16 @@ tensorboard --logdir=./fine_tuned_models/
 **Ready to build a world-class Indian education AI?** 🚀
 
 Let's go! 💪
+# Grounded PYQ expansion
+
+Prepare reviewed PYQ question/answer pairs as JSON or JSONL, then create
+prompt, Hinglish, and exam-style variations without changing the verified
+answer:
+
+```bash
+python training/build_pyq_dataset.py verified_pyq.jsonl --variants 8
+```
+
+The output keeps every canonical question and all its variants in the same
+train/test group. Never fine-tune directly on unreviewed generated answers;
+question-paper PDFs generally do not contain an answer key.

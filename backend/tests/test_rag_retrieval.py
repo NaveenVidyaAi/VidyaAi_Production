@@ -30,6 +30,23 @@ class RAGRetrievalTests(unittest.TestCase):
             "English",
         )
 
+    def test_hinglish_subject_terms_override_selected_subject(self):
+        cases = {
+            "ganit ka quadratic equation solve karo": "Math",
+            "vigyan me acid base kya hota hai": "Science",
+            "itihas me gandhiji ka role samjhao": "Social Science",
+            "english grammar me tense samjhao": "English",
+            "sanskrit ka shlok arth batao": "Sanskrit",
+        }
+        for prompt, expected in cases.items():
+            with self.subTest(prompt=prompt):
+                self.assertEqual(rag._infer_subject("Hindi", prompt), expected)
+
+    def test_roman_hindi_is_detected_as_hindi_answer_language(self):
+        for prompt in ("ganit ka answer nikalo", "mujhe science samjao", "solve karo please"):
+            with self.subTest(prompt=prompt):
+                self.assertEqual(rag._detect_prompt_language(prompt), "hindi")
+
     def test_math_problem_prompt_overrides_selected_subject(self):
         self.assertEqual(
             rag._infer_subject("Hindi", "Solve 2x + 3 = 11 and 5x - 4 = 16"),

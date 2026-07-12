@@ -499,6 +499,9 @@ export default function Dashboard() {
   const [quizSubject, setQuizSubject] = useState("Hindi");
   const [pyqSubject, setPyqSubject] = useState("Hindi");
   const [studyHours, setStudyHours] = useState(3);
+  const [studyDaysPerWeek, setStudyDaysPerWeek] = useState(6);
+  const [studyGoal, setStudyGoal] = useState("balanced");
+  const [planSubjects, setPlanSubjects] = useState(() => readJson("vidyaai_plan_subjects", ["Hindi", "Math", "Science", "Social Science", "English"]));
   const [studyPlan, setStudyPlan] = useState([]);
   const [showRecentPanel, setShowRecentPanel] = useState(false);
   const windowRef = useRef(null);
@@ -531,11 +534,12 @@ export default function Dashboard() {
 
   const inferSubject = (text) => {
     const q = (text || "").toLowerCase();
-    if (q.includes("हिंदी") || q.includes("hindi")) return "Hindi";
-    if (q.includes("गणित") || q.includes("math")) return "Math";
-    if (q.includes("विज्ञान") || q.includes("science")) return "Science";
-    if (q.includes("इतिहास") || q.includes("भूगोल") || q.includes("social")) return "Social Science";
-    if (q.includes("english")) return "English";
+    if (/\b(math|maths|ganit|algebra|geometry|trigonometry|quadratic|equation|probability)\b/.test(q) || q.includes("गणित") || /\d+\s*[+×÷=]/.test(q)) return "Math";
+    if (/\b(science|vigyan|physics|chemistry|biology|acid|base|electricity|light|carbon)\b/.test(q) || q.includes("विज्ञान")) return "Science";
+    if (/\b(social science|sst|history|geography|civics|economics|itihas|bhugol)\b/.test(q) || q.includes("इतिहास") || q.includes("भूगोल")) return "Social Science";
+    if (/\b(english|grammar|essay|letter|tense|voice|narration)\b/.test(q)) return "English";
+    if (/\b(sanskrit|sanskrut|shlok|shloka)\b/.test(q) || q.includes("संस्कृत")) return "Sanskrit";
+    if (/\b(hindi|vyakaran|nibandh|patra|muhavara)\b/.test(q) || q.includes("हिंदी") || q.includes("हिन्दी")) return "Hindi";
     return "General";
   };
 
@@ -682,7 +686,8 @@ export default function Dashboard() {
     if (!currentQuestion || isLoading) return;
 
     recordStudyActivity();
-    const outgoingSubject = subjectOverride || selectedSubject || inferSubject(currentQuestion);
+    const promptSubject = inferSubject(currentQuestion);
+    const outgoingSubject = promptSubject !== "General" ? promptSubject : (subjectOverride || selectedSubject || "General");
     const outgoingAnswerStyle = answerStyleOverride || answerStyle;
     setQuestion("");
     setIsLoading(true);
@@ -835,23 +840,28 @@ export default function Dashboard() {
   };
 
   const buildStudyPlan = () => {
-    const parsedHours = Math.min(4, Math.max(3, Number(studyHours) || 3));
+    const parsedHours = Math.min(8, Math.max(0.5, Number(studyHours) || 2));
     const days = Math.max(Math.ceil((new Date(examDate) - new Date()) / 86400000), 1);
-    const planLength = Math.min(days, 21);
-    const allSubjects = subjects.map((subject) => subject.id);
+    const planLength = Math.min(days, 30);
+    const chosenSubjects = planSubjects.length ? planSubjects : [selectedSubject];
     const totalMinutes = parsedHours * 60;
-    const nextPlan = Array.from({ length: planLength }, (_, index) => {
-      const subject = index % 5 === 0 ? selectedSubject : allSubjects[index % allSubjects.length];
+    const activeDays = Array.from({ length: planLength }, (_, index) => index)
+      .filter((index) => (index % 7) < Number(studyDaysPerWeek));
+    const nextPlan = activeDays.map((index, planIndex) => {
+      const priorityOffset = studyGoal === "weak" && chosenSubjects.includes(selectedSubject) && planIndex % 3 === 0;
+      const subject = priorityOffset ? selectedSubject : chosenSubjects[planIndex % chosenSubjects.length];
       const subjectPlan = chapterPlanner[subject] || chapterPlanner.Hindi;
-      const chapter = subjectPlan[index % subjectPlan.length];
-      const secondSubject = allSubjects[(index + 2) % allSubjects.length];
+      const chapter = subjectPlan[Math.floor(planIndex / chosenSubjects.length) % subjectPlan.length];
+      const secondSubject = chosenSubjects[(planIndex + 1) % chosenSubjects.length];
       const secondPlan = chapterPlanner[secondSubject] || chapterPlanner.Hindi;
-      const secondChapter = secondPlan[index % secondPlan.length];
-      const revisionMinutes = Math.round(totalMinutes * 0.45);
-      const practiceMinutes = Math.round(totalMinutes * 0.35);
+      const secondChapter = secondPlan[Math.floor(planIndex / chosenSubjects.length) % secondPlan.length];
+      const practiceRatio = studyGoal === "pyq" ? 0.5 : studyGoal === "revision" ? 0.25 : 0.35;
+      const revisionMinutes = Math.round(totalMinutes * (studyGoal === "revision" ? 0.55 : 0.4));
+      const practiceMinutes = Math.round(totalMinutes * practiceRatio);
       const testMinutes = totalMinutes - revisionMinutes - practiceMinutes;
       return {
         day: index + 1,
+        date: dateKey(addDays(new Date(), index)),
         subject,
         chapter: chapter.chapter,
         topics: chapter.topics,
@@ -865,6 +875,7 @@ export default function Dashboard() {
         ],
       };
     });
+    localStorage.setItem("vidyaai_plan_subjects", JSON.stringify(chosenSubjects));
     setStudyPlan(nextPlan);
     setActiveSection("plan");
   };
@@ -1122,6 +1133,21 @@ export default function Dashboard() {
               </span>
             </button>
           ))}
+        </div>
+
+        <div className="desktop-account-actions">
+          <div className="desktop-account-summary">
+            <span className="desktop-account-avatar" aria-hidden="true">{studentName?.trim()?.charAt(0) || "V"}</span>
+            <div><strong>{studentName}</strong><small>{isGuest ? t.profileLabels.guest : t.profileLabels.loggedIn}</small></div>
+          </div>
+          {isGuest ? (
+            <button type="button" className="nav-action" onClick={() => navigate("/login")}>Login</button>
+          ) : (
+            <button type="button" className="nav-action desktop-logout-action" onClick={handleLogout}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/></svg>
+              <span>{lang === "hi" ? "लॉग आउट" : "Logout"}</span>
+            </button>
+          )}
         </div>
 
         {showRecentPanel && (
@@ -1705,14 +1731,40 @@ export default function Dashboard() {
                 </label>
                 <label>
                   Daily study time
-                  <select value={studyHours} onChange={(e) => setStudyHours(e.target.value)}>
-                    <option value="3">3 hours/day</option>
-                    <option value="4">4 hours/day</option>
+                  <input type="number" min="0.5" max="8" step="0.5" value={studyHours} onChange={(e) => setStudyHours(e.target.value)} />
+                </label>
+                <label>
+                  Study days/week
+                  <select value={studyDaysPerWeek} onChange={(e) => setStudyDaysPerWeek(e.target.value)}>
+                    {[4, 5, 6, 7].map((days) => <option key={days} value={days}>{days} days</option>)}
+                  </select>
+                </label>
+                <label>
+                  My goal
+                  <select value={studyGoal} onChange={(e) => setStudyGoal(e.target.value)}>
+                    <option value="balanced">Balanced preparation</option>
+                    <option value="weak">Improve my weak subject</option>
+                    <option value="pyq">More PYQ practice</option>
+                    <option value="revision">Fast revision</option>
                   </select>
                 </label>
                 <button type="button" className="primary-tool-btn" onClick={buildStudyPlan}>
-                  Create Plan
+                  Build My Plan
                 </button>
+              </div>
+
+              <div className="plan-subject-choice">
+                <strong>Subjects I want to study</strong>
+                <div className="tool-subject-grid">
+                  {subjects.map((subject) => {
+                    const active = planSubjects.includes(subject.id);
+                    return (
+                      <button key={subject.id} type="button" className={active ? "active" : ""} onClick={() => setPlanSubjects((current) => active ? current.filter((item) => item !== subject.id) : [...current, subject.id])}>
+                        <strong>{subject[lang]}</strong><small>{active ? "Included" : "Tap to include"}</small>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {studyPlan.length > 0 ? (
@@ -1720,7 +1772,7 @@ export default function Dashboard() {
                   {studyPlan.map((day) => (
                     <article key={day.day} className="study-plan-day">
                       <div>
-                        <strong>Day {day.day}</strong>
+                        <strong>Day {day.day} · {day.date}</strong>
                         <span>{day.subject} · {day.chapter} · {day.hours} hours</span>
                       </div>
                       <ul>
@@ -1732,7 +1784,7 @@ export default function Dashboard() {
               ) : (
                 <div className="empty-tool-state">
                   <strong>No plan created yet</strong>
-                  <span>Use your probable exam date and choose 3 or 4 hours/day. Class and medium are already taken from login.</span>
+                  <span>Choose your subjects, available time, weekly routine, and personal goal. The plan will follow your choices.</span>
                 </div>
               )}
             </div>

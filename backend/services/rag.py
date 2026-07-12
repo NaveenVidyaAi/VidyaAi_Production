@@ -506,6 +506,21 @@ def _detect_prompt_language(question: str) -> str:
         "avedan",
         "pradhanacharya",
         "adhyaksh",
+        "solve karo",
+        "nikalo",
+        "banao",
+        "padhao",
+        "samajh",
+        "samjha",
+        "kyunki",
+        "wala",
+        "wali",
+        "aur",
+        "ya",
+        "iska",
+        "iske",
+        "mujhe",
+        "please bata",
     )
     if any(re.search(rf"\b{re.escape(term)}\b", normalized) for term in hinglish_terms):
         return "hindi"
@@ -894,15 +909,19 @@ def _infer_subject(subject: str, question: str) -> str:
         raw = (text or "").lower()
         if _is_math_problem_request(raw):
             return "Math"
-        if "english" in raw:
+        # The prompt is authoritative. These terms intentionally include common
+        # Roman-Hindi spellings used by Class 10 students.
+        if re.search(r"\b(english|grammar|essay|letter|tenses?|voice|narration|poem)\b", raw):
             return "English"
-        if "हिंदी" in raw or "हिन्दी" in raw or "hindi" in raw:
+        if re.search(r"\b(hindi|hindi grammar|vyakaran|nibandh|patra|anuched|muhavare?)\b", raw) or "हिंदी" in raw or "हिन्दी" in raw:
             return "Hindi"
-        if "social science" in raw or "इतिहास" in raw or "भूगोल" in raw:
+        if re.search(r"\b(sanskrit|sanskrut|shlok|shloka|sandhi|samasa)\b", raw) or "संस्कृत" in raw:
+            return "Sanskrit"
+        if re.search(r"\b(social science|sst|history|geography|civics|economics|itihas|bhugol|nagrik)\b", raw) or "इतिहास" in raw or "भूगोल" in raw or "नागरिक" in raw:
             return "Social Science"
-        if "math" in raw or "गणित" in raw:
+        if re.search(r"\b(math|maths|ganit|algebra|geometry|trigonometry|quadratic|equation|probability|mensuration)\b", raw) or "गणित" in raw:
             return "Math"
-        if "science" in raw or "विज्ञान" in raw:
+        if re.search(r"\b(science|vigyan|physics|chemistry|biology|chemical|acid|base|electricity|light|life process|carbon)\b", raw) or "विज्ञान" in raw:
             return "Science"
         return None
 
@@ -1195,6 +1214,8 @@ def _groq_answer(
         "For maths questions, solve carefully. For a single maths question, show enough working unless the student asks for only the final answer. "
         "If the student asks 2-3 maths questions together, or says 'just solve'/'only answer', give concise numbered solutions and final answers; add detailed explanation only when explicitly requested. "
         "Understand Hinglish or romanized Hindi requests such as 'application likho principal ko', 'samjhao', or 'kya hai' as Hindi tasks unless English is explicitly requested. "
+        "Roman-Hindi spelling is informal: silently interpret variants such as 'kyu/kyon', 'samjao/samjhao', 'ganit', 'vigyan', 'itihas', 'bhugol', 'nikalo', and 'solve karo'. Do not correct or mock the student's spelling. "
+        "The detected subject comes from the student's prompt and overrides any subject previously selected in the UI. Never answer from the selected subject when the actual question clearly belongs to another subject. "
         "For definitions, start with a proper definition sentence and keep it precise. "
         "For English or Hindi letter, application, essay, or grammar tasks, answer in the proper school format requested by the question. "
         "When the student says 'this chapter' or similar, use the recent conversation context to identify the chapter/topic. "
