@@ -804,6 +804,40 @@ export default function Dashboard() {
     }
   };
 
+  const generatePyqQuiz = async (paper) => {
+    if (quizLoading) return;
+    setQuizLoading(true);
+    try {
+      const sourceFile = paper.fileUrl.split("/").pop();
+      const response = await api.post("/quiz/generate", {
+        subject: paper.subject,
+        chapter: `${paper.year} Set ${paper.set}`,
+        topic: `${paper.subject} ${paper.year} Set ${paper.set} PYQ`,
+        quiz_type: "pyq",
+        count: 5,
+        paper_source_file: sourceFile,
+        paper_year: paper.year,
+        paper_set: paper.set,
+      });
+      setSelectedSubject(paper.subject);
+      setQuizSubject(paper.subject);
+      setStandaloneQuiz({
+        role: "quiz",
+        text: `${paper.title} Practice`,
+        quiz: response.data,
+        selectedAnswers: {},
+        status: "started",
+      });
+      setActiveSection("quiz");
+    } catch (err) {
+      const detail = err?.response?.data?.detail || "This paper could not be loaded from the PYQ knowledge base.";
+      setMessages((prev) => [...prev, { role: "assistant", text: detail }]);
+      setActiveSection("chat");
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
   const updateQuizMessage = (quizId, updater) => {
     setMessages((prev) => prev.map((message) => (
       message.role === "quiz" && message.quiz?.quiz_id === quizId ? updater(message) : message
@@ -1692,12 +1726,8 @@ export default function Dashboard() {
                           <div className="pyq-actions">
                             <a className="pyq-open-action" href={paper.fileUrl} target="_blank" rel="noreferrer">Open</a>
                             <a className="pyq-download-action" href={paper.fileUrl} download>Download</a>
-                            <button type="button" onClick={() => {
-                              setSelectedSubject(paper.subject);
-                              setQuestion(`Class ${classLevel} ${paper.subject} ${paper.year} PYQ paper solve करवाइए`);
-                              setActiveSection("chat");
-                            }}>
-                              {t.startPaper}
+                            <button type="button" disabled={quizLoading} onClick={() => generatePyqQuiz(paper)}>
+                              {quizLoading ? "Preparing..." : t.startPaper}
                             </button>
                           </div>
                         </article>

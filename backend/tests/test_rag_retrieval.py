@@ -23,12 +23,44 @@ class FakeClient:
         return self._points, None
 
 
+class FakePyqClient:
+    def __init__(self, points):
+        self._points = points
+        self.filter = None
+
+    def scroll(self, collection_name, scroll_filter, with_payload=True, with_vectors=False, limit=8):
+        self.filter = scroll_filter
+        return self._points, None
+
+
 class RAGRetrievalTests(unittest.TestCase):
     def test_question_subject_overrides_selected_subject(self):
         self.assertEqual(
             rag._infer_subject("Hindi", "class 10 english chapter 2"),
             "English",
         )
+
+    def test_pyq_retrieval_uses_exact_source_file_and_subject(self):
+        matching = FakePoint(
+            {"subject": "Hindi", "content_type": "previous_year_question", "source_file": "class_10_hindi_PYQ25_SET_B.pdf"},
+            "प्रश्न 8. लड़कों को दान देते समय माँ को अंतिम पूँजी देने जैसा दुःख क्यों हो रहा है?",
+        )
+        wrong_subject = FakePoint(
+            {"subject": "Science", "content_type": "previous_year_question", "source_file": "class_10_hindi_PYQ25_SET_B.pdf"},
+            "This must not enter Hindi practice even if its filename metadata is wrong.",
+        )
+        client = FakePyqClient([matching, wrong_subject])
+        original_client = rag._get_qdrant_client
+        try:
+            rag._get_qdrant_client = lambda: client
+            text, sources = rag.retrieve_pyq_paper_text("Hindi", "class_10_hindi_PYQ25_SET_B.pdf")
+        finally:
+            rag._get_qdrant_client = original_client
+
+        self.assertIn("प्रश्न 8", text)
+        self.assertNotIn("must not enter", text)
+        self.assertTrue(sources)
+        self.assertIsNotNone(client.filter)
 
     def test_hinglish_subject_terms_override_selected_subject(self):
         cases = {

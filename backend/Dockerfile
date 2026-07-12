@@ -3,6 +3,10 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-hin \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir --timeout 120 --retries 10 -r requirements.txt
 

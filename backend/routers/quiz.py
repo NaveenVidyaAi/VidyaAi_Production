@@ -2,6 +2,7 @@ import json
 import logging
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import requests
@@ -16,6 +17,8 @@ from backend.models.session import ChatSession
 from backend.models.weak_topic import WeakTopic
 from backend.routers.auth import get_current_student, get_db
 from backend.routers.chat import _ensure_db_student
+from backend.services.rag import retrieve_pyq_paper_text
+from ingestion.ingest import extract_text_from_pdf
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -28,6 +31,9 @@ class QuizGenerateRequest(BaseModel):
     source_session_id: Optional[int] = None
     source_question: Optional[str] = None
     source_answer: Optional[str] = None
+    paper_source_file: Optional[str] = None
+    paper_year: Optional[str] = None
+    paper_set: Optional[str] = None
     quiz_type: str = "activity"
     count: int = Field(default=2, ge=2, le=10)
 
@@ -253,6 +259,24 @@ async def _load_source_text(db: AsyncSession | None, payload: QuizGenerateReques
     source_question = payload.source_question or ""
     source_answer = payload.source_answer or ""
     topic = payload.topic or payload.chapter or payload.subject
+    if payload.quiz_type == "pyq" and payload.paper_source_file:
+        try:
+            paper_text, _ = retrieve_pyq_paper_text(payload.subject, payload.paper_source_file)
+        except Exception:
+            logger.exception("Exact PYQ retrieval failed; trying the matching local PDF")
+            paper_text = ""
+        if not paper_text:
+            safe_name = Path(payload.paper_source_file).name
+            paper_path = Path(__file__).resolve().parents[2] / "ingestion" / "data" / "Previous_Year_Questions" / safe_name
+            if paper_path.is_file():
+                paper_text = extract_text_from_pdf(str(paper_path), enable_ocr=True)
+        if not paper_text:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"The selected PYQ paper is not available in the knowledge base: {payload.paper_source_file}",
+            )
+        paper_label = f"{payload.subject} {payload.paper_year or ''} Set {payload.paper_set or ''} PYQ".strip()
+        return paper_text, paper_label, f"Create practice from {paper_label}", paper_text
     if db is not None and payload.source_session_id:
         result = await db.execute(select(ChatSession).where(ChatSession.id == payload.source_session_id))
         session = result.scalars().first()

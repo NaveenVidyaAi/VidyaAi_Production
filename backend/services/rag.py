@@ -8,6 +8,7 @@ from typing import List, Tuple
 
 import requests
 from qdrant_client import QdrantClient
+from qdrant_client.http.models import FieldCondition, Filter, MatchValue
 
 from backend.config import settings
 from backend.services.embeddings import embedding_service
@@ -977,6 +978,37 @@ def _get_qdrant_client() -> QdrantClient:
             fallback_path,
         )
         return QdrantClient(path=fallback_path)
+
+
+def retrieve_pyq_paper_text(subject: str, source_file: str, limit: int = 8) -> tuple[str, list[str]]:
+    """Load chunks only from the exact ingested PYQ PDF selected by the student."""
+    expected_file = os.path.basename(str(source_file or "").strip())
+    if not expected_file:
+        return "", []
+    client = _get_qdrant_client()
+    points, _ = client.scroll(
+        collection_name=COLLECTION_NAME,
+        scroll_filter=Filter(must=[
+            FieldCondition(key="source_file", match=MatchValue(value=expected_file)),
+            FieldCondition(key="content_type", match=MatchValue(value="previous_year_question")),
+        ]),
+        with_payload=True,
+        with_vectors=False,
+        limit=max(1, min(limit, 20)),
+    )
+    chunks: list[str] = []
+    labels: list[str] = []
+    for point in points:
+        payload = point.payload or {}
+        payload_subject = str(payload.get("subject") or "")
+        if subject and payload_subject and payload_subject.lower() != subject.lower():
+            continue
+        text = str(payload.get("text") or "").strip()
+        if len(text) < 30:
+            continue
+        chunks.append(text)
+        labels.append(_format_source_label(payload, str(point.id)))
+    return "\n\n--- NEXT PAPER CHUNK ---\n\n".join(chunks), list(dict.fromkeys(labels))
 
 
 def _iter_candidate_points(client: QdrantClient, question: str, limit: int):

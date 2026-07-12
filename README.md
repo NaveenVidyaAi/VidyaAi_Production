@@ -29,6 +29,7 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 - **Session History** — Chat history persisted per user session
 - **Multi-language UI** — Toggle between Hindi and English interface
 - **Progress Dashboard** — See past questions and topics studied
+- **Paper-specific PYQ practice** — Starting practice from a PYQ card creates a five-question quiz from that exact year/set PDF, with exact-source Qdrant retrieval and a local-PDF fallback for older indexes
 
 ### Admin Features
 - **Platform KPIs** — Total users, questions (total + 24h), active users, estimated study time, cache hit count
@@ -471,6 +472,10 @@ Click **"View"** on any row to open the user detail drawer.
 }
 ```
 `confidence: 0.97` means the answer was served from cache.
+
+### PYQ Practice
+
+The PYQ page passes the selected paper's subject, year, set, and exact PDF filename to `/quiz/generate` with `quiz_type: "pyq"`. The backend retrieves only chunks whose `source_file` matches that PDF. If an older Qdrant export contains only consolidated subject papers, the backend reads the matching PDF from `ingestion/data/Previous_Year_Questions` instead of silently using a different paper. Image-only papers use Hindi+English Tesseract OCR; the backend Docker image includes both OCR language packs.
 
 ### Admin (requires admin JWT)
 
