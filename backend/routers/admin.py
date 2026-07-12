@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel, Field
 
 from backend.config import is_admin_email
 from backend.models.qa_cache import QACache
@@ -16,12 +17,18 @@ from backend.models.quiz import Quiz
 from backend.models.session import ChatSession
 from backend.models.student import Student
 from backend.models.weak_topic import WeakTopic
+from backend.models.learning_example import LearningExample
 from backend.routers.auth import get_current_student, get_db
 from backend.routers.chat import in_memory_store
 
 router = APIRouter()
 
 STUDY_SESSION_GAP_MINUTES = 30
+
+
+class LearningReviewRequest(BaseModel):
+    status: str = Field(pattern="^(approved|rejected|pending)$")
+    note: str = Field(default="", max_length=1000)
 
 
 def _estimated_minutes_per_user(timestamps: list[datetime]) -> float:
@@ -764,3 +771,93 @@ async def export_training_data(
         "train_path": str(TRAIN_PATH),
         "test_path": str(TEST_PATH),
     }
+
+
+@router.get("/learning-loop/stats")
+async def learning_loop_stats(admin=Depends(_require_admin), db: AsyncSession = Depends(get_db)):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Learning database is unavailable")
+    total = await db.scalar(select(func.count()).select_from(LearningExample)) or 0
+    pending = await db.scalar(select(func.count()).select_from(LearningExample).where(LearningExample.review_status == "pending")) or 0
+    approved = await db.scalar(select(func.count()).select_from(LearningExample).where(LearningExample.review_status == "approved")) or 0
+    rejected = await db.scalar(select(func.count()).select_from(LearningExample).where(LearningExample.review_status == "rejected")) or 0
+    ready = await db.scalar(select(func.count()).select_from(LearningExample).where(
+        LearningExample.review_status == "pending", LearningExample.quality_score >= 0.75,
+    )) or 0
+    avg_quality = await db.scalar(select(func.avg(LearningExample.quality_score))) or 0.0
+    return {
+        "captured": int(total), "pending_review": int(pending), "approved": int(approved),
+        "rejected": int(rejected), "high_quality_candidates": int(ready),
+        "average_quality_score": round(float(avg_quality), 3),
+        "automatic_weight_updates": False,
+    }
+
+
+@router.get("/learning-loop/candidates")
+async def learning_loop_candidates(
+    limit: int = 100,
+    status_filter: str = "pending",
+    admin=Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Learning database is unavailable")
+    limit = max(1, min(limit, 500))
+    query = select(LearningExample)
+    if status_filter in {"pending", "approved", "rejected"}:
+        query = query.where(LearningExample.review_status == status_filter)
+    rows = (await db.execute(query.order_by(LearningExample.quality_score.desc(), LearningExample.created_at.desc()).limit(limit))).scalars().all()
+    return [{
+        "id": row.id, "question": row.question, "answer": row.answer, "subject": row.subject,
+        "source_type": row.source_type, "sources": json.loads(row.sources_json or "[]"),
+        "positive_feedback": row.positive_feedback, "negative_feedback": row.negative_feedback,
+        "quality_score": row.quality_score, "review_status": row.review_status,
+        "review_note": row.review_note, "created_at": row.created_at.isoformat() if row.created_at else None,
+    } for row in rows]
+
+
+@router.put("/learning-loop/candidates/{candidate_id}")
+async def review_learning_candidate(
+    candidate_id: int,
+    payload: LearningReviewRequest,
+    admin=Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Learning database is unavailable")
+    row = await db.get(LearningExample, candidate_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Learning candidate not found")
+    if payload.status == "approved" and (row.negative_feedback > 0 or row.quality_score < 0.60):
+        raise HTTPException(status_code=400, detail="Resolve negative feedback or low quality before approval")
+    row.review_status = payload.status
+    row.review_note = payload.note.strip() or None
+    row.reviewed_by = admin.email
+    row.reviewed_at = datetime.utcnow()
+    await db.commit()
+    return {"id": row.id, "review_status": row.review_status, "quality_score": row.quality_score}
+
+
+@router.get("/learning-loop/export-approved")
+async def export_approved_learning_data(admin=Depends(_require_admin), db: AsyncSession = Depends(get_db)):
+    """Export only human-approved records; this endpoint never starts training."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="Learning database is unavailable")
+    rows = (await db.execute(
+        select(LearningExample).where(LearningExample.review_status == "approved").order_by(LearningExample.id)
+    )).scalars().all()
+    lines = []
+    for row in rows:
+        lines.append(json.dumps({
+            "instruction": f"{row.question}\n(Subject: {row.subject}, Class: {row.class_level})",
+            "output": row.answer,
+            "metadata": {
+                "learning_example_id": row.id, "subject": row.subject, "class_level": row.class_level,
+                "source": row.source_type, "quality_score": row.quality_score,
+                "positive_feedback": row.positive_feedback, "human_approved": True,
+            },
+        }, ensure_ascii=False) + "\n")
+    filename = f"vidyaai_approved_learning_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.jsonl"
+    return StreamingResponse(iter(lines), media_type="application/x-ndjson", headers={
+        "Content-Disposition": f'attachment; filename="{filename}"', "X-Training-Examples": str(len(rows)),
+    })

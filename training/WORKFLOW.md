@@ -341,3 +341,26 @@ Issues or questions?
 2. Test on smaller data first
 3. Use Google Colab for debugging
 4. Monitor GPU with `nvidia-smi`
+# Safe continuous-improvement loop
+
+Production questions do not update model weights directly. The supported loop is:
+
+1. Every persisted answer creates a privacy-minimized `learning_examples` record.
+2. Grounded RAG sources, answer completeness, and student feedback produce a ranking score.
+3. Negative feedback rejects the example automatically.
+4. Admins inspect `GET /admin/learning-loop/candidates` and approve or reject records.
+5. Only approved records are downloaded from `GET /admin/learning-loop/export-approved`.
+6. Approved data is combined with verified PYQs, deduplicated, and split by canonical question.
+7. A candidate model must beat the current model on a locked subject/Hinglish evaluation set.
+8. Deploy gradually, monitor negative-feedback rate, and roll back on regression.
+
+Useful admin endpoints:
+
+- `GET /admin/learning-loop/stats`
+- `GET /admin/learning-loop/candidates?status_filter=pending`
+- `PUT /admin/learning-loop/candidates/{id}` with `{"status":"approved","note":"verified"}`
+- `GET /admin/learning-loop/export-approved`
+
+Approval is intentionally separate from training. Schedule retraining only after enough reviewed
+examples have accumulated, and never include names, email addresses, phone numbers, or free-form
+personal data in the training corpus.

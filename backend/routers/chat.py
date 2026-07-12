@@ -19,6 +19,7 @@ from backend.models.student import Student as StudentModel
 from backend.models.weak_topic import WeakTopic
 from backend.routers.auth import get_db
 from backend.services.rag import _is_chapter_style_question, format_unit_selection_answer, get_unit_options, run_rag
+from backend.services.learning_loop import apply_feedback, capture_interaction
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
@@ -364,6 +365,12 @@ async def _store_session(db, current_student, session: dict) -> int:
     if db_session_id:
         session["id"] = db_session_id
         in_memory_store["next_session_id"] = max(in_memory_store["next_session_id"], db_session_id + 1)
+    try:
+        await capture_interaction(db, current_student, session)
+    except Exception:
+        if db is not None:
+            await db.rollback()
+        logger.exception("Failed to capture continuous-learning interaction")
     return int(session["id"])
 
 
@@ -427,6 +434,7 @@ async def ask(
             "topic": "",
             "class_level": current_student.class_level,
             "source_type": "chapter_options",
+            "sources": [],
             "confidence": 1.0,
             "answer_style": request.answer_style,
             "created_at": created_at,
@@ -472,6 +480,7 @@ async def ask(
             "topic": "",
             "class_level": current_student.class_level,
             "source_type": cached_entry.get("source_type", "cache"),
+            "sources": cached_entry.get("sources", []),
             "confidence": 0.97,
             "answer_style": request.answer_style,
             "created_at": created_at,
@@ -530,6 +539,7 @@ async def ask(
         "topic": "",
         "class_level": current_student.class_level,
         "source_type": answer_source,
+        "sources": sources,
         "confidence": confidence,
         "answer_style": request.answer_style,
         "created_at": created_at,
@@ -568,6 +578,12 @@ async def feedback(
     session["feedback"] = "thumbs_up" if request.understood else "thumbs_down"
     session["feedback_at"] = datetime.utcnow().isoformat()
     _record_feedback(session, current_student, request.understood)
+    try:
+        await apply_feedback(db, int(request.session_id), current_student, request.understood)
+    except Exception:
+        if db is not None:
+            await db.rollback()
+        logger.exception("Failed to update continuous-learning feedback")
     if not request.understood:
         student_topics = in_memory_store["weak_topics"].setdefault(current_student.id, [])
         weak_subject = session.get("subject", "General")

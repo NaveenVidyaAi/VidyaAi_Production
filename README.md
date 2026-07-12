@@ -43,6 +43,13 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 - **Section-aware retrieval** — Parses "chapter 1.3" → section hint "1-3" for more precise chunk scoring
 - **Anti-repetition** — Removes consecutive duplicate lines and repeated phrases from LLM output
 - **TOC filtering** — Table-of-contents chunks are downranked so real content is retrieved
+- **Prompt-first subject routing** — The student's prompt overrides the selected UI subject, including common Hinglish terms such as `ganit`, `vigyan`, `itihas`, and `bhugol`
+- **Safe continuous learning** — Production interactions become privacy-minimized review candidates; only human-approved answers can be exported for training
+
+### Study Planning
+- Students choose their exam date, subjects, daily available time, study days per week, and preparation goal
+- Plans support balanced preparation, weak-subject improvement, PYQ-heavy practice, and fast revision
+- Desktop and mobile account controls both provide login/logout access
 
 ---
 
@@ -82,6 +89,7 @@ AI_Assistant_cgbse/
 │   │   ├── session.py               ← ChatSession table (per-question history)
 │   │   ├── weak_topic.py            ← WeakTopic table
 │   │   └── qa_cache.py              ← QACache table (dedup + cache-first answering)
+│   │   └── learning_example.py      ← Privacy-minimized continuous-learning candidates
 │   │
 │   ├── routers/
 │   │   ├── auth.py                  ← /auth/register, /auth/login, /auth/me
@@ -93,6 +101,7 @@ AI_Assistant_cgbse/
 │       ├── rag.py                   ← Core RAG pipeline + Groq generation
 │       ├── embeddings.py            ← Embedding service (real or mock)
 │       └── hybrid_rag.py            ← Hybrid fine-tuned/Groq routing (future)
+│       └── learning_loop.py          ← Redaction, quality scoring, feedback learning loop
 │
 ├── frontend/
 │   ├── index.html
@@ -469,6 +478,10 @@ Click **"View"** on any row to open the user detail drawer.
 |---|---|---|
 | GET | `/admin/dashboard` | Platform-wide summary, top subjects, source mix |
 | GET | `/admin/users` | Per-user breakdown with subjects, time, weak topics, recent questions |
+| GET | `/admin/learning-loop/stats` | Continuous-learning capture and review metrics |
+| GET | `/admin/learning-loop/candidates` | Ranked pending/approved/rejected learning candidates |
+| PUT | `/admin/learning-loop/candidates/{id}` | Approve or reject a candidate with a review note |
+| GET | `/admin/learning-loop/export-approved` | Download only human-approved training examples as JSONL |
 
 ---
 
@@ -484,11 +497,14 @@ FastAPI Backend (:8000)
   ├─ /chat/ask        → QACache (hit?) → Qdrant RAG → Groq LLM
   │                     └─ stores result in QACache
   ├─ /chat/history    → PostgreSQL (chat_sessions table)
+  ├─ /chat/feedback   → learning quality score + rejection signal
   ├─ /admin/dashboard → Aggregated queries across all tables
-  └─ /admin/users     → Per-user joins: students + sessions + weak_topics
+  ├─ /admin/users     → Per-user joins: students + sessions + weak_topics
+  └─ /admin/learning-loop/* → teacher review + approved JSONL export
        │
        ├── PostgreSQL (:5432)
-       │     tables: students, chat_sessions, weak_topics, qa_cache
+       │     tables: students, chat_sessions, weak_topics, qa_cache,
+       │             quizzes, quiz_questions, quiz_answers, learning_examples
        │
        └── Qdrant (:6333)
              collection: cgbse_knowledge
@@ -532,6 +548,20 @@ Each chunk from Qdrant is scored by token overlap with the question. Bonuses/pen
 | Section number match (e.g. "1-3") | +7.0 |
 | Table-of-contents chunk detected | −4.0 |
 | TOC chunk when section hint exists | −8.0 |
+
+### Safe Continuous-Improvement Flow
+
+```text
+Student question → RAG/Groq answer → privacy redaction → learning candidate
+       → grounding/feedback score → teacher review → approved JSONL
+       → offline evaluation → controlled fine-tuning → gradual deployment
+```
+
+The application never updates model weights directly from student prompts. Email addresses and Indian phone numbers are redacted, student identifiers are hashed, negative feedback rejects a candidate automatically, and approval remains separate from training. See `training/WORKFLOW.md` for the release process.
+
+### Documentation Rule
+
+Every implementation change must include a corresponding update to this `README.md`, covering the changed behavior, configuration, API, workflow, or limitation.
 
 ---
 
