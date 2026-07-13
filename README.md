@@ -475,7 +475,7 @@ Click **"View"** on any row to open the user detail drawer.
 
 ### PYQ Practice
 
-The PYQ page passes the selected paper's subject, year, set, and exact PDF filename to `/quiz/generate` with `quiz_type: "pyq"`. The backend retrieves only chunks whose `source_file` matches that PDF. If an older Qdrant export contains only consolidated subject papers, the backend reads the matching PDF from `ingestion/data/Previous_Year_Questions` instead of silently using a different paper. Image-only papers use Hindi+English Tesseract OCR; the backend Docker image includes both OCR language packs.
+The PYQ page passes the selected paper's subject, year, set, and exact PDF filename to `/quiz/generate` with `quiz_type: "pyq"`. Only the selected paper shows a preparation state, and its quiz remains directly below the paper list instead of navigating to the standalone Quiz tab. The backend retrieves only chunks whose `source_file` matches that PDF. If an older Qdrant export contains only consolidated subject papers, the backend reads the matching PDF from `ingestion/data/Previous_Year_Questions` instead of silently using a different paper. Image-only papers use Hindi+English Tesseract OCR; the backend Docker image includes both OCR language packs.
 
 ### Admin (requires admin JWT)
 

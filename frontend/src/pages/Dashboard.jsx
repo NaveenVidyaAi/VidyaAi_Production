@@ -496,6 +496,8 @@ export default function Dashboard() {
   const [quizLoading, setQuizLoading] = useState(false);
   const [activeSection, setActiveSection] = useState("chat");
   const [standaloneQuiz, setStandaloneQuiz] = useState(null);
+  const [pyqQuiz, setPyqQuiz] = useState(null);
+  const [pyqLoadingFile, setPyqLoadingFile] = useState("");
   const [quizSubject, setQuizSubject] = useState("Hindi");
   const [pyqSubject, setPyqSubject] = useState("Hindi");
   const [studyHours, setStudyHours] = useState(3);
@@ -805,10 +807,11 @@ export default function Dashboard() {
   };
 
   const generatePyqQuiz = async (paper) => {
-    if (quizLoading) return;
-    setQuizLoading(true);
+    if (pyqLoadingFile) return;
+    const sourceFile = paper.fileUrl.split("/").pop();
+    setPyqLoadingFile(sourceFile);
+    setPyqQuiz(null);
     try {
-      const sourceFile = paper.fileUrl.split("/").pop();
       const response = await api.post("/quiz/generate", {
         subject: paper.subject,
         chapter: `${paper.year} Set ${paper.set}`,
@@ -821,20 +824,19 @@ export default function Dashboard() {
       });
       setSelectedSubject(paper.subject);
       setQuizSubject(paper.subject);
-      setStandaloneQuiz({
+      setPyqQuiz({
         role: "quiz",
         text: `${paper.title} Practice`,
         quiz: response.data,
         selectedAnswers: {},
+        result: null,
         status: "started",
       });
-      setActiveSection("quiz");
     } catch (err) {
       const detail = err?.response?.data?.detail || "This paper could not be loaded from the PYQ knowledge base.";
-      setMessages((prev) => [...prev, { role: "assistant", text: detail }]);
-      setActiveSection("chat");
+      setPyqQuiz({ role: "quiz", text: `${paper.title} Practice`, error: detail, quiz: null, status: "error" });
     } finally {
-      setQuizLoading(false);
+      setPyqLoadingFile("");
     }
   };
 
@@ -843,6 +845,9 @@ export default function Dashboard() {
       message.role === "quiz" && message.quiz?.quiz_id === quizId ? updater(message) : message
     )));
     setStandaloneQuiz((message) => (
+      message?.role === "quiz" && message.quiz?.quiz_id === quizId ? updater(message) : message
+    ));
+    setPyqQuiz((message) => (
       message?.role === "quiz" && message.quiz?.quiz_id === quizId ? updater(message) : message
     ));
   };
@@ -1726,12 +1731,20 @@ export default function Dashboard() {
                           <div className="pyq-actions">
                             <a className="pyq-open-action" href={paper.fileUrl} target="_blank" rel="noreferrer">Open</a>
                             <a className="pyq-download-action" href={paper.fileUrl} download>Download</a>
-                            <button type="button" disabled={quizLoading} onClick={() => generatePyqQuiz(paper)}>
-                              {quizLoading ? "Preparing..." : t.startPaper}
+                            <button type="button" disabled={Boolean(pyqLoadingFile)} onClick={() => generatePyqQuiz(paper)}>
+                              {pyqLoadingFile === paper.fileUrl.split("/").pop() ? "Preparing..." : t.startPaper}
                             </button>
                           </div>
                         </article>
                       ))}
+                    </div>
+                    <div className="standalone-quiz-wrap pyq-practice-wrap">
+                      {pyqQuiz ? renderQuizCard(pyqQuiz) : (
+                        <div className="empty-tool-state">
+                          <strong>Select a paper to practice</strong>
+                          <span>Your paper-specific questions will appear here without leaving the PYQ page.</span>
+                        </div>
+                      )}
                     </div>
                   </section>
                 </div>
