@@ -30,6 +30,7 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 - **Multi-language UI** — Toggle between Hindi and English interface
 - **Progress Dashboard** — See past questions and topics studied
 - **Paper-specific PYQ practice** — Starting practice from a PYQ card creates a five-question quiz from that exact year/set PDF, with exact-source Qdrant retrieval and a local-PDF fallback for older indexes
+- **Streaming answer presentation** — Newly generated assistant answers reveal progressively with Markdown support and a typing cursor; reduced-motion preferences and previously displayed answers skip the animation
 
 ### Admin Features
 - **Platform KPIs** — Total users, questions (total + 24h), active users, estimated study time, cache hit count

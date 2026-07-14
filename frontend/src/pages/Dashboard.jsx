@@ -474,6 +474,51 @@ const readJson = (key, fallback) => {
 
 const defaultExamDate = () => dateKey(addDays(new Date(), 47));
 
+function StreamingMarkdown({ text, animate, onProgress }) {
+  const tokens = (text || "").match(/\S+\s*/g) || [];
+  const [visibleCount, setVisibleCount] = useState(animate ? 0 : tokens.length);
+
+  useEffect(() => {
+    if (!animate) {
+      setVisibleCount(tokens.length);
+      return undefined;
+    }
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setVisibleCount(tokens.length);
+      return undefined;
+    }
+    setVisibleCount(0);
+    const wordsPerTick = Math.max(1, Math.ceil(tokens.length / 320));
+    const timer = window.setInterval(() => {
+      setVisibleCount((current) => {
+        const next = Math.min(current + wordsPerTick, tokens.length);
+        if (next >= tokens.length) window.clearInterval(timer);
+        return next;
+      });
+      onProgress?.();
+    }, 28);
+    return () => window.clearInterval(timer);
+  }, [animate, text]);
+
+  const isStreaming = visibleCount < tokens.length;
+  return (
+    <div className={`streaming-markdown${isStreaming ? " is-streaming" : ""}`} aria-live="polite">
+      <ReactMarkdown>{tokens.slice(0, visibleCount).join("")}</ReactMarkdown>
+    </div>
+  );
+}
+
+function AssistantResponse({ message, animationRegistry, onProgress }) {
+  const animationKey = message.streamId || message.sessionId || message.text;
+  const [animate] = useState(() => message.animateResponse && !animationRegistry.has(animationKey));
+
+  useEffect(() => {
+    if (animate) animationRegistry.add(animationKey);
+  }, [animate, animationKey, animationRegistry]);
+
+  return <StreamingMarkdown text={message.text} animate={animate} onProgress={onProgress} />;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [lang, setLang] = useState("hi");
@@ -509,6 +554,7 @@ export default function Dashboard() {
   const windowRef = useRef(null);
   const messagesEndRef = useRef(null);
   const profileMenuRef = useRef(null);
+  const animatedMessagesRef = useRef(new Set());
 
   const t = translations[lang];
   const todayIndex = Math.floor(new Date().getTime() / 86400000) % dailyTargets.length;
@@ -714,6 +760,8 @@ export default function Dashboard() {
         role: "assistant",
         text: response?.data?.answer || t.welcomeMsg,
         sessionId: response?.data?.session_id,
+        streamId: `${response?.data?.session_id || "answer"}-${Date.now()}`,
+        animateResponse: true,
         question: currentQuestion,
         subject: outgoingSubject,
         answerStyle: outgoingAnswerStyle,
@@ -1520,7 +1568,14 @@ export default function Dashboard() {
                   <div className="dashboard-message-stack">
                     <span className="message-label">{message.role === "student" ? t.studentLabel : message.role === "quiz" ? "MCQ Quiz" : t.assistantLabel}</span>
                     <div className={`dashboard-message-bubble ${message.role === "student" ? "student" : "assistant"}${message.role === "quiz" ? " quiz-bubble" : ""}`}>
-                      {message.role !== "quiz" && <ReactMarkdown>{message.text}</ReactMarkdown>}
+                      {message.role === "student" && <ReactMarkdown>{message.text}</ReactMarkdown>}
+                      {message.role === "assistant" && (
+                        <AssistantResponse
+                          message={message}
+                          animationRegistry={animatedMessagesRef.current}
+                          onProgress={() => messagesEndRef.current?.scrollIntoView({ block: "end" })}
+                        />
+                      )}
                       {message.role === "quiz" && (
                         renderQuizCard(message)
                       )}

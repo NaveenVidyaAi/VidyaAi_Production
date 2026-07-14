@@ -1570,6 +1570,31 @@ button:disabled {
   margin-top: 0.8rem;
 }
 
+.streaming-markdown {
+  min-width: 1px;
+}
+
+.streaming-markdown.is-streaming::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 3px;
+  border-radius: 2px;
+  background: var(--brand);
+  vertical-align: -0.15em;
+  animation: response-cursor-blink 0.72s steps(1, end) infinite;
+}
+
+@keyframes response-cursor-blink {
+  0%, 48% { opacity: 1; }
+  49%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streaming-markdown.is-streaming::after { animation: none; }
+}
+
 .dashboard-message-bubble ul,
 .dashboard-message-bubble ol {
   margin: 0.8rem 0 0;
