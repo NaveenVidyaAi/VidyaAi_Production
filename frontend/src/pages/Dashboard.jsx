@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
+import RichMarkdown from "../components/RichMarkdown";
 import api from "../api/client";
 
 const translations = {
@@ -503,7 +503,7 @@ function StreamingMarkdown({ text, animate, onProgress }) {
   const isStreaming = visibleCount < tokens.length;
   return (
     <div className={`streaming-markdown${isStreaming ? " is-streaming" : ""}`} aria-live="polite">
-      <ReactMarkdown>{tokens.slice(0, visibleCount).join("")}</ReactMarkdown>
+      <RichMarkdown streaming={isStreaming}>{tokens.slice(0, visibleCount).join("")}</RichMarkdown>
     </div>
   );
 }
@@ -1568,7 +1568,7 @@ export default function Dashboard() {
                   <div className="dashboard-message-stack">
                     <span className="message-label">{message.role === "student" ? t.studentLabel : message.role === "quiz" ? "MCQ Quiz" : t.assistantLabel}</span>
                     <div className={`dashboard-message-bubble ${message.role === "student" ? "student" : "assistant"}${message.role === "quiz" ? " quiz-bubble" : ""}`}>
-                      {message.role === "student" && <ReactMarkdown>{message.text}</ReactMarkdown>}
+                      {message.role === "student" && <RichMarkdown>{message.text}</RichMarkdown>}
                       {message.role === "assistant" && (
                         <AssistantResponse
                           message={message}

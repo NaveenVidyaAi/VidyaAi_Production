@@ -1601,6 +1601,223 @@ button:disabled {
   padding-left: 1.2rem;
 }
 
+.response-table-wrap {
+  max-width: 100%;
+  margin-top: 0.9rem;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.response-table-wrap table {
+  width: 100%;
+  min-width: 440px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.response-table-wrap th,
+.response-table-wrap td {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.response-table-wrap th:last-child,
+.response-table-wrap td:last-child { border-right: 0; }
+.response-table-wrap tr:last-child td { border-bottom: 0; }
+
+.response-table-wrap th {
+  background: var(--brand-soft);
+  color: var(--ink);
+  font-weight: 1000;
+}
+
+.response-mermaid,
+.response-venn,
+.response-visual-status,
+.response-visual-fallback {
+  max-width: 100%;
+  margin: 1rem 0 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.response-mermaid {
+  overflow-x: auto;
+  padding: 16px;
+  text-align: center;
+}
+
+.response-mermaid svg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+/* Mermaid uses one base node color by default. Rotate through the VidyaAI
+   palette so multi-step educational flows are easier to scan. */
+.response-mermaid .node:nth-of-type(6n + 1) rect,
+.response-mermaid .node:nth-of-type(6n + 1) circle,
+.response-mermaid .node:nth-of-type(6n + 1) polygon,
+.response-mermaid .node:nth-of-type(6n + 1) path {
+  fill: #ccfbf1 !important;
+  stroke: #0f766e !important;
+}
+
+.response-mermaid .node:nth-of-type(6n + 2) rect,
+.response-mermaid .node:nth-of-type(6n + 2) circle,
+.response-mermaid .node:nth-of-type(6n + 2) polygon,
+.response-mermaid .node:nth-of-type(6n + 2) path {
+  fill: #dbeafe !important;
+  stroke: #2563eb !important;
+}
+
+.response-mermaid .node:nth-of-type(6n + 3) rect,
+.response-mermaid .node:nth-of-type(6n + 3) circle,
+.response-mermaid .node:nth-of-type(6n + 3) polygon,
+.response-mermaid .node:nth-of-type(6n + 3) path {
+  fill: #fef3c7 !important;
+  stroke: #d97706 !important;
+}
+
+.response-mermaid .node:nth-of-type(6n + 4) rect,
+.response-mermaid .node:nth-of-type(6n + 4) circle,
+.response-mermaid .node:nth-of-type(6n + 4) polygon,
+.response-mermaid .node:nth-of-type(6n + 4) path {
+  fill: #fee2e2 !important;
+  stroke: #dc2626 !important;
+}
+
+.response-mermaid .node:nth-of-type(6n + 5) rect,
+.response-mermaid .node:nth-of-type(6n + 5) circle,
+.response-mermaid .node:nth-of-type(6n + 5) polygon,
+.response-mermaid .node:nth-of-type(6n + 5) path {
+  fill: #ede9fe !important;
+  stroke: #7c3aed !important;
+}
+
+.response-mermaid .node:nth-of-type(6n) rect,
+.response-mermaid .node:nth-of-type(6n) circle,
+.response-mermaid .node:nth-of-type(6n) polygon,
+.response-mermaid .node:nth-of-type(6n) path {
+  fill: #dcfce7 !important;
+  stroke: #16a34a !important;
+}
+
+.response-mermaid .flowchart-link,
+.response-mermaid .edgePath path {
+  stroke: #475569 !important;
+  stroke-width: 2px !important;
+}
+
+.response-mermaid marker path {
+  fill: #475569 !important;
+  stroke: #475569 !important;
+}
+
+.response-visual-status,
+.response-visual-fallback {
+  color: var(--muted);
+  padding: 13px 15px;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.response-visual-fallback pre {
+  max-width: 100%;
+  margin: 9px 0 0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  font-weight: 600;
+}
+
+.response-venn {
+  overflow: hidden;
+  padding: 14px;
+}
+
+.response-venn figcaption {
+  margin-bottom: 10px;
+  color: var(--ink);
+  text-align: center;
+  font-weight: 1000;
+}
+
+.response-venn-canvas {
+  position: relative;
+  min-width: 430px;
+  min-height: 290px;
+}
+
+.response-venn-circle {
+  position: absolute;
+  top: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 260px;
+  height: 260px;
+  border: 2px solid;
+  border-radius: 50%;
+  padding: 44px;
+  text-align: center;
+}
+
+.response-venn-circle.left {
+  left: calc(50% - 230px);
+  border-color: rgba(15, 118, 110, 0.72);
+  background: rgba(20, 184, 166, 0.14);
+  padding-right: 82px;
+}
+
+.response-venn-circle.right {
+  right: calc(50% - 230px);
+  border-color: rgba(37, 99, 235, 0.7);
+  background: rgba(59, 130, 246, 0.13);
+  padding-left: 82px;
+}
+
+.response-venn-circle strong,
+.response-venn-shared strong {
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.response-venn-circle span,
+.response-venn-shared span {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.response-venn-shared {
+  position: absolute;
+  z-index: 2;
+  top: 82px;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 116px;
+  min-height: 126px;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+@media (max-width: 620px) {
+  .response-venn { overflow-x: auto; }
+  .response-venn-canvas { min-width: 430px; }
+}
+
 .chapter-option-list {
   display: grid;
   gap: 8px;

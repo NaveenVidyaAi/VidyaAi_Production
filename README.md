@@ -31,6 +31,9 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 - **Progress Dashboard** — See past questions and topics studied
 - **Paper-specific PYQ practice** — Starting practice from a PYQ card creates a five-question quiz from that exact year/set PDF, with exact-source Qdrant retrieval and a local-PDF fallback for older indexes
 - **Streaming answer presentation** — Newly generated assistant answers reveal progressively with Markdown support and a typing cursor; reduced-motion preferences and previously displayed answers skip the animation
+- **Consistent answer formatting** — Summary, 2-mark, 5-mark, Q&A, and exam-ready modes use distinct layouts; headings and ordinary paragraphs stay unnumbered, while genuine questions and solution steps retain consecutive numbering
+- **Rich visual answers** — Chat responses render responsive tables, color-coded Mermaid flows/timelines/hierarchies/charts, and native two-set Venn diagrams using the VidyaAI palette; explicit visual requests are validated, missing blocks are repaired, and numeric pie/bar charts preserve exact prompt values
+- **Grounded 5-mark answers** — Long-form exam responses use connected paragraphs, avoid repetitive numbered templates, and prioritize lesson chunks that match the actual titled reading over unrelated end-of-unit exercises
 
 ### Admin Features
 - **Platform KPIs** — Total users, questions (total + 24h), active users, estimated study time, cache hit count

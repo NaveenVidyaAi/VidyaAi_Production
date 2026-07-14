@@ -218,12 +218,44 @@ class RAGRetrievalTests(unittest.TestCase):
             "3-A",
         )
 
+    def test_english_reading_code_is_not_misclassified_as_math(self):
+        question = "class 10 english chapter 1-C A Great Moment For All Those Children"
+
+        self.assertEqual(rag._infer_subject("Hindi", question), "English")
+
     def test_answer_style_formats_are_distinct(self):
         self.assertIn("2-mark", rag._answer_format_for_style("English", "two").lower())
         self.assertIn("5-mark", rag._answer_format_for_style("English", "five").lower())
-        self.assertIn("q&a", rag._answer_format_for_style("English", "qa").lower())
+        self.assertIn("question 6", rag._answer_format_for_style("English", "qa").lower())
         self.assertIn("सारांश", rag._answer_format_for_style("Hindi", "summary"))
         self.assertLess(rag._max_tokens_for_style("two"), rag._max_tokens_for_style("exam"))
+
+    def test_five_mark_style_requires_grounded_connected_answer(self):
+        answer_format = rag._answer_format_for_style("English", "five")
+
+        self.assertIn("120-170 word", answer_format)
+        self.assertIn("connected paragraphs", answer_format)
+        self.assertIn("specific details found in the textbook context", answer_format)
+        self.assertIn("do not use a numbered template", answer_format.lower())
+
+    def test_visual_request_types_are_detected(self):
+        cases = {
+            "Show this as a table": "table",
+            "Create a Venn diagram": "venn",
+            "Create a pie chart": "pie",
+            "Prepare a bar graph": "bar",
+            "Explain this with a flowchart diagram": "mermaid",
+        }
+        for prompt, expected in cases.items():
+            with self.subTest(prompt=prompt):
+                self.assertEqual(rag._requested_visual_type(prompt), expected)
+
+    def test_markdown_table_requires_header_separator(self):
+        valid = "| Day | Subject |\n| --- | --- |\n| Monday | Maths |"
+        invalid = "Day | Subject\nMonday | Maths"
+
+        self.assertTrue(rag._contains_requested_visual(valid, "table"))
+        self.assertFalse(rag._contains_requested_visual(invalid, "table"))
 
     def test_two_mark_answer_is_coerced_to_compact_format(self):
         answer = rag._coerce_answer_to_style(
@@ -233,9 +265,21 @@ class RAGRetrievalTests(unittest.TestCase):
         )
 
         self.assertNotIn("2-Mark Answer", answer)
-        self.assertIn("1. First important point", answer)
-        self.assertIn("2. Second important point", answer)
+        self.assertIn("First important point", answer)
+        self.assertIn("Second important point", answer)
+        self.assertNotIn("1.", answer)
+        self.assertNotIn("2.", answer)
         self.assertNotIn("Extra point", answer)
+
+    def test_loose_numbers_are_removed_from_five_mark_paragraphs(self):
+        answer = rag._coerce_answer_to_style(
+            "**A Lesson**\n\n2. The opening paragraph explains the real event.\n\n3. The next paragraph develops its message.\n\n4. The lesson ends with hope.",
+            "English",
+            "five",
+        )
+
+        self.assertNotRegex(answer, r"(?m)^\s*[234][.)]")
+        self.assertIn("The opening paragraph", answer)
 
     def test_followup_reference_is_contextualized_with_previous_chapter(self):
         history = [
@@ -375,10 +419,94 @@ class RAGRetrievalTests(unittest.TestCase):
         prompt_text = "\n".join(message["content"] for message in captured_payload["messages"])
         self.assertEqual(source, "groq")
         self.assertIn("Answer in clear English", prompt_text)
-        self.assertIn("Summary (2-3 lines)", prompt_text)
+        self.assertIn("one connected paragraph of 2-3 sentences", prompt_text)
+        self.assertIn("do not number headings or ordinary paragraphs", prompt_text)
         self.assertIn("board-exam-ready", prompt_text)
         self.assertIn("ask the student to write a clearer prompt", prompt_text)
+        self.assertIn("GitHub-flavored Markdown table", prompt_text)
+        self.assertIn("valid fenced Mermaid block", prompt_text)
+        self.assertIn("fenced `venn` block", prompt_text)
+        self.assertIn("A visual must supplement, not replace", prompt_text)
         self.assertIn("Photosynthesis", answer)
+
+    def test_requested_pie_chart_uses_exact_prompt_values(self):
+        original_api_key = rag.settings.groq_api_key
+        original_post = rag.requests.post
+        calls = []
+
+        class FakeResponse:
+            status_code = 200
+
+            def __init__(self, content):
+                self.content = content
+
+            def json(self):
+                return {"choices": [{"message": {"content": self.content}}]}
+
+        def fake_post(url, headers, json, timeout):
+            calls.append(json)
+            return FakeResponse("Maths and Science receive the most study time.")
+
+        rag.settings.groq_api_key = "test-key"
+        rag.requests.post = fake_post
+        try:
+            answer, source = rag._groq_answer(
+                question="Create a pie chart: Maths 90 minutes, Science 90 minutes",
+                context_blocks=[],
+                subject="Math",
+                class_level="10",
+                answer_style="exam",
+            )
+        finally:
+            rag.settings.groq_api_key = original_api_key
+            rag.requests.post = original_post
+
+        self.assertEqual(source, "groq")
+        self.assertEqual(len(calls), 1)
+        self.assertIn("```mermaid", answer)
+        self.assertIn("pie showData", answer)
+        self.assertIn('"Maths" : 90', answer)
+        self.assertIn('"Science" : 90', answer)
+        self.assertIn("**Visual**", answer)
+
+    def test_missing_requested_flowchart_is_repaired(self):
+        original_api_key = rag.settings.groq_api_key
+        original_post = rag.requests.post
+        calls = []
+
+        class FakeResponse:
+            status_code = 200
+
+            def __init__(self, content):
+                self.content = content
+
+            def json(self):
+                return {"choices": [{"message": {"content": self.content}}]}
+
+        def fake_post(url, headers, json, timeout):
+            calls.append(json)
+            if len(calls) == 1:
+                return FakeResponse("Water evaporates, condenses, and falls as rain.")
+            return FakeResponse("```mermaid\nflowchart TD\n    A[\"Evaporation\"] --> B[\"Condensation\"]\n    B --> C[\"Rain\"]\n```")
+
+        rag.settings.groq_api_key = "test-key"
+        rag.requests.post = fake_post
+        try:
+            answer, source = rag._groq_answer(
+                question="Explain the water cycle with a flowchart diagram",
+                context_blocks=[],
+                subject="Science",
+                class_level="10",
+                answer_style="exam",
+            )
+        finally:
+            rag.settings.groq_api_key = original_api_key
+            rag.requests.post = original_post
+
+        self.assertEqual(source, "groq")
+        self.assertEqual(len(calls), 2)
+        self.assertIn("flowchart TD", answer)
+        self.assertIn("**Visual**", answer)
 
     def test_groq_prompt_uses_hindi_exam_format_for_hinglish_question(self):
         original_api_key = rag.settings.groq_api_key

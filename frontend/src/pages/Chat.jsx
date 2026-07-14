@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import RichMarkdown from "../components/RichMarkdown";
 import api from "../api/client";
 
 const subjects = ["Science", "Math", "Hindi", "Social Science", "English"];
@@ -172,7 +172,7 @@ export default function Chat() {
           <div className="chat-window">
             {messages.map((message, index) => (
               <div key={index} className={`chat-bubble ${message.role === "assistant" ? "assistant" : message.role === "quiz" ? "assistant quiz-bubble" : "student"}`}>
-                {message.role !== "quiz" && <ReactMarkdown>{message.text}</ReactMarkdown>}
+                {message.role !== "quiz" && <RichMarkdown>{message.text}</RichMarkdown>}
                 {message.role === "quiz" && (
                   <div className="quiz-card">
                     <div className="quiz-card-head">
