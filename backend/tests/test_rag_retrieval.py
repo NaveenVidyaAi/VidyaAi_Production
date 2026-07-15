@@ -140,6 +140,265 @@ class RAGRetrievalTests(unittest.TestCase):
         self.assertFalse(calls["retrieved"])
         self.assertFalse(calls["llm"])
 
+    def test_trailing_equals_arithmetic_returns_only_result(self):
+        class Student:
+            class_level = "10"
+
+        original_retrieve = rag._retrieve_context
+        original_answer = rag._groq_answer
+        calls = {"retrieved": False, "llm": False}
+
+        def fake_retrieve(**kwargs):
+            calls["retrieved"] = True
+            return []
+
+        def fake_answer(*args, **kwargs):
+            calls["llm"] = True
+            return ("wrong", "groq")
+
+        try:
+            rag._retrieve_context = fake_retrieve
+            rag._groq_answer = fake_answer
+            answer, sources, answer_source = asyncio.run(
+                rag.run_rag(Student(), "Hindi", "5+4+9=", [])
+            )
+        finally:
+            rag._retrieve_context = original_retrieve
+            rag._groq_answer = original_answer
+
+        self.assertEqual(answer, "18")
+        self.assertEqual(sources, [])
+        self.assertEqual(answer_source, "math-direct")
+        self.assertFalse(calls["retrieved"])
+        self.assertFalse(calls["llm"])
+
+    def test_prompt_intent_router_separates_direct_and_rag_tasks(self):
+        cases = {
+            "5 + 4 + 9 =": "simple_arithmetic",
+            "Solve 2x + 3 = 11": "math_problem",
+            "Create a pie chart: Maths 80, Science 70": "visual_data",
+            "Write an application to the principal": "writing_task",
+            "Create a seven-day study plan": "study_plan",
+            "Class 10 Science chapter 2 explain": "curriculum",
+            "What is the capital of India?": "general",
+        }
+        for prompt, expected in cases.items():
+            with self.subTest(prompt=prompt):
+                self.assertEqual(rag._classify_prompt_intent("Hindi", prompt), expected)
+
+    def test_general_question_skips_retrieval_and_uses_ai_directly(self):
+        class Student:
+            class_level = "10"
+
+        original_retrieve = rag._retrieve_context
+        original_answer = rag._groq_answer
+        calls = {"retrieved": False, "contexts": None, "subject": None}
+
+        def fake_retrieve(**kwargs):
+            calls["retrieved"] = True
+            return []
+
+        def fake_answer(question, context_blocks, subject, class_level, answer_style="exam", recent_history=None):
+            calls["contexts"] = context_blocks
+            calls["subject"] = subject
+            return ("New Delhi.", "groq")
+
+        try:
+            rag._retrieve_context = fake_retrieve
+            rag._groq_answer = fake_answer
+            answer, sources, answer_source = asyncio.run(
+                rag.run_rag(Student(), "Hindi", "What is the capital of India?", [])
+            )
+        finally:
+            rag._retrieve_context = original_retrieve
+            rag._groq_answer = original_answer
+
+        self.assertFalse(calls["retrieved"])
+        self.assertEqual(calls["contexts"], [])
+        self.assertEqual(calls["subject"], "General")
+        self.assertEqual(answer, "New Delhi.")
+        self.assertEqual(sources, [])
+        self.assertEqual(answer_source, "groq")
+
+    def test_weak_curriculum_retrieval_uses_guarded_rewrite_then_retries(self):
+        class Student:
+            class_level = "10"
+
+        original_retrieve = rag._retrieve_context
+        original_rewrite = rag._rewrite_query_for_retrieval
+        original_answer = rag._groq_answer
+        retrieval_queries = []
+        captured = {}
+
+        def fake_retrieve(**kwargs):
+            retrieval_queries.append(kwargs["question"])
+            if "Acids Bases and Salts" in kwargs["question"]:
+                return [
+                    (
+                        "Acids react with bases to form salt and water. The pH scale measures acidity and basicity.",
+                        "science-acids",
+                        12.0,
+                        "Science | Chapter: 2 | Acids Bases and Salts",
+                    )
+                ]
+            return []
+
+        def fake_answer(question, context_blocks, subject, class_level, answer_style="exam", recent_history=None):
+            captured["contexts"] = context_blocks
+            captured["subject"] = subject
+            return ("Acids and bases explained.", "groq")
+
+        try:
+            rag._retrieve_context = fake_retrieve
+            rag._rewrite_query_for_retrieval = lambda *args: (
+                "Class 10 Science Acids Bases and Salts properties and pH",
+                "Science",
+            )
+            rag._groq_answer = fake_answer
+            answer, sources, answer_source = asyncio.run(
+                rag.run_rag(Student(), "Hindi", "aml chhar samjhao", [])
+            )
+        finally:
+            rag._retrieve_context = original_retrieve
+            rag._rewrite_query_for_retrieval = original_rewrite
+            rag._groq_answer = original_answer
+
+        self.assertEqual(len(retrieval_queries), 2)
+        self.assertEqual(captured["subject"], "Science")
+        self.assertTrue(captured["contexts"])
+        self.assertIn("Acids react with bases", captured["contexts"][0])
+        self.assertTrue(sources)
+        self.assertEqual(answer_source, "groq")
+        self.assertIn("Acids", answer)
+
+    def test_science_chapter_concept_uses_ai_fallback_when_retrieval_is_weak(self):
+        class Student:
+            class_level = "10"
+
+        original_retrieve = rag._retrieve_context
+        original_rewrite = rag._rewrite_query_for_retrieval
+        original_answer = rag._groq_answer
+        captured = {}
+
+        def fake_answer(question, context_blocks, subject, class_level, answer_style="exam", recent_history=None):
+            captured["question"] = question
+            captured["contexts"] = context_blocks
+            captured["subject"] = subject
+            return (
+                "| गुण | धातु | अधातु |\n"
+                "| --- | --- | --- |\n"
+                "| चमक | सामान्यतः चमकीले | सामान्यतः बिना चमक के |",
+                "groq",
+            )
+
+        try:
+            rag._retrieve_context = lambda **kwargs: []
+            rag._rewrite_query_for_retrieval = lambda *args: None
+            rag._groq_answer = fake_answer
+            answer, sources, answer_source = asyncio.run(
+                rag.run_rag(
+                    Student(),
+                    "Hindi",
+                    "Class 10 Science Chapter 3 me dhatu aur adhatu ke physical properties ka comparison table banao",
+                    [],
+                )
+            )
+        finally:
+            rag._retrieve_context = original_retrieve
+            rag._rewrite_query_for_retrieval = original_rewrite
+            rag._groq_answer = original_answer
+
+        self.assertEqual(captured["subject"], "Science")
+        self.assertEqual(captured["contexts"], [])
+        self.assertIn("| गुण | धातु | अधातु |", answer)
+        self.assertEqual(sources, [])
+        self.assertEqual(answer_source, "groq")
+
+    def test_language_chapter_still_requires_textbook_context(self):
+        self.assertTrue(
+            rag._requires_strict_textbook_grounding(
+                "English",
+                "Class 10 English Chapter 1-C A Great Moment For All Those Children",
+            )
+        )
+        self.assertFalse(
+            rag._requires_strict_textbook_grounding(
+                "Science",
+                "Class 10 Science Chapter 3 metals and non-metals",
+            )
+        )
+
+    def test_query_rewriter_understands_hinglish_without_answering(self):
+        original_api_key = rag.settings.groq_api_key
+        original_post = rag.requests.post
+        captured_payload = {}
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {
+                    "choices": [{
+                        "message": {
+                            "content": '{"query":"Class 10 Science Acids Bases and Salts explanation","subject":"Science"}'
+                        }
+                    }]
+                }
+
+        def fake_post(url, headers, json, timeout):
+            captured_payload.update(json)
+            return FakeResponse()
+
+        rag.settings.groq_api_key = "test-key"
+        rag.requests.post = fake_post
+        try:
+            rewritten = rag._rewrite_query_for_retrieval(
+                "aml chhar samjhao",
+                "Hindi",
+                "10",
+            )
+        finally:
+            rag.settings.groq_api_key = original_api_key
+            rag.requests.post = original_post
+
+        self.assertEqual(
+            rewritten,
+            ("Class 10 Science Acids Bases and Salts explanation", "Science"),
+        )
+        system_prompt = captured_payload["messages"][0]["content"]
+        self.assertIn("Do not answer", system_prompt)
+        self.assertIn("Return strict JSON only", system_prompt)
+
+    def test_query_rewriter_rejects_subject_change(self):
+        original_api_key = rag.settings.groq_api_key
+        original_post = rag.requests.post
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {
+                    "choices": [{
+                        "message": {
+                            "content": '{"query":"Class 10 Science chapter 1","subject":"Science"}'
+                        }
+                    }]
+                }
+
+        rag.settings.groq_api_key = "test-key"
+        rag.requests.post = lambda *args, **kwargs: FakeResponse()
+        try:
+            rewritten = rag._rewrite_query_for_retrieval(
+                "Class 10 English chapter 1",
+                "Hindi",
+                "10",
+            )
+        finally:
+            rag.settings.groq_api_key = original_api_key
+            rag.requests.post = original_post
+
+        self.assertIsNone(rewritten)
+
     def test_math_problem_bypasses_retrieval_context(self):
         class Student:
             class_level = "10"
@@ -428,6 +687,41 @@ class RAGRetrievalTests(unittest.TestCase):
         self.assertIn("fenced `venn` block", prompt_text)
         self.assertIn("A visual must supplement, not replace", prompt_text)
         self.assertIn("Photosynthesis", answer)
+
+    def test_groq_general_question_uses_direct_format(self):
+        original_api_key = rag.settings.groq_api_key
+        original_post = rag.requests.post
+        captured_payload = {}
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"choices": [{"message": {"content": "New Delhi."}}]}
+
+        def fake_post(url, headers, json, timeout):
+            captured_payload.update(json)
+            return FakeResponse()
+
+        rag.settings.groq_api_key = "test-key"
+        rag.requests.post = fake_post
+        try:
+            answer, source = rag._groq_answer(
+                question="What is the capital of India?",
+                context_blocks=[],
+                subject="Hindi",
+                class_level="10",
+                answer_style="exam",
+            )
+        finally:
+            rag.settings.groq_api_key = original_api_key
+            rag.requests.post = original_post
+
+        prompt_text = "\n".join(message["content"] for message in captured_payload["messages"])
+        self.assertEqual(source, "groq")
+        self.assertEqual(answer, "New Delhi.")
+        self.assertIn("Answer the question directly in 1-4 sentences", prompt_text)
+        self.assertNotIn("**Exam Questions**", prompt_text)
 
     def test_requested_pie_chart_uses_exact_prompt_values(self):
         original_api_key = rag.settings.groq_api_key

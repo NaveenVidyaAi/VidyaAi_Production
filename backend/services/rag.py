@@ -3,6 +3,7 @@ import re
 import time
 import logging
 import ast
+import json
 import operator
 from typing import List, Tuple
 
@@ -121,9 +122,6 @@ CLASS_10_ENGLISH_UNITS = {
 
 
 def _is_chapter_style_question(question: str) -> bool:
-    if _is_math_problem_request(question):
-        return False
-
     q = question.lower()
     markers = [
         "chapter",
@@ -131,12 +129,14 @@ def _is_chapter_style_question(question: str) -> bool:
         "पाठ",
         "unit",
         "lesson",
-        "explain",
-        "व्याख्या",
-        "सार",
+        "this chapter",
+        "इस chapter",
     ]
     if any(marker in q for marker in markers):
         return True
+
+    if _is_math_problem_request(question):
+        return False
 
     normalized_q = _normalize_for_match(question)
     known_titles = [
@@ -149,6 +149,19 @@ def _is_chapter_style_question(question: str) -> bool:
         for item in units
     ]
     return any(_normalize_for_match(title) in normalized_q for title in known_titles)
+
+
+def _requires_strict_textbook_grounding(subject: str, question: str) -> bool:
+    """Reserve safe mode for source-dependent language and literature answers.
+
+    Science, mathematics, and social-science concepts can still be answered from
+    the model's general knowledge after both retrieval attempts fail. Language
+    chapters are more likely to depend on a board-specific story, poem, author,
+    or wording, so those remain protected from invented chapter details.
+    """
+    if not _is_chapter_style_question(question):
+        return False
+    return (subject or "").strip().lower() in {"hindi", "english", "sanskrit"}
 
 
 def _is_math_problem_request(question: str) -> bool:
@@ -176,13 +189,21 @@ def _is_math_problem_request(question: str) -> bool:
 
 
 def _is_bare_arithmetic_expression(text: str) -> bool:
-    normalized = (text or "").strip()
+    normalized = _normalize_arithmetic_expression(text)
     if not normalized:
         return False
-    normalized = normalized.replace("−", "-").replace("×", "*").replace("÷", "/")
     if re.fullmatch(r"\d+(?:\.\d+)?", normalized):
         return False
     return bool(re.fullmatch(r"[\d\s+\-*/().]+", normalized) and re.search(r"\d\s*[+\-*/]\s*\d", normalized))
+
+
+def _normalize_arithmetic_expression(text: str) -> str:
+    expression = (text or "").strip()
+    expression = expression.replace("−", "-").replace("×", "*").replace("÷", "/")
+    # Students commonly finish calculator-style prompts with an equals sign.
+    # Strip one optional trailing '=' while keeping equations such as x + 2 = 5
+    # out of the deterministic arithmetic evaluator.
+    return re.sub(r"=\s*$", "", expression).strip()
 
 
 def _format_number(value: float) -> str:
@@ -217,14 +238,85 @@ def _safe_eval_arithmetic(expression: str) -> float:
 
 
 def _answer_simple_arithmetic(question: str) -> str | None:
-    expression = (question or "").strip()
-    expression = expression.replace("−", "-").replace("×", "*").replace("÷", "/")
+    expression = _normalize_arithmetic_expression(question)
     if not _is_bare_arithmetic_expression(expression):
         return None
     try:
         return _format_number(_safe_eval_arithmetic(expression))
     except (SyntaxError, ValueError, ZeroDivisionError):
         return None
+
+
+def _is_writing_or_language_task(question: str) -> bool:
+    normalized = re.sub(r"\s+", " ", question or "").strip().lower()
+    return bool(
+        re.search(
+            r"\b(?:essay|paragraph|letter|application|grammar|tense|voice|narration|translation|"
+            r"rewrite|fill in|editing|omission)\b|"
+            r"निबंध|अनुच्छेद|पत्र|आवेदन|व्याकरण|काल|वाच्य|अनुवाद|रिक्त|शुद्ध",
+            normalized,
+        )
+    )
+
+
+def _has_explicit_curriculum_signal(question: str) -> bool:
+    normalized = _normalize_for_match(question)
+    if re.search(
+        r"\b(?:class\s*(?:10|x)|chapter|unit|lesson|textbook|cgbse|pyq|previous year question)\b|"
+        r"कक्षा\s*10|अध्याय|पाठ|पाठ्यपुस्तक|प्रश्नपत्र",
+        normalized,
+    ):
+        return True
+    known_titles = [
+        item["title"]
+        for units in CLASS_10_HINDI_UNITS.values()
+        for item in units
+    ] + [
+        item["title"]
+        for units in CLASS_10_ENGLISH_UNITS.values()
+        for item in units
+    ]
+    return any(_normalize_for_match(title) in normalized for title in known_titles)
+
+
+def _classify_prompt_intent(subject: str, question: str) -> str:
+    if _answer_simple_arithmetic(question) is not None:
+        return "simple_arithmetic"
+    if re.search(
+        r"\b(?:study|revision|exam)\s+(?:plan|schedule|routine|timetable|time\s*table)\b|"
+        r"अध्ययन\s*(?:योजना|समय\s*सारणी)|पढ़ाई\s*(?:का\s*)?(?:plan|schedule|routine)",
+        question or "",
+        flags=re.IGNORECASE,
+    ):
+        return "study_plan"
+    if _is_standalone_visual_data_request(question):
+        return "visual_data"
+    inferred_subject = _infer_subject(subject, question)
+    if inferred_subject.lower() == "math" and _is_math_problem_request(question):
+        return "math_problem"
+    if _is_writing_or_language_task(question):
+        return "writing_task"
+    if _has_explicit_curriculum_signal(question):
+        return "curriculum"
+
+    question_subject = _infer_subject("", question)
+    if question_subject.lower() in {"hindi", "english", "sanskrit", "science", "math", "social science"}:
+        return "curriculum"
+
+    normalized = re.sub(r"\s+", " ", question or "").strip().lower()
+    academic_request = bool(
+        re.search(
+            r"\b(?:explain|define|difference|compare|samjhao|samjha|batao|kya\s+hai|kaise|kyon|"
+            r"meaning|summary|question|answer|solve)\b|"
+            r"समझाइ|बताइ|क्या\s+है|कैसे|क्यों|परिभाषा|अंतर|तुलना|सारांश|प्रश्न|उत्तर|हल",
+            normalized,
+        )
+    )
+    if academic_request and (subject or "").lower() in {
+        "hindi", "english", "sanskrit", "science", "math", "maths", "social science"
+    }:
+        return "curriculum"
+    return "general"
 
 
 def _clean_fallback_excerpt(text: str) -> str:
@@ -830,7 +922,15 @@ def _requested_format_for_question(question: str, subject: str) -> str | None:
             "Do not add summary, key points, Q&A, or practice questions."
         )
 
-    if re.search(r"\b(definition|define|meaning|what is|kise kahte|kya hota|kya hai)\b|परिभाषा|किसे कहते|क्या होता|क्या है", normalized):
+    explicit_definition = bool(
+        re.search(
+            r"\b(definition|define|meaning|kise kahte|kya hota)\b|परिभाषा|किसे कहते|क्या होता",
+            normalized,
+        )
+    )
+    informal_definition = bool(re.search(r"\b(?:what is|kya hai)\b|क्या है", normalized))
+    informal_definition = informal_definition and _infer_subject("", question) != "General"
+    if explicit_definition or informal_definition:
         if is_hindi_request:
             return (
                 "The student asked for a definition. Give a proper exam definition:\n"
@@ -1055,7 +1155,11 @@ def _infer_subject(subject: str, question: str) -> str:
             return "Social Science"
         if re.search(r"\b(math|maths|ganit|algebra|geometry|trigonometry|quadratic|equation|probability|mensuration)\b", raw) or "गणित" in raw:
             return "Math"
-        if re.search(r"\b(science|vigyan|physics|chemistry|biology|chemical|acid|base|electricity|light|life process|carbon|photosynthesis)\b", raw) or "विज्ञान" in raw:
+        if re.search(
+            r"\b(science|vigyan|physics|chemistry|biology|chemical|acid|base|electricity|light|"
+            r"life process|carbon|photosynthesis|aml|amla|kshar|chhar|lavan|prakash sanshleshan)\b",
+            raw,
+        ) or "विज्ञान" in raw:
             return "Science"
         if _is_math_problem_request(raw):
             return "Math"
@@ -1070,6 +1174,105 @@ def _infer_subject(subject: str, question: str) -> str:
         return selected_subject
 
     return subject or "General"
+
+
+def _rewrite_query_for_retrieval(
+    question: str,
+    selected_subject: str,
+    class_level: str,
+) -> tuple[str, str] | None:
+    """Use the LLM only as a guarded search-query interpreter, never as evidence."""
+    if not settings.groq_api_key:
+        return None
+
+    original = re.sub(r"\s+", " ", question or "").strip()
+    if len(original) < 3 or len(original) > 500:
+        return None
+
+    allowed_subjects = {"Hindi", "English", "Sanskrit", "Science", "Math", "Social Science", "General"}
+    payload = {
+        "model": settings.groq_model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You rewrite unclear Class 10 student prompts into one precise textbook retrieval query. "
+                    "Understand Hinglish and spelling variants. Preserve the student's meaning, class, chapter, names, "
+                    "numbers, and requested topic. Do not answer the question and do not invent a chapter. "
+                    "Return strict JSON only: {\"query\": \"...\", \"subject\": \"Hindi|English|Sanskrit|Science|Math|Social Science|General\"}."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Selected UI subject: {selected_subject}\n"
+                    f"Class: {class_level}\n"
+                    f"Original student prompt: {original}"
+                ),
+            },
+        ],
+        "temperature": 0.0,
+        "max_tokens": 180,
+    }
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {settings.groq_api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=25,
+        )
+        if response.status_code != 200:
+            return None
+        content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        json_match = re.search(r"\{[\s\S]*\}", content)
+        if not json_match:
+            return None
+        parsed = json.loads(json_match.group(0))
+    except (requests.RequestException, json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+    rewritten = re.sub(r"\s+", " ", str(parsed.get("query", ""))).strip()
+    rewritten_subject = str(parsed.get("subject", "")).strip().title()
+    subject_aliases = {"Maths": "Math", "Social Science": "Social Science"}
+    rewritten_subject = subject_aliases.get(rewritten_subject, rewritten_subject)
+    if rewritten_subject not in allowed_subjects or len(rewritten) < 3 or len(rewritten) > 320:
+        return None
+    if _normalize_for_match(rewritten) == _normalize_for_match(original):
+        return None
+
+    explicit_subject = _infer_subject("", original)
+    if explicit_subject != "General" and rewritten_subject not in {explicit_subject, "General"}:
+        return None
+
+    original_numbers = set(re.findall(r"\d+(?:[.\-]\d+)*", original))
+    rewritten_numbers = set(re.findall(r"\d+(?:[.\-]\d+)*", rewritten))
+    allowed_new_numbers = {str(class_level)}
+    if not original_numbers.issubset(rewritten_numbers):
+        return None
+    if rewritten_numbers.difference(original_numbers).difference(allowed_new_numbers):
+        return None
+
+    if rewritten_subject == "General":
+        rewritten_subject = _infer_subject(selected_subject, rewritten)
+    return rewritten, rewritten_subject
+
+
+def _retrieval_match_is_strong(
+    rows: list[tuple[str, str, float, str]],
+    subject: str,
+) -> bool:
+    if not rows or rows[0][2] < 2.5:
+        return False
+    label = (rows[0][3] or "").lower()
+    expected = (subject or "").lower()
+    known_labels = ("hindi", "english", "sanskrit", "science", "math", "social science")
+    labeled_subjects = [item for item in known_labels if re.search(rf"(?:^|\|\s*){re.escape(item)}(?:\s*\||$)", label)]
+    if labeled_subjects and expected not in labeled_subjects:
+        return False
+    return True
 
 
 def _format_source_label(payload: dict, source_id: str) -> str:
@@ -1396,7 +1599,26 @@ def _groq_answer(
         else "Use simple, correct Hindi with clear academic terms when needed. Pay close attention to spelling, matras, and grammar."
     )
     requested_format = _requested_format_for_question(question, subject)
-    answer_format = requested_format or _answer_format_for_style(subject, answer_style, answer_language)
+    prompt_intent = _classify_prompt_intent(subject, question)
+    if requested_format:
+        answer_format = requested_format
+    elif prompt_intent == "general":
+        answer_format = (
+            "Answer the question directly in 1-4 sentences. Start with the answer itself. "
+            "Do not add a title, summary, key points, exam Q&A, conclusion, or practice question unless requested."
+        )
+    elif prompt_intent in {"study_plan", "visual_data"}:
+        answer_format = (
+            "Give only the requested plan, schedule, table, chart, or visual with a short useful introduction. "
+            "Do not add exam Q&A or unrelated practice questions."
+        )
+    elif prompt_intent == "writing_task":
+        answer_format = (
+            "Complete only the requested writing or language task in its proper school format. "
+            "Do not add unrelated chapter summaries, exam Q&A, or practice questions."
+        )
+    else:
+        answer_format = _answer_format_for_style(subject, answer_style, answer_language)
     visual_instruction = _visual_output_instruction(question)
     visual_section = f"\n\n{visual_instruction}\n" if visual_instruction else ""
     conversation_context = _format_conversation_context(recent_history)
@@ -1726,20 +1948,26 @@ async def run_rag(
 
     class_level = str(getattr(student, "class_level", "10"))
     inferred_subject = _infer_subject(subject, question)
-    math_problem_intent = inferred_subject.lower() == "math" and _is_math_problem_request(question)
-    standalone_visual_intent = _is_standalone_visual_data_request(question)
-    simple_math_answer = _answer_simple_arithmetic(question) if math_problem_intent else None
+    prompt_intent = _classify_prompt_intent(subject, question)
+    if prompt_intent == "general":
+        # A UI default such as Hindi must not influence an unrelated factual
+        # question. The prompt language and content control general answers.
+        inferred_subject = _infer_subject("", question)
+    math_problem_intent = prompt_intent == "math_problem"
+    standalone_visual_intent = prompt_intent == "visual_data"
+    should_retrieve = prompt_intent == "curriculum"
+    simple_math_answer = _answer_simple_arithmetic(question) if prompt_intent == "simple_arithmetic" else None
     if simple_math_answer is not None:
         return simple_math_answer, [], "math-direct"
 
     allow_bare_section = class_level == "10" and inferred_subject.lower() == "hindi"
     section_hint = _normalize_section_hint_for_subject(
-        None if math_problem_intent else _extract_section_hint(question, allow_bare=allow_bare_section),
+        None if not should_retrieve else _extract_section_hint(question, allow_bare=allow_bare_section),
         inferred_subject,
     )
-    chapter_hint = None if section_hint or math_problem_intent else _extract_chapter_number(question)
+    chapter_hint = None if section_hint or not should_retrieve else _extract_chapter_number(question)
 
-    if math_problem_intent or standalone_visual_intent:
+    if not should_retrieve:
         context_with_sources = []
     else:
         try:
@@ -1759,16 +1987,61 @@ async def run_rag(
                 question,
             )
             context_with_sources = []
+
+    retrieval_subject = inferred_subject
+    has_strong_match = _retrieval_match_is_strong(context_with_sources, retrieval_subject)
+    if should_retrieve and not has_strong_match:
+        rewritten = _rewrite_query_for_retrieval(question, inferred_subject, class_level)
+        if rewritten:
+            rewritten_question, rewritten_subject = rewritten
+            rewritten_allow_bare = class_level == "10" and rewritten_subject.lower() == "hindi"
+            rewritten_section = _normalize_section_hint_for_subject(
+                _extract_section_hint(rewritten_question, allow_bare=rewritten_allow_bare),
+                rewritten_subject,
+            )
+            rewritten_chapter = None if rewritten_section else _extract_chapter_number(rewritten_question)
+            try:
+                rewritten_rows = _retrieve_context(
+                    question=rewritten_question,
+                    subject=rewritten_subject,
+                    class_level=class_level,
+                    weak_topics=weak_topics,
+                    chapter_hint=rewritten_chapter,
+                    section_hint=rewritten_section,
+                )
+            except Exception:
+                logger.exception(
+                    "Rewritten RAG retrieval failed for subject=%s class=%s query=%r",
+                    rewritten_subject,
+                    class_level,
+                    rewritten_question,
+                )
+                rewritten_rows = []
+
+            if _retrieval_match_is_strong(rewritten_rows, rewritten_subject):
+                # The original prompt and rewritten query were both searched.
+                # Prefer the rewritten ranking only after it passes the same
+                # evidence threshold; the rewrite itself is never answer text.
+                context_with_sources = rewritten_rows
+                retrieval_subject = rewritten_subject
+                inferred_subject = rewritten_subject
+                section_hint = rewritten_section
+                chapter_hint = rewritten_chapter
+                has_strong_match = True
+
     contexts = [f"[Source: {item[3]}]\n{item[0]}" for item in context_with_sources]
     sources = [item[3] for item in context_with_sources]
 
-    top_score = context_with_sources[0][2] if context_with_sources else 0.0
-    has_strong_match = bool(context_with_sources and top_score >= 2.5)
-    chapter_intent = False if (math_problem_intent or standalone_visual_intent) else _is_chapter_style_question(question)
+    if not has_strong_match:
+        has_strong_match = _retrieval_match_is_strong(context_with_sources, retrieval_subject)
+    strict_textbook_intent = False if (math_problem_intent or standalone_visual_intent) else (
+        _requires_strict_textbook_grounding(inferred_subject, question)
+    )
 
-    # Chapter/title requests must be grounded in retrieved textbook context.
-    # Do not let the LLM invent chapter facts when retrieval is weak or empty.
-    if chapter_intent and not has_strong_match:
+    # Board-specific language/literature chapters must be grounded in retrieved
+    # textbook context. Standard Science/SST concepts continue to the model-only
+    # fallback after original and rewritten retrieval both fail.
+    if strict_textbook_intent and not has_strong_match:
         if inferred_subject.lower() == "english":
             safe_answer = (
                 "**Insufficient Context**\n\n"
@@ -1814,7 +2087,7 @@ async def run_rag(
             answer = _science_chapter_2_overview(answer_style)
             answer_source = "fallback-topic-guard"
 
-    if not math_problem_intent and not has_strong_match and not context_with_sources and answer_source != "groq":
+    if prompt_intent == "curriculum" and not has_strong_match and not context_with_sources and answer_source != "groq":
         if inferred_subject.lower() == "english":
             answer = (
                 "**Note:** Chapter context is limited for this question, but I am still answering from an exam point of view.\n\n"

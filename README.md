@@ -25,6 +25,7 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 
 ### Student Features
 - **AI Chat** — Ask questions in Hindi or English; get textbook-grounded answers via RAG
+- **Intent-aware answer routing** — Calculator-style prompts return direct deterministic results, general and writing questions bypass irrelevant retrieval, curriculum questions use RAG, and weak Hinglish/ambiguous searches receive a guarded AI query rewrite before falling back to a model answer; standard Science/SST concepts can use that direct fallback while source-dependent language and literature chapters remain textbook-grounded
 - **Subject Selection** — Hindi, Math, Science, Social Science, English
 - **Session History** — Chat history persisted per user session
 - **Multi-language UI** — Toggle between Hindi and English interface
