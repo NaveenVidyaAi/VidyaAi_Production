@@ -6,15 +6,17 @@ import BrandMark from "../components/BrandMark";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("student");
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await api.post("/auth/login", new URLSearchParams({ username: email, password }));
+      const response = await api.post("/auth/login", new URLSearchParams({ username: email, password, role }));
       localStorage.setItem("vidyaai_token", response.data.access_token);
-      navigate("/chat");
+      localStorage.setItem("vidyaai_role", response.data.role || role);
+      navigate((response.data.role || role) === "teacher" ? "/teacher" : "/dashboard");
     } catch (err) {
       setError("Login failed. Please check credentials.");
     }
@@ -55,8 +57,21 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
+          <label>आप VidyaAI का उपयोग कैसे करेंगे?</label>
+          <div className="role-selector" role="radiogroup" aria-label="Account role">
+            <button type="button" className={role === "student" ? "active" : ""} onClick={() => setRole("student")}>
+              <span aria-hidden="true">🎓</span>
+              <strong>Student</strong>
+              <small>Learn and practise</small>
+            </button>
+            <button type="button" className={role === "teacher" ? "active" : ""} onClick={() => setRole("teacher")}>
+              <span aria-hidden="true">📘</span>
+              <strong>Teacher</strong>
+              <small>Plan and teach</small>
+            </button>
+          </div>
           <label>ईमेल</label>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="student@example.com" required />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder={role === "teacher" ? "teacher@example.com" : "student@example.com"} required />
           <label>पासवर्ड</label>
           <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="अपना पासवर्ड लिखें" required />
           <button type="submit">लॉगिन</button>

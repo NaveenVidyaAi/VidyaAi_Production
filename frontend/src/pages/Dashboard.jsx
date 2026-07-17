@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import RichMarkdown from "../components/RichMarkdown";
 import api from "../api/client";
 
@@ -521,6 +521,7 @@ function AssistantResponse({ message, animationRegistry, onProgress }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [lang, setLang] = useState("hi");
   const [studentName, setStudentName] = useState("विद्यार्थी");
   const [studentProfile, setStudentProfile] = useState(null);
@@ -531,6 +532,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGuest, setIsGuest] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [accountRole, setAccountRole] = useState(() => localStorage.getItem("vidyaai_role") || "student");
   const [adminStats, setAdminStats] = useState(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [examDate, setExamDate] = useState(() => localStorage.getItem("vidyaai_exam_date") || defaultExamDate());
@@ -580,6 +582,13 @@ export default function Dashboard() {
   const selectedPyqSubjectMeta = subjects.find((subject) => subject.id === pyqSubject) || subjects[0];
   const selectedPyqPapers = pyqPapers.filter((paper) => paper.subject === pyqSubject);
 
+  useEffect(() => {
+    const requestedSection = new URLSearchParams(location.search).get("section");
+    if (["chat", "quiz", "pyq", "plan"].includes(requestedSection)) {
+      setActiveSection(requestedSection);
+    }
+  }, [location.search]);
+
   const inferSubject = (text) => {
     const q = (text || "").toLowerCase();
     if (/\b(math|maths|ganit|algebra|geometry|trigonometry|quadratic|equation|probability)\b/.test(q) || q.includes("गणित") || /\d+\s*[+×÷=]/.test(q)) return "Math";
@@ -610,6 +619,8 @@ export default function Dashboard() {
           }
           setIsGuest(false);
           setIsAdmin(Boolean(response.data.is_admin));
+          setAccountRole(response.data.role || "student");
+          localStorage.setItem("vidyaai_role", response.data.role || "student");
         }
       } catch {
         setStudentName(t.guestName);
@@ -723,6 +734,7 @@ export default function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem("vidyaai_token");
+    localStorage.removeItem("vidyaai_role");
     setStudentProfile(null);
     setStudentName("अतिथि विद्यार्थी");
     setIsGuest(true);
@@ -1132,6 +1144,9 @@ export default function Dashboard() {
         </button>
         {isAdmin && (
           <button type="button" className="nav-action nav-action-admin" onClick={() => navigate("/admin")}>Admin Panel</button>
+        )}
+        {accountRole === "teacher" && (
+          <button type="button" className="nav-action teacher-workspace-link" onClick={() => navigate("/teacher")}>← Teacher Workspace</button>
         )}
 
         <div className="sidebar-section quick-prompt-section">

@@ -14,6 +14,7 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 - [Environment Variables](#environment-variables)
 - [Running the Application](#running-the-application)
 - [PDF Ingestion](#pdf-ingestion)
+- [Teacher Dashboard](#teacher-dashboard)
 - [Admin Dashboard](#admin-dashboard)
 - [API Reference](#api-reference)
 - [Architecture Overview](#architecture-overview)
@@ -42,6 +43,14 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 - **User Drill-down Drawer** — Click any user to see subject-wise bar chart, weak topics, and last 5 questions
 - **Charts** — Bar chart (questions per subject), Donut chart (answer source mix: Groq vs Cache vs RAG)
 - **Q&A Cache Stats** — Number of unique questions cached, total cache hits saved
+
+### Teacher Features
+- **Role-aware entry** — Login and registration ask whether the user is a student or teacher and open the matching workspace
+- **Curriculum Creator** — Builds a week-wise curriculum with outcomes, period allocation, activities, assessments, differentiation, revision, and a teacher checklist
+- **Test & Paper Creator** — Accepts class, subject, syllabus, marks, question count, duration, difficulty, medium, and paper type; returns a printable paper, answer key, and marking scheme
+- **How to Teach** — Prepares the teacher with a topic explanation, prerequisites, important points, misconceptions, minute-by-minute lesson flow, board work, examples, classroom questions, activities, differentiation, assessment, and likely student doubts
+- **Shared AI Chat and PYQ** — Teachers use the same curriculum-grounded chat and exact-paper PYQ library as students
+- **Reusable outputs** — Generated teacher resources can be copied, printed/saved as PDF, and reopened from browser-local recent history
 
 ### AI / RAG Features
 - **Hybrid RAG** — Retrieves relevant chunks from Qdrant vector DB, sends to Groq LLM with context
@@ -95,18 +104,21 @@ AI_Assistant_cgbse/
 │   │   ├── session.py               ← ChatSession table (per-question history)
 │   │   ├── weak_topic.py            ← WeakTopic table
 │   │   └── qa_cache.py              ← QACache table (dedup + cache-first answering)
+│   │   ├── quiz.py                  ← Quiz, QuizQuestion, and QuizAnswer tables
 │   │   └── learning_example.py      ← Privacy-minimized continuous-learning candidates
 │   │
 │   ├── routers/
 │   │   ├── auth.py                  ← /auth/register, /auth/login, /auth/me
 │   │   ├── chat.py                  ← /chat/ask (cache-first), /chat/history, /chat/feedback
 │   │   ├── profile.py               ← /profile endpoints
-│   │   └── admin.py                 ← /admin/dashboard, /admin/users (admin-only)
+│   │   ├── quiz.py                  ← Adaptive activity and exact-paper PYQ quizzes
+│   │   ├── teacher.py               ← Curriculum, paper, and teaching-guide generation
+│   │   └── admin.py                 ← Analytics, exports, and learning review (admin-only)
 │   │
 │   └── services/
 │       ├── rag.py                   ← Core RAG pipeline + Groq generation
 │       ├── embeddings.py            ← Embedding service (real or mock)
-│       └── hybrid_rag.py            ← Hybrid fine-tuned/Groq routing (future)
+│       ├── hybrid_rag.py            ← Experimental fine-tuned/Groq router (not mounted)
 │       └── learning_loop.py          ← Redaction, quality scoring, feedback learning loop
 │
 ├── frontend/
@@ -123,11 +135,13 @@ AI_Assistant_cgbse/
 │       │   └── client.js            ← Axios instance with JWT interceptor
 │       │
 │       ├── components/              ← Shared UI components
+│       │   └── RichMarkdown.jsx      ← Markdown, Mermaid, tables, and Venn rendering
 │       │
 │       └── pages/
 │           ├── Login.jsx
 │           ├── Register.jsx
 │           ├── Dashboard.jsx        ← Student dashboard + chat UI
+│           ├── TeacherDashboard.jsx ← Teacher planning and preparation workspace
 │           └── AdminDashboard.jsx   ← Admin analytics page (table + charts + drawer)
 │
 ├── ingestion/
@@ -404,6 +418,26 @@ backend/.venv311/bin/python -m ingestion.ingest --file "Class_X_Hindi_Chapter_1.
 
 ---
 
+## Teacher Dashboard
+
+At login or registration, select **Teacher** to receive a JWT with `role: "teacher"`. After login, VidyaAI opens `/teacher`. Teacher-only generation endpoints reject student-role tokens. The role is currently selected during login rather than loaded from a persisted account record; see the authentication limitation below.
+
+### Teacher Workspaces
+
+| Workspace | Teacher inputs | Generated output |
+|---|---|---|
+| Curriculum Creator | Class, subject, duration, weekly periods, medium, chapters, learning goals | Outcomes, week-wise sequence, period allocation, pedagogy, resources, assessments, differentiation, revision, and checklist |
+| Test & Paper Creator | Class, subject, syllabus, total marks, question count, duration, difficulty, paper type, medium, instructions | Blueprint, printable numbered paper, answer key, marking scheme, and validation checklist |
+| How to Teach | Class, subject, chapter/topic, lesson duration, medium, student readiness, teacher notes | Teacher concept briefing, lesson objectives, important points, misconceptions, timed lesson flow, board plan, examples, questions, activity, differentiation, checks, homework, and likely doubts |
+
+Teacher generators search the same Qdrant curriculum collection used by student chat. Strongly matched chunks are supplied to Groq as factual context and returned as source labels. When no strong source is found, the generated resource explicitly tells the teacher to verify chapter-specific details. If Groq is unavailable, the API returns a structured draft instead of failing with an empty screen.
+
+Generated resources are kept in browser-local recent history, not in PostgreSQL. Teachers can copy the Markdown or use the print action to save it as PDF. **AI-generated curricula, assessments, answer keys, and teaching explanations remain drafts and should be checked against the current board syllabus and textbook before classroom use.**
+
+The **AI Chat** and **PYQ Library** are native sections of the teacher dashboard. Teachers can ask curriculum-grounded questions and browse, open, or download previous papers without leaving `/teacher`. The teacher header also keeps the active-day streak visible and includes a Hindi/English interface switch.
+
+---
+
 ## Admin Dashboard
 
 ### Accessing the Admin Panel
@@ -478,6 +512,32 @@ Click **"View"** on any row to open the user detail drawer.
 ```
 `confidence: 0.97` means the answer was served from cache.
 
+### Profile (requires JWT)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/profile/summary` | Student activity, subject progress, weak topics, and exam information |
+| GET | `/profile/weak-topics` | Weak-topic list for the current student |
+| PUT | `/profile/exam-date` | Save or update the student's exam date |
+| GET | `/profile/countdown` | Days remaining until the saved exam date |
+
+### Quiz (requires JWT)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/quiz/generate` | Generate 2–10 adaptive or exact-paper PYQ MCQs |
+| POST | `/quiz/{quiz_id}/submit` | Grade answers, reveal explanations, and update weak topics |
+| POST | `/quiz/{quiz_id}/skip` | Mark a quiz as skipped |
+| GET | `/quiz/summary` | Return quiz count, completed count, and average score |
+
+### Teacher (requires a teacher-role JWT)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/teacher/curriculum` | Generate a curriculum plan from class, subject, weeks, periods, chapters, and goals |
+| POST | `/teacher/test-paper` | Generate a constrained question paper, answer key, and marking scheme |
+| POST | `/teacher/lesson-guide` | Generate a topic briefing and classroom teaching plan |
+
 ### PYQ Practice
 
 The PYQ page passes the selected paper's subject, year, set, and exact PDF filename to `/quiz/generate` with `quiz_type: "pyq"`. Only the selected paper shows a preparation state, and its quiz remains directly below the paper list instead of navigating to the standalone Quiz tab. The backend retrieves only chunks whose `source_file` matches that PDF. If an older Qdrant export contains only consolidated subject papers, the backend reads the matching PDF from `ingestion/data/Previous_Year_Questions` instead of silently using a different paper. Image-only papers use Hindi+English Tesseract OCR; the backend Docker image includes both OCR language packs.
@@ -488,6 +548,8 @@ The PYQ page passes the selected paper's subject, year, set, and exact PDF filen
 |---|---|---|
 | GET | `/admin/dashboard` | Platform-wide summary, top subjects, source mix |
 | GET | `/admin/users` | Per-user breakdown with subjects, time, weak topics, recent questions |
+| GET | `/admin/export-student-metrics` | Download platform and per-student metrics as CSV |
+| POST | `/admin/export-training-data` | Append eligible cache records to offline train/test JSONL files |
 | GET | `/admin/learning-loop/stats` | Continuous-learning capture and review metrics |
 | GET | `/admin/learning-loop/candidates` | Ranked pending/approved/rejected learning candidates |
 | PUT | `/admin/learning-loop/candidates/{id}` | Approve or reject a candidate with a review note |
@@ -497,77 +559,444 @@ The PYQ page passes the selected paper's subject, year, set, and exact PDF filen
 
 ## Architecture Overview
 
+VidyaAI is a modular web application with two offline pipelines. The online path serves the React application, answers questions, creates quizzes, and records learning activity. The ingestion path turns textbooks and previous-year papers into searchable Qdrant points. The improvement path converts privacy-minimized interactions into human-reviewed training data; it never retrains a model automatically.
+
+### Architecture Flowchart
+
+```mermaid
+flowchart TD
+    User([User]) --> Role{Login role}
+    Role -->|Student| Student[Student Dashboard]
+    Role -->|Teacher| Teacher[Teacher Dashboard]
+    Role -->|Allowlisted admin| AdminUI[Admin Analytics]
+    Student --> UI[Shared React Chat, Quiz and PYQ]
+    Teacher --> UI
+    Teacher --> TeacherTools[Curriculum, Paper and Lesson Tools]
+    AdminUI --> UI
+    UI -->|Axios requests + JWT| Gateway{Runtime gateway}
+    Gateway -->|Development| API[FastAPI Backend]
+    Gateway -->|Production: Nginx /api proxy| API
+
+    API --> Route{Request type}
+
+    Route -->|Login and identity| Auth[Auth Service]
+    Route -->|Question| Chat[Chat Orchestrator]
+    Route -->|Practice| Quiz[Quiz and PYQ Engine]
+    Route -->|Progress| Profile[Student Profile]
+    Route -->|Analytics and review| Admin[Admin Dashboard API]
+    Route -->|Teacher planning| TeacherAPI[Teacher API]
+
+    Chat --> Cache{Answer in process cache?}
+    Cache -->|Yes| Cached[Return Cached Answer]
+    Cache -->|No| Intent{Classify Intent}
+
+    Intent -->|Simple calculation| Direct[Deterministic Answer]
+    Intent -->|General or writing| Groq[Groq LLM]
+    Intent -->|Curriculum question| Retrieve[Retrieve Textbook Context]
+    Retrieve --> Qdrant[(Qdrant Vector Database)]
+    Qdrant --> Ground{Strong Evidence?}
+    Ground -->|Yes| Groq
+    Ground -->|No, strict textbook request| Safe[Insufficient-Context Safe Mode]
+    Ground -->|No, general fallback allowed| Groq
+
+    Groq --> Format[Validate and Format Answer]
+    Direct --> Format
+    Safe --> Format
+    Cached --> Response[Return Answer to Frontend]
+    Format --> Save[Save Session, Cache and Learning Candidate]
+    Save --> Postgres[(PostgreSQL)]
+    Save --> Response
+    Response --> UI
+
+    Quiz -->|Generate adaptive MCQs| Groq
+    Quiz -->|Retrieve exact selected paper| Qdrant
+    Quiz -->|Exact-PDF fallback| PDFs[(Local PYQ PDFs + OCR)]
+    Quiz --> Postgres
+    Profile --> Postgres
+    Admin --> Postgres
+    TeacherAPI -->|Strong curriculum context| Qdrant
+    TeacherAPI -->|Structured generation| Groq
+
+    SourcePDF[Textbook and PYQ PDFs] --> Ingest[Extract, OCR, Chunk and Embed]
+    Ingest --> Qdrant
+
+    Postgres --> Review[Human Review of Learning Candidates]
+    Review --> Approved[Approved JSONL Dataset]
+    Approved --> Training[Offline Evaluation and Optional QLoRA Training]
 ```
-Browser (React / Vite :5173)
-       │
-       │ HTTP (Axios + JWT)
-       ▼
-FastAPI Backend (:8000)
-  ├─ /auth/*          → PostgreSQL (students table)
-  ├─ /chat/ask        → QACache (hit?) → Qdrant RAG → Groq LLM
-  │                     └─ stores result in QACache
-  ├─ /chat/history    → PostgreSQL (chat_sessions table)
-  ├─ /chat/feedback   → learning quality score + rejection signal
-  ├─ /admin/dashboard → Aggregated queries across all tables
-  ├─ /admin/users     → Per-user joins: students + sessions + weak_topics
-  └─ /admin/learning-loop/* → teacher review + approved JSONL export
-       │
-       ├── PostgreSQL (:5432)
-       │     tables: students, chat_sessions, weak_topics, qa_cache,
-       │             quizzes, quiz_questions, quiz_answers, learning_examples
-       │
-       └── Qdrant (:6333)
-             collection: cgbse_knowledge
-             ~1000+ chunks from Hindi textbook PDFs
+
+The central online flow is **frontend → FastAPI → cache/intent routing → Qdrant and/or Groq → formatted answer → PostgreSQL → frontend**. PDF ingestion feeds the knowledge base independently, while reviewed interactions feed an offline improvement pipeline.
+
+### Complete System Diagram
+
+```mermaid
+flowchart TB
+    subgraph Client[Client layer]
+        Browser[Student or admin browser]
+        React[React 18 single-page app<br/>Dashboard, chat, quiz, profile, admin]
+        Render[RichMarkdown renderer<br/>GFM tables, Mermaid and Venn diagrams]
+        React --> Render
+    end
+
+    subgraph Edge[Development / production edge]
+        Vite[Vite development server<br/>:5173]
+        Nginx[Nginx production gateway<br/>:80 / :443]
+        Static[Built frontend files<br/>frontend/dist]
+        Nginx --> Static --> React
+    end
+
+    Browser -->|Development assets| Vite
+    Vite --> React
+    React -->|Development Axios + optional Bearer JWT| API
+    Browser -->|Production assets and API| Nginx
+    React -->|Production Axios to /api/*| Nginx
+    Nginx -->|Remove /api prefix and proxy| API
+
+    subgraph Backend[FastAPI application :8000]
+        API[backend/main.py]
+        Auth[Auth router<br/>JWT identity]
+        Chat[Chat router<br/>history, cache and feedback]
+        Profile[Profile router<br/>progress and exam countdown]
+        Quiz[Quiz router<br/>adaptive and PYQ MCQs]
+        TeacherRoute[Teacher router<br/>curriculum, papers and lesson guides]
+        Admin[Admin router<br/>analytics, review and exports]
+        RAG[RAG service<br/>intent, retrieval and answer formatting]
+        Learn[Learning-loop service<br/>redaction and quality scoring]
+        Embed[Embedding service<br/>mock or multilingual model]
+        API --> Auth
+        API --> Chat
+        API --> Profile
+        API --> Quiz
+        API --> TeacherRoute
+        API --> Admin
+        Chat --> RAG
+        Chat --> Learn
+        Quiz --> RAG
+        RAG --> Embed
+    end
+
+    subgraph Data[Persistent and fallback data]
+        Postgres[(PostgreSQL 15<br/>application and learning records)]
+        Qdrant[(Qdrant<br/>cgbse_knowledge collection)]
+        LocalQ[(Local Qdrant fallback<br/>development only)]
+        Memory[(Process memory fallback<br/>sessions, cache and weak topics)]
+        Logs[(feedback_logs/*.json)]
+        PDFs[(Textbook and PYQ PDFs)]
+    end
+
+    Chat --> Postgres
+    Profile --> Postgres
+    Quiz --> Postgres
+    Admin --> Postgres
+    Chat --> Memory
+    Chat --> Logs
+    RAG --> Qdrant
+    RAG -. development fallback .-> LocalQ
+    Quiz -->|Exact-paper OCR fallback| PDFs
+
+    subgraph External[External inference]
+        Groq[Groq chat-completions API<br/>configured Llama model]
+        HF[Local Hugging Face model cache<br/>optional embedding download]
+    end
+    RAG --> Groq
+    Quiz --> Groq
+    TeacherRoute --> Groq
+    TeacherRoute --> Qdrant
+    Embed --> HF
+
+    subgraph Offline[Offline data and improvement pipelines]
+        Ingest[ingestion/ingest.py<br/>extract, OCR, chunk and tag]
+        Review[Teacher/admin review<br/>approve or reject candidates]
+        JSONL[Approved JSONL<br/>train/test datasets]
+        Train[Offline QLoRA scripts<br/>evaluation and controlled deployment]
+        PDFs --> Ingest
+        Ingest --> Embed
+        Ingest --> Qdrant
+        Learn --> Postgres
+        Postgres --> Review --> JSONL --> Train
+    end
 ```
+
+### Component Responsibilities
+
+| Component | Responsibility | Main files |
+|---|---|---|
+| React client | Routes between login, registration, student dashboard/chat, quiz experiences, progress, study planning, PYQ practice, and the admin dashboard. Axios adds the JWT from local storage. | `frontend/src/App.jsx`, `frontend/src/pages/`, `frontend/src/api/client.js` |
+| Answer renderer | Displays Markdown, tables, Mermaid diagrams, and native Venn diagrams, including progressive answer reveal. | `frontend/src/components/RichMarkdown.jsx` |
+| FastAPI composition root | Configures CORS, initializes SQLAlchemy tables, and mounts the auth, chat, profile, quiz, and admin routers. | `backend/main.py` |
+| Chat orchestration | Resolves chapter choices and follow-ups, checks the in-process cache, calls RAG, persists the answer, and records feedback and weak topics. Guest questions are allowed. | `backend/routers/chat.py` |
+| RAG and answer policy | Infers prompt intent and subject, retrieves and ranks evidence, optionally rewrites weak searches, applies textbook-grounding guards, calls Groq, and enforces answer/visual formats. | `backend/services/rag.py` |
+| Quiz engine | Produces 2–10 MCQs from a chat answer or one exact PYQ paper, records submissions/skips, and turns wrong answers into weak-topic signals. | `backend/routers/quiz.py` |
+| Student profile | Aggregates questions, subjects, weak topics, exam date, and countdown information. | `backend/routers/profile.py` |
+| Admin analytics | Aggregates engagement, feedback, cache, quiz, subject, and user metrics; exports CSV/training data and controls the learning-candidate review queue. | `backend/routers/admin.py` |
+| Persistence | Uses async SQLAlchemy with PostgreSQL. Table creation runs at startup; the application can continue with reduced persistence if the database is unavailable. | `backend/database.py`, `backend/models/` |
+| Knowledge store | Holds 384-dimensional textbook and PYQ chunks with class, subject, chapter, topic, content type, and source-file metadata. | Qdrant collection `cgbse_knowledge` |
+| Ingestion | Extracts PDF text, optionally runs Hindi/English OCR, normalizes and chunks content, creates embeddings, removes old points for the same source, and upserts stable point IDs. | `ingestion/ingest.py` |
+| Safe improvement loop | Redacts email addresses and Indian phone numbers, hashes student identity/questions, scores candidates, requires human approval, and exports approved JSONL. | `backend/services/learning_loop.py`, `training/` |
+
+### Chat Answer Request Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as Student browser
+    participant C as Chat router
+    participant DB as PostgreSQL / memory
+    participant R as RAG service
+    participant Q as Qdrant
+    participant G as Groq API
+
+    U->>C: POST /chat/ask<br/>question, selected subject, answer style
+    C->>C: Resolve chapter selection and contextualize follow-up
+    C->>DB: Load recent history and weak topics
+    C->>C: Normalize question and check process cache
+    alt Cache hit
+        C->>DB: Increment persistent cache hit and save session
+        C-->>U: Cached answer, confidence 0.97
+    else Cache miss
+        C->>R: run_rag(...)
+        R->>R: Infer subject and classify prompt intent
+        alt Simple arithmetic
+            R->>R: Safely evaluate deterministic expression
+        else General, writing, or non-curriculum request
+            R->>G: Generate without irrelevant textbook context
+        else Curriculum request
+            R->>Q: Retrieve and score candidate chunks
+            opt Retrieval is weak
+                R->>G: Rewrite query as guarded JSON (not evidence)
+                R->>Q: Retry retrieval with rewritten query
+            end
+            alt Strict language/literature request has no strong evidence
+                R->>R: Return insufficient-context safe mode
+            else Strong evidence or permitted general fallback
+                R->>G: Generate with strong context, or without weak context
+            end
+        end
+        R->>R: Apply answer-style, repetition, topic and visual guards
+        R-->>C: Answer, source labels, source type
+        C->>DB: Save cacheable answer, chat session and learning candidate
+        C-->>U: Answer, sources, confidence and session ID
+    end
+```
+
+The selected UI subject is only a hint. Explicit terms in the question—such as `ganit`, `vigyan`, `history`, or `English`—take priority. Recent history is added only for likely follow-up questions. Chapter-summary requests deliberately bypass the cache so a stale or over-general summary is not reused.
+
+The intent router has five practical outcomes:
+
+| Intent | Processing path |
+|---|---|
+| Simple arithmetic | Local, restricted arithmetic evaluator; no retrieval or LLM call. |
+| Math problem | Groq problem solving; weak textbook chunks are not injected. |
+| General knowledge / writing | Direct Groq generation in the detected prompt language. |
+| Standalone visual-data request | Groq generation with strict Mermaid/Venn/chart output requirements. |
+| Curriculum question | Qdrant retrieval, guarded rewrite on a weak match, then grounded generation or safe fallback. |
+
+### Retrieval and Grounding
+
+For real embeddings, the service searches Qdrant semantically and also scrolls stored points so lexical and metadata scoring can be applied. In mock mode, semantic search is skipped and ranking is lexical/metadata based. Only the top four ranked chunks are normally sent to the model.
+
+Important ranking signals include:
+
+| Signal | Effect |
+|---|---|
+| Token/phrase overlap and semantic similarity | Establish the base relevance score. |
+| Matching prompt topic, subject, and class | Boost the expected curriculum material. |
+| Matching chapter metadata | Adds a strong chapter bonus. |
+| Matching section metadata, such as `1-3` | Adds the strongest structural bonus. |
+| Weak-topic match | Slightly favors content the student needs to revisit. |
+| Subject/class mismatch | Penalizes unrelated material. |
+| TOC, exercise, or unrelated inherited-section content | Downranks navigational or misleading chunks. |
+
+A result must pass the strong-match threshold before it is used as evidence. A Groq-generated query rewrite may improve search terms, but the rewrite is never treated as source material. Language and literature questions that require exact chapter facts enter safe mode when strong textbook evidence is absent. Standard Science/Social Science concepts may still receive a clearly separated model fallback.
 
 ### Q&A Cache Flow
 
-```
-User asks question
-      │
-      ▼
-normalize_question()   ← lowercase, strip punctuation, sort words
-      │
-      ▼
-Lookup QACache table   (unique key: normalized_question + subject + class)
-      │
-   ┌──┴──┐
-  HIT   MISS
-   │     │
-   │     ▼
-   │   Qdrant retrieval (top-k chunks, token-overlap scored)
-   │     │
-   │     ▼
-   │   Groq LLM  (llama-3.1-8b-instant)
-   │     │
-   │     ▼
-   │   Store in QACache  (hit_count=0)
-   │     │
-   └──→ Return answer + confidence
-         (confidence=0.97 for cache hits)
+```mermaid
+flowchart TD
+    Ask[Question + subject + class + style] --> Normalize[Lowercase, trim and normalize whitespace]
+    Normalize --> Key[Add recent-history signature]
+    Key --> Local{Process cache hit?}
+    Local -->|Yes| Hit[Return confidence 0.97]
+    Hit --> Count[Upsert PostgreSQL qa_cache<br/>and increment hit_count]
+    Local -->|No| Generate[RAG / Groq answer path]
+    Generate --> Eligible{Cacheable source<br/>with source labels?}
+    Eligible -->|Yes| Mem[Store in process cache]
+    Mem --> Persist[Upsert PostgreSQL qa_cache]
+    Eligible -->|No| Return[Return without caching]
+    Persist --> Return
+    Count --> Return
 ```
 
-### RAG Retrieval Scoring
+There are two cache layers. The process-local cache includes normalized question, subject, class, answer style, and recent-history signature. PostgreSQL `qa_cache` persists reusable answers and cache statistics. Only eligible generated answers with source labels are cached; chapter-style requests and safe/direct paths are excluded. The current read path checks the process cache, while PostgreSQL is used for persistence and hit accounting.
 
-Each chunk from Qdrant is scored by token overlap with the question. Bonuses/penalties applied:
+### Quiz and PYQ Practice Flow
 
-| Signal | Score Δ |
-|---|---|
-| Chapter number match | +5.0 |
-| Section number match (e.g. "1-3") | +7.0 |
-| Table-of-contents chunk detected | −4.0 |
-| TOC chunk when section hint exists | −8.0 |
+```mermaid
+flowchart LR
+    Start[Student starts practice] --> Kind{Source type}
+    Kind -->|Chat activity| Session[Question + answer or chat session]
+    Kind -->|Selected PYQ card| Exact[Subject + year + set + exact PDF filename]
+    Exact --> QR[Qdrant filter by source_file<br/>and previous_year_question]
+    QR --> Found{Exact chunks found?}
+    Found -->|No| OCR[Read the same local PDF<br/>with Hindi + English OCR]
+    Found -->|Yes| Source[Paper text]
+    OCR --> Source
+    Session --> Context[Add weak topics and recent quiz performance]
+    Source --> Context
+    Context --> LLM[Groq creates structured MCQs]
+    LLM --> Valid{Valid MCQ JSON?}
+    Valid -->|No| Fallback[Deterministic MCQ fallback]
+    Valid -->|Yes| Save[Save quiz and questions]
+    Fallback --> Save
+    Save --> Submit[Submit or skip]
+    Submit --> Results[Save answers, score and status]
+    Results -->|Incorrect answers| Weak[Increment weak topic]
+    Results --> Profile2[Profile and admin analytics]
+```
+
+Exact-paper isolation prevents a student who selects one year/set from silently receiving questions from another paper. Quiz endpoints require a JWT and a working database. Correct options are hidden until submission; after submission the response includes correctness and explanations.
+
+### Data Model
+
+```mermaid
+erDiagram
+    STUDENTS ||--o{ CHAT_SESSIONS : asks
+    STUDENTS ||--o{ WEAK_TOPICS : develops
+    STUDENTS ||--o{ QUIZZES : attempts
+    QUIZZES ||--|{ QUIZ_QUESTIONS : contains
+    QUIZZES ||--o{ QUIZ_ANSWERS : receives
+    QUIZ_QUESTIONS ||--o{ QUIZ_ANSWERS : answered_by
+    CHAT_SESSIONS ||--o| LEARNING_EXAMPLES : produces
+
+    STUDENTS {
+        string id PK
+        string email UK
+        string class_level
+        string medium
+        date exam_date
+    }
+    CHAT_SESSIONS {
+        int id PK
+        string student_id FK
+        text question
+        text answer
+        string subject
+        datetime created_at
+    }
+    WEAK_TOPICS {
+        int id PK
+        string student_id FK
+        string subject
+        string topic
+        int wrong_count
+    }
+    QA_CACHE {
+        int id PK
+        string normalized_question
+        text answer
+        string subject
+        string class_level
+        int hit_count
+    }
+    QUIZZES {
+        int id PK
+        string student_id FK
+        string quiz_type
+        string status
+        int correct_count
+    }
+    QUIZ_QUESTIONS {
+        int id PK
+        int quiz_id FK
+        text prompt
+        text options_json
+        int correct_option
+    }
+    QUIZ_ANSWERS {
+        int id PK
+        int quiz_id FK
+        int question_id FK
+        int selected_option
+        boolean is_correct
+    }
+    LEARNING_EXAMPLES {
+        int id PK
+        int chat_session_id UK
+        string student_key
+        string question_hash
+        float quality_score
+        string review_status
+    }
+```
+
+`qa_cache` is intentionally independent of a student: its unique key is normalized question + subject + class level. `learning_examples` references a chat session logically through a unique ID but stores a hashed student key and redacted text for the review workflow.
+
+### PDF Ingestion Pipeline
+
+```mermaid
+flowchart LR
+    PDF[Textbook or PYQ PDF] --> Extract[pdfplumber text extraction]
+    Extract --> Check{Missing or garbled<br/>and OCR enabled?}
+    Check -->|Yes| Tess[Tesseract hin+eng OCR]
+    Check -->|No| Normalize[Unicode/text normalization]
+    Tess --> Normalize
+    Normalize --> Meta[Infer class, subject, chapter,<br/>topic, set/year and content type]
+    Meta --> Chunk[Lesson-aware overlapping chunks]
+    Chunk --> Vector[384-dimensional embedding]
+    Vector --> Replace[Delete points for the same source_file]
+    Replace --> Upsert[Stable-ID upsert to<br/>cgbse_knowledge]
+```
+
+The ingestion script is idempotent per filename: re-ingesting a PDF deletes its previous points before inserting the new set. In production, Qdrant unavailability stops ingestion to avoid writing to an accidental local store. In development, both ingestion and retrieval can use `qdrant_storage_local` as a fallback.
 
 ### Safe Continuous-Improvement Flow
 
-```text
-Student question → RAG/Groq answer → privacy redaction → learning candidate
-       → grounding/feedback score → teacher review → approved JSONL
-       → offline evaluation → controlled fine-tuning → gradual deployment
+```mermaid
+flowchart LR
+    Interaction[Saved chat interaction] --> Privacy[Redact email/phone<br/>hash student and question]
+    Privacy --> Score[Quality score from source,<br/>grounding, length and feedback]
+    Score --> Pending[(learning_examples<br/>pending)]
+    Pending --> Feedback{Student feedback}
+    Feedback -->|Thumbs down| Reject[Automatic rejection]
+    Feedback -->|Thumbs up / none| Review[Admin/teacher review]
+    Review -->|Reject| Reject
+    Review -->|Approve if quality is sufficient| Export[Approved JSONL export]
+    Export --> Eval[Offline dataset checks<br/>and evaluation]
+    Eval --> QLoRA[Optional QLoRA fine-tuning]
+    QLoRA --> Deploy[Controlled model deployment]
 ```
 
-The application never updates model weights directly from student prompts. Email addresses and Indian phone numbers are redacted, student identifiers are hashed, negative feedback rejects a candidate automatically, and approval remains separate from training. See `training/WORKFLOW.md` for the release process.
+The application never updates model weights directly from student prompts. A thumbs-down rejects the corresponding candidate automatically. Admin approval only makes a record exportable; it does not start training. The experimental fine-tuned/Groq router in `backend/services/hybrid_rag.py` is not mounted in `backend/main.py`, so it is not part of the live request path. See `training/WORKFLOW.md` for the controlled release process.
+
+### Authentication, Authorization, and Privacy Boundaries
+
+- The frontend stores a HS256 bearer JWT in browser local storage and Axios attaches it to API requests.
+- Login includes a `student` or `teacher` role in the signed JWT. The frontend uses it for the initial workspace, and `/teacher/*` verifies it server-side.
+- Chat asking, history, and feedback accept a guest identity when a valid token is absent. Profile, quiz, and admin routes require a token.
+- Admin access is derived from `ADMIN_EMAILS`; the admin dependency verifies the current email against that allowlist.
+- The current `/auth/register` endpoint returns a profile response without writing credentials, and `/auth/login` issues a JWT from the submitted email and selected role without checking the submitted password. Roles are therefore not yet tied to a persisted, administrator-verified account. This is development scaffolding and must be replaced with persisted user lookup, bcrypt verification, and controlled teacher-role assignment before treating the system as secure authentication.
+- Learning candidates redact email addresses and Indian mobile numbers, and replace student/question identity with SHA-256 hashes. Raw operational chat sessions remain in the application database.
+
+### Runtime and Deployment Topology
+
+| Environment | Request path | Services and storage |
+|---|---|---|
+| Local frontend development | Browser → Vite `:5173` → FastAPI `:8000` | Docker Compose runs FastAPI, PostgreSQL `:5432`, and Qdrant `:6333`; CORS permits the documented local Vite ports. |
+| Production | Browser → Nginx `:80/:443` → static React files or `/api/*` → FastAPI `:8000` | `docker-compose.prod.yml` runs Nginx, FastAPI, PostgreSQL, and Qdrant. Database, vector, ingestion, and training-data directories are mounted as volumes. |
+
+Production PostgreSQL, Qdrant, and FastAPI ports bind to loopback; Nginx is the public entry point. Nginx handles React Router fallback, gzip, and `/api` prefix removal. The frontend is built with `VITE_API_URL=/api`. Docker Compose starts dependencies in order, but application-level readiness is handled defensively: database initialization logs failures and the backend stays alive, while production Qdrant failures do not silently switch to local storage.
+
+### Failure and Fallback Behavior
+
+| Failure | Behavior |
+|---|---|
+| PostgreSQL unavailable at startup | FastAPI continues; DB-dependent profile, quiz, admin, and durable history features are reduced or unavailable. Chat can use process memory for the current backend process. |
+| Qdrant unavailable in development | Retrieval uses the local embedded Qdrant store under `qdrant_storage_local`. |
+| Qdrant unavailable in production | Retrieval is caught by the RAG path and proceeds without retrieved evidence; strict textbook questions return safe mode. Ingestion fails explicitly. |
+| Embedding model missing | The service uses fixed mock vectors and relies on lexical/metadata scoring unless downloads are explicitly allowed. |
+| Weak or irrelevant retrieval | Context is withheld from Groq; strict chapter-dependent language/literature requests are not guessed. |
+| Groq unavailable or returns unusable quiz JSON | RAG uses its local fallback answer behavior; quiz generation uses deterministic fallback MCQs when source text exists. |
+| Backend restart | Process-local cache, guest history, and pending chapter choices are lost; PostgreSQL and Qdrant data remain. |
 
 ### Documentation Rule
 
@@ -581,4 +1010,6 @@ Every implementation change must include a corresponding update to this `README.
 - **Legacy-encoded Hindi PDFs** — PDFs using Kruti Dev / pre-Unicode fonts produce garbled text after extraction. Use Unicode-encoded PDFs for best results.
 - **Estimated study time** — Calculated from session timestamps with a gap-based heuristic (≤8 min per gap). Not a direct time-on-page measurement.
 - **Admin email-only access** — Admin status is determined by email address in `ADMIN_EMAILS` env var, not a DB column. To add admins, update `.env` and rebuild the backend container.
+- **Development-only role selection** — Student/teacher role is selected during login and signed into the JWT, but it is not yet verified against a persisted user record. Production must require administrator approval or an institution invite for teacher accounts.
+- **Teacher outputs are drafts** — Generated curricula, papers, answer keys, and teaching guides require teacher review against the latest CGBSE syllabus and textbook. Recent teacher resources currently live only in browser local storage.
 - **Single Qdrant collection** — All subjects share `cgbse_knowledge`. Subject filtering is done at scoring time, not at vector DB query time.

@@ -4,7 +4,7 @@ import api from "../api/client";
 import BrandMark from "../components/BrandMark";
 
 export default function Register() {
-  const [form, setForm] = useState({ name: "", email: "", password: "", class_level: "10", medium: "Hindi" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", class_level: "10", medium: "Hindi", role: "student" });
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
@@ -61,13 +61,21 @@ export default function Register() {
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form auth-grid-form">
+          <div className="role-selector span-two" role="radiogroup" aria-label="Account role">
+            <button type="button" className={form.role === "student" ? "active" : ""} onClick={() => setForm({ ...form, role: "student" })}>
+              <span aria-hidden="true">🎓</span><strong>Student</strong><small>Learn and practise</small>
+            </button>
+            <button type="button" className={form.role === "teacher" ? "active" : ""} onClick={() => setForm({ ...form, role: "teacher" })}>
+              <span aria-hidden="true">📘</span><strong>Teacher</strong><small>Plan and teach</small>
+            </button>
+          </div>
           <label>नाम</label>
           <input name="name" value={form.name} onChange={handleChange} placeholder="अपना नाम लिखें" required />
           <label>ईमेल</label>
           <input name="email" type="email" value={form.email} onChange={handleChange} placeholder="student@example.com" required />
           <label>पासवर्ड</label>
           <input name="password" type="password" value={form.password} onChange={handleChange} placeholder="मजबूत पासवर्ड चुनें" required />
-          <label>कक्षा</label>
+          <label>{form.role === "teacher" ? "मुख्य कक्षा" : "कक्षा"}</label>
           <select name="class_level" value={form.class_level} onChange={handleChange}>
             {Array.from({ length: 12 }, (_, i) => i + 1).map((level) => (
               <option key={level} value={String(level)}>{level}</option>

@@ -9,7 +9,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routers import auth, chat, profile, admin, quiz
+from backend.routers import auth, chat, profile, admin, quiz, teacher
 from backend.config import settings
 from backend.database import init_db
 import asyncio
@@ -61,3 +61,4 @@ app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(profile.router, prefix="/profile", tags=["profile"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
 app.include_router(quiz.router, prefix="/quiz", tags=["quiz"])
+app.include_router(teacher.router, prefix="/teacher", tags=["teacher"])
