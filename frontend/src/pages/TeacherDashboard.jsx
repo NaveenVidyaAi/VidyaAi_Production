@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/client";
 import BrandMark from "../components/BrandMark";
+import Icon from "../components/Icon";
 import RichMarkdown from "../components/RichMarkdown";
 
 const subjects = ["Hindi", "English", "Math", "Science", "Social Science", "Sanskrit"];
@@ -38,6 +39,7 @@ const copy = {
       lesson: { title: "How to Teach", text: "Learn the topic before class and receive a minute-by-minute teaching strategy.", action: "Prepare a lesson" },
     },
     recent: { title: "Recent resources", note: "Resources are kept in this browser for quick access.", empty: "Your generated curricula, papers, and teaching guides will appear here.", curriculum: "Curriculum", paper: "Test paper", lesson: "Teaching guide" },
+    insights: { title: "Teacher pulse", note: "Your preparation activity", resources: "Resources", activeDays: "Active days", curricula: "Curricula", papers: "Papers", recent: "Recent activity", noRecent: "Create your first resource to start the activity timeline.", quick: "Quick create", lastActive: "Last active" },
     homeChat: { kicker: "TEACHER COPILOT", title: "Plan with VidyaAI without leaving your dashboard", note: "Ask a teaching question now, or open the full chat for a longer conversation.", open: "Open full chat" },
     curriculumForm: { title: "Curriculum details", note: "Give the planning boundaries; VidyaAI will organize the sequence.", weeks: "Duration (weeks)", periods: "Periods per week", teachingMedium: "Teaching medium", chapters: "Chapters or syllabus", chaptersPlaceholder: "Example: Chapters 1–6, or paste the chapter list", goals: "Learning goals", goalsPlaceholder: "What should students know or be able to do?", loading: "Building curriculum…", action: "Create curriculum plan" },
     paperForm: { title: "Paper blueprint", note: "Marks and question count are validated in the generation prompt.", marks: "Total marks", questions: "Number of questions", duration: "Duration (minutes)", difficulty: "Difficulty", type: "Paper type", syllabus: "Syllabus / chapters", syllabusPlaceholder: "Example: Acids, Bases and Salts; Metals and Non-metals", instructions: "Additional instructions", instructionsPlaceholder: "Optional: include diagrams, competency-based questions, internal choice…", loading: "Setting the paper…", action: "Create question paper" },
@@ -79,6 +81,7 @@ const copy = {
       lesson: { title: "कैसे पढ़ाएँ", text: "कक्षा से पहले विषय समझें और मिनट-दर-मिनट शिक्षण रणनीति पाएँ।", action: "पाठ तैयार करें" },
     },
     recent: { title: "हाल के संसाधन", note: "त्वरित उपयोग के लिए संसाधन इस ब्राउज़र में सुरक्षित रहते हैं।", empty: "आपके बनाए पाठ्यक्रम, पेपर और शिक्षण मार्गदर्शिकाएँ यहाँ दिखाई देंगी।", curriculum: "पाठ्यक्रम", paper: "टेस्ट पेपर", lesson: "शिक्षण मार्गदर्शिका" },
+    insights: { title: "शिक्षक प्रगति", note: "आपकी तैयारी की गतिविधि", resources: "संसाधन", activeDays: "सक्रिय दिन", curricula: "पाठ्यक्रम", papers: "पेपर", recent: "हाल की गतिविधि", noRecent: "गतिविधि टाइमलाइन शुरू करने के लिए पहला संसाधन बनाएँ।", quick: "त्वरित निर्माण", lastActive: "अंतिम सक्रियता" },
     homeChat: { kicker: "शिक्षक कोपायलट", title: "डैशबोर्ड छोड़े बिना VidyaAI के साथ योजना बनाएँ", note: "अभी शिक्षण से जुड़ा प्रश्न पूछें या लंबी बातचीत के लिए पूरी चैट खोलें।", open: "पूरी चैट खोलें" },
     curriculumForm: { title: "पाठ्यक्रम विवरण", note: "योजना की सीमाएँ दें; VidyaAI क्रम को व्यवस्थित करेगा।", weeks: "अवधि (सप्ताह)", periods: "प्रति सप्ताह पीरियड", teachingMedium: "शिक्षण माध्यम", chapters: "अध्याय या पाठ्यक्रम", chaptersPlaceholder: "उदाहरण: अध्याय 1–6, या अध्याय सूची यहाँ लिखें", goals: "सीखने के लक्ष्य", goalsPlaceholder: "विद्यार्थियों को क्या जानना या कर पाना चाहिए?", loading: "पाठ्यक्रम बन रहा है…", action: "पाठ्यक्रम योजना बनाएँ" },
     paperForm: { title: "प्रश्नपत्र रूपरेखा", note: "अंक और प्रश्न संख्या को निर्माण के दौरान जाँचा जाता है।", marks: "कुल अंक", questions: "प्रश्नों की संख्या", duration: "अवधि (मिनट)", difficulty: "कठिनाई", type: "पेपर का प्रकार", syllabus: "पाठ्यक्रम / अध्याय", syllabusPlaceholder: "उदाहरण: अम्ल, क्षार और लवण; धातु और अधातु", instructions: "अतिरिक्त निर्देश", instructionsPlaceholder: "वैकल्पिक: चित्र, योग्यता-आधारित प्रश्न, आंतरिक विकल्प…", loading: "पेपर बन रहा है…", action: "प्रश्नपत्र बनाएँ" },
@@ -137,10 +140,11 @@ function Field({ label, children, wide = false }) {
 }
 
 function FireIcon() {
+  const gradientId = useId();
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <defs><linearGradient id="teacherFireGradient" x1="7" x2="17" y1="21" y2="2"><stop stopColor="#facc15" /><stop offset=".48" stopColor="#fb923c" /><stop offset="1" stopColor="#ef4444" /></linearGradient></defs>
-      <path fill="url(#teacherFireGradient)" d="M13.3 2.2c.4 2.5-.2 4.1-1.3 5.6-.9 1.2-2 2.4-2.1 4.3 0 1.1.5 2.1 1.5 2.8-.1-1.5.5-2.6 1.5-3.7.9 1 1.8 2.3 1.8 4 0 2.1-1.7 3.8-3.8 3.8-2.8 0-5-2.2-5-5 0-2.2 1-4.1 2.7-5.9 1.4-1.5 2.3-3.2 1.9-5.2 4 1.7 7.6 5.6 7.6 10.3 0 4.7-3.8 8.5-8.5 8.5S1.7 18 1.7 13.3c0-2.9 1.4-5.4 3.7-7.2-.6 1.2-.9 2.3-.8 3.4.3-1.6 1.2-2.9 2.4-4.1 1.8-1.8 3.4-3.2 6.3-3.2Z" />
+      <defs><linearGradient id={gradientId} x1="7" x2="17" y1="21" y2="2"><stop stopColor="#facc15" /><stop offset=".48" stopColor="#fb923c" /><stop offset="1" stopColor="#ef4444" /></linearGradient></defs>
+      <path fill={`url(#${gradientId})`} d="M13.3 2.2c.4 2.5-.2 4.1-1.3 5.6-.9 1.2-2 2.4-2.1 4.3 0 1.1.5 2.1 1.5 2.8-.1-1.5.5-2.6 1.5-3.7.9 1 1.8 2.3 1.8 4 0 2.1-1.7 3.8-3.8 3.8-2.8 0-5-2.2-5-5 0-2.2 1-4.1 2.7-5.9 1.4-1.5 2.3-3.2 1.9-5.2 4 1.7 7.6 5.6 7.6 10.3 0 4.7-3.8 8.5-8.5 8.5S1.7 18 1.7 13.3c0-2.9 1.4-5.4 3.7-7.2-.6 1.2-.9 2.3-.8 3.4.3-1.6 1.2-2.9 2.4-4.1 1.8-1.8 3.4-3.2 6.3-3.2Z" />
     </svg>
   );
 }
@@ -150,7 +154,7 @@ function TeacherProfile({ profile, logout, t, compact = false }) {
     <div className={`teacher-header-profile${compact ? " compact" : ""}`}>
       <span>{profile.name?.charAt(0)?.toUpperCase() || "T"}</span>
       <div><strong>{profile.name}</strong><small>{profile.email}</small></div>
-      <button type="button" onClick={logout} title={t.logout} aria-label={t.logout}>↪</button>
+      <button type="button" onClick={logout} title={t.logout} aria-label={t.logout}><Icon name="logout" size={18} /></button>
     </div>
   );
 }
@@ -166,6 +170,50 @@ function TeacherHeaderControls({ profile, logout, t, lang, streak, onToggleLangu
   );
 }
 
+function TeacherInsightsRail({ recent, streak, t, lang, onOpenTool, onOpenRecent }) {
+  const curriculumCount = recent.filter((item) => item.type === "curriculum").length;
+  const paperCount = recent.filter((item) => item.type === "paper").length;
+  const quickActions = [
+    ["curriculum", "curriculum"],
+    ["paper", "paper"],
+    ["lesson", "lesson"],
+  ];
+
+  return (
+    <aside className="teacher-insights-rail" aria-label={t.insights.title}>
+      <section className="teacher-insight-card teacher-pulse-card">
+        <header><div><span>{t.insights.note}</span><h2>{t.insights.title}</h2></div><i aria-hidden="true"><Icon name="sparkle" size={18} /></i></header>
+        <div className="teacher-pulse-grid">
+          <div><strong>{recent.length}</strong><span>{t.insights.resources}</span></div>
+          <div><strong>{streak.count || 0}</strong><span>{t.insights.activeDays}</span></div>
+          <div><strong>{curriculumCount}</strong><span>{t.insights.curricula}</span></div>
+          <div><strong>{paperCount}</strong><span>{t.insights.papers}</span></div>
+        </div>
+        {streak.lastActive && <p><FireIcon /> {t.insights.lastActive}: {new Date(`${streak.lastActive}T00:00:00`).toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN", { day: "numeric", month: "short" })}</p>}
+      </section>
+
+      <section className="teacher-insight-card teacher-activity-card">
+        <div className="teacher-insight-heading"><h2>{t.insights.recent}</h2><span>{recent.length}</span></div>
+        {recent.length ? (
+          <div className="teacher-activity-list">
+            {recent.slice(0, 4).map((item) => (
+              <button key={item.createdAt} type="button" onClick={() => onOpenRecent(item)}>
+                <i aria-hidden="true"><Icon name={item.type === "curriculum" ? "curriculum" : item.type === "paper" ? "paper" : "lesson"} size={17} /></i>
+                <span><strong>{t.recent[item.type] || t.recent.curriculum}</strong><small>{item.title}</small><time>{new Date(item.createdAt).toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN", { day: "numeric", month: "short" })}</time></span>
+              </button>
+            ))}
+          </div>
+        ) : <p className="teacher-activity-empty">{t.insights.noRecent}</p>}
+      </section>
+
+      <section className="teacher-insight-card teacher-quick-card">
+        <h2>{t.insights.quick}</h2>
+        <div>{quickActions.map(([tool, icon]) => <button key={tool} type="button" onClick={() => onOpenTool(tool)}><span><Icon name={icon} size={17} /></span>{t.cards[tool].title}<Icon name="arrowRight" size={15} /></button>)}</div>
+      </section>
+    </aside>
+  );
+}
+
 function TeacherChat({ compact = false, t, lang, question, setQuestion, subject, setSubject, loading, messages, onSubmit, onClear, onOpenFull }) {
   const prompts = lang === "hi"
     ? ["कक्षा 10 में प्रकाश का परावर्तन कैसे पढ़ाएँ?", "अम्ल और क्षार के लिए कक्षा गतिविधि बनाएँ।", "कमजोर विद्यार्थियों के लिए भिन्न समझाएँ।"]
@@ -175,11 +223,11 @@ function TeacherChat({ compact = false, t, lang, question, setQuestion, subject,
       <div className="teacher-chat-toolbar">
         <div><strong>{compact ? t.homeChat.title : t.nav.chat}</strong><span>{compact ? t.homeChat.note : t.chatWelcome}</span></div>
         {!compact && <label><span>{t.subject}</span><select value={subject} onChange={(event) => setSubject(event.target.value)}><option value="General">{t.options.general}</option>{subjects.map((item) => <option key={item} value={item}>{t.subjectNames[item]}</option>)}</select></label>}
-        {compact ? <button type="button" onClick={onOpenFull}>{t.homeChat.open} →</button> : <button type="button" onClick={onClear}>{t.newChat}</button>}
+        {compact ? <button type="button" onClick={onOpenFull}>{t.homeChat.open} <Icon name="arrowRight" size={17} /></button> : <button type="button" onClick={onClear}>{t.newChat}</button>}
       </div>
       <div className="teacher-chat-window" aria-live="polite">
         {!messages.length && !loading && (
-          <div className="teacher-chat-welcome"><span>✦</span>{!compact && <h2>{t.ask}</h2>}<p>{t.chatWelcome}</p><div>{prompts.slice(0, compact ? 2 : 3).map((prompt) => <button key={prompt} type="button" onClick={() => setQuestion(prompt)}>{prompt}</button>)}</div></div>
+          <div className="teacher-chat-welcome"><span><Icon name="sparkle" size={30} /></span>{!compact && <h2>{t.ask}</h2>}<p>{t.chatWelcome}</p><div>{prompts.slice(0, compact ? 2 : 3).map((prompt) => <button key={prompt} type="button" onClick={() => setQuestion(prompt)}>{prompt}</button>)}</div></div>
         )}
         {messages.map((message, index) => (
           <article key={`${message.role}-${index}`} className={`teacher-chat-message ${message.role}`}>
@@ -190,8 +238,8 @@ function TeacherChat({ compact = false, t, lang, question, setQuestion, subject,
         {loading && <div className="teacher-chat-loading"><div className="teacher-loader" /><span>{t.thinking}</span></div>}
       </div>
       <form className="teacher-chat-form" onSubmit={onSubmit}>
-        <textarea rows={compact ? 1 : 2} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder={t.chatPlaceholder} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} />
-        <button type="submit" disabled={loading || !question.trim()}><span className="teacher-send-label">{loading ? t.thinking : t.send}</span><span>↑</span></button>
+        <textarea rows={compact ? 1 : 2} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder={t.chatPlaceholder} aria-label={t.chatPlaceholder} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} />
+        <button type="submit" disabled={loading || !question.trim()} aria-label={t.send}><span className="teacher-send-label">{loading ? t.thinking : t.send}</span><Icon name="send" size={18} /></button>
       </form>
     </section>
   );
@@ -313,6 +361,7 @@ export default function TeacherDashboard() {
 
   return (
     <div className="teacher-shell">
+      <a className="skip-link" href="#teacher-main">{lang === "hi" ? "मुख्य सामग्री पर जाएँ" : "Skip to main content"}</a>
       <aside className="teacher-sidebar">
         <div className="teacher-sidebar-head">
           <BrandMark compact tone="teacher" tagline={t.brandTagline} />
@@ -321,22 +370,22 @@ export default function TeacherDashboard() {
         <div className="teacher-role-badge">{t.roleBadge}</div>
         <nav>
           {[
-            ["home", "⌂"],
-            ["curriculum", "▦"],
-            ["paper", "✎"],
-            ["lesson", "◉"],
+            ["home", "home"],
+            ["curriculum", "curriculum"],
+            ["paper", "paper"],
+            ["lesson", "lesson"],
           ].map(([id, icon]) => (
-            <button key={id} type="button" className={activeTool === id ? "active" : ""} onClick={() => openTool(id)}><span>{icon}</span>{t.nav[id]}</button>
+            <button key={id} type="button" className={activeTool === id ? "active" : ""} aria-current={activeTool === id ? "page" : undefined} onClick={() => openTool(id)}><span><Icon name={icon} size={17} /></span>{t.nav[id]}</button>
           ))}
         </nav>
         <div className="teacher-shared-tools">
           <p>{t.shared}</p>
-          <button type="button" className={activeTool === "chat" ? "active" : ""} onClick={() => openTool("chat")}>{t.nav.chat} <span>→</span></button>
-          <button type="button" className={activeTool === "pyq" ? "active" : ""} onClick={() => openTool("pyq")}>{t.nav.pyq} <span>→</span></button>
+          <button type="button" className={activeTool === "chat" ? "active" : ""} aria-current={activeTool === "chat" ? "page" : undefined} onClick={() => openTool("chat")}><span className="teacher-shared-icon"><Icon name="chat" size={17} /></span>{t.nav.chat}<Icon name="arrowRight" size={16} /></button>
+          <button type="button" className={activeTool === "pyq" ? "active" : ""} aria-current={activeTool === "pyq" ? "page" : undefined} onClick={() => openTool("pyq")}><span className="teacher-shared-icon"><Icon name="library" size={17} /></span>{t.nav.pyq}<Icon name="arrowRight" size={16} /></button>
         </div>
       </aside>
 
-      <main className="teacher-main">
+      <main className="teacher-main" id="teacher-main" tabIndex="-1">
         <header className="teacher-header">
           <div><span className="teacher-kicker">{t.kicker}</span><h1>{meta.title}</h1><p>{meta.subtitle}</p></div>
           <TeacherHeaderControls profile={profile} logout={logout} t={t} lang={lang} streak={streak} onToggleLanguage={toggleLanguage} onOpenChat={() => openTool("chat")} />
@@ -352,7 +401,7 @@ export default function TeacherDashboard() {
             <TeacherChat compact t={t} lang={lang} question={chatQuestion} setQuestion={setChatQuestion} subject={chatSubject} setSubject={setChatSubject} loading={chatLoading} messages={chatMessages} onSubmit={askChat} onClear={() => setChatMessages([])} onOpenFull={() => openTool("chat")} />
             <section className="teacher-tool-grid">
               {[["curriculum", "curriculum-card"], ["paper", "paper-card"], ["lesson", "lesson-card"]].map(([id, className]) => (
-                <article key={id} className={`teacher-tool-card ${className}`}><div className="teacher-tool-icon">{id === "curriculum" ? "▦" : id === "paper" ? "✎" : "◉"}</div><h3>{t.cards[id].title}</h3><p>{t.cards[id].text}</p><button type="button" onClick={() => openTool(id)}>{t.cards[id].action} →</button></article>
+                <article key={id} className={`teacher-tool-card ${className}`}><div className="teacher-tool-icon"><Icon name={id === "curriculum" ? "curriculum" : id === "paper" ? "paper" : "lesson"} size={22} /></div><h3>{t.cards[id].title}</h3><p>{t.cards[id].text}</p><button type="button" onClick={() => openTool(id)}>{t.cards[id].action}<Icon name="arrowRight" size={17} /></button></article>
               ))}
             </section>
             <section className="teacher-recent-panel">
@@ -438,13 +487,22 @@ export default function TeacherDashboard() {
                 <article key={paper.file}>
                   <div className="teacher-pyq-file-icon">PDF</div>
                   <div><strong>{t.classLabel} {paper.classLevel} {t.subjectNames[paper.subject]} PYQ {paper.year} {t.setLabel} {paper.set}</strong><span>{paper.year} · {t.setLabel} {paper.set} · {t.subjectNames[paper.subject]}</span></div>
-                  <div><a href={`/pyq/${paper.file}`} target="_blank" rel="noreferrer">{t.open}</a><a href={`/pyq/${paper.file}`} download>{t.download}</a></div>
+                  <div><a className="teacher-pyq-open" href={`/pyq/${paper.file}`} target="_blank" rel="noreferrer"><Icon name="externalLink" size={16} />{t.open}</a><a className="teacher-pyq-download" href={`/pyq/${paper.file}`} download><Icon name="download" size={16} />{t.download}</a></div>
                 </article>
               ))}
             </div>
           </section>
         )}
       </main>
+
+      <TeacherInsightsRail
+        recent={recent}
+        streak={streak}
+        t={t}
+        lang={lang}
+        onOpenTool={openTool}
+        onOpenRecent={(item) => { setResult(item); setActiveTool(item.type); }}
+      />
     </div>
   );
 }
@@ -452,6 +510,6 @@ export default function TeacherDashboard() {
 function renderResult(result, error, loading, onCopy, t) {
   if (error) return <section className="teacher-result error-state"><strong>{t.result.error}</strong><p>{error}</p></section>;
   if (loading) return <section className="teacher-result loading-state"><div className="teacher-loader" /><strong>{t.result.loading}</strong><p>{t.result.loadingNote}</p></section>;
-  if (!result) return <section className="teacher-result empty-state"><span>✦</span><strong>{t.result.empty}</strong><p>{t.result.emptyNote}</p></section>;
+  if (!result) return <section className="teacher-result empty-state"><span><Icon name="sparkle" size={34} /></span><strong>{t.result.empty}</strong><p>{t.result.emptyNote}</p></section>;
   return <section className="teacher-result generated-resource"><header><div><span>{t.result.generated}</span><h2>{result.title}</h2></div><div><button type="button" onClick={onCopy}>{t.result.copy}</button><button type="button" onClick={() => window.print()}>{t.result.print}</button></div></header><article><RichMarkdown>{result.content}</RichMarkdown></article>{result.sources?.length > 0 && <footer><strong>{t.result.sources}</strong>{result.sources.map((source) => <span key={source}>{source}</span>)}</footer>}</section>;
 }

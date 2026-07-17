@@ -1,9 +1,11 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-import TeacherDashboard from "./pages/TeacherDashboard";
+
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const TeacherDashboard = lazy(() => import("./pages/TeacherDashboard"));
 
 function RoleHome() {
   const hasToken = Boolean(localStorage.getItem("vidyaai_token"));
@@ -14,15 +16,17 @@ function RoleHome() {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<RoleHome />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/chat" element={<Dashboard />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/admin" element={<AdminDashboard />} />
-      <Route path="/teacher" element={<TeacherDashboard />} />
-    </Routes>
+    <Suspense fallback={<div className="route-loader" role="status"><span /><strong>VidyaAI</strong><small>Loading your workspace…</small></div>}>
+      <Routes>
+        <Route path="/" element={<RoleHome />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/chat" element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/teacher" element={<TeacherDashboard />} />
+      </Routes>
+    </Suspense>
   );
 }
 

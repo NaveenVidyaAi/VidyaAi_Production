@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import RichMarkdown from "../components/RichMarkdown";
 import api from "../api/client";
+import Icon from "../components/Icon";
 
 const translations = {
   hi: {
@@ -22,9 +23,9 @@ const translations = {
     profileTitle: "प्रोफाइल",
     tipsTitle: "अच्छा प्रश्न कैसे पूछें",
     tips: ["अध्याय संख्या या नाम जरूर लिखें", "उत्तर प्रकार बताएं: 2 अंक, 5 अंक, सारांश", "जरूरत हो तो किताब की पंक्ति भी जोड़ें"],
-    profileLabels: { name: "नाम", class: "कक्षा", medium: "माध्यम", status: "स्थिति", guest: "Guest", loggedIn: "Logged in" },
+    profileLabels: { name: "नाम", class: "कक्षा", medium: "माध्यम", status: "स्थिति", guest: "अतिथि", loggedIn: "लॉग इन" },
     sidebarTagline: "छात्रों के लिए सरल, हल्का और उपयोगी सीखने का अनुभव",
-    brandTagline: "लोगो, प्रोफाइल और आउटपुट अब एक ही light theme में हैं।",
+    brandTagline: "आपका स्मार्ट पढ़ाई साथी",
     welcomeMsg: "नमस्ते! मैं VidyaAI हूँ। आप अध्याय, कविता, प्रश्नोत्तर या परीक्षा तैयारी से जुड़ा कोई भी सवाल पूछ सकते हैं।",
     newChatMsg: "नई चैट शुरू हो गई है। अपना अध्याय, कविता या प्रश्न लिखिए।",
     loginRequired: "कृपया personalized उत्तर पाने के लिए लॉगिन करें।",
@@ -42,19 +43,19 @@ const translations = {
     countdownTitle: "बोर्ड परीक्षा में",
     countdownUnit: "दिन",
     countdownNote: "हर दिन एक छोटा लक्ष्य पूरा करें।",
-    examDateLabel: "Exam date",
+    examDateLabel: "परीक्षा तिथि",
     todayTargetTitle: "आज का लक्ष्य",
     targetProgress: (done, total) => `${done}/${total} पूरे`,
-    streakTitle: "Study streak",
+    streakTitle: "अध्ययन स्ट्रीक",
     streakUnit: "दिन",
     streakNote: "आज एक लक्ष्य पूरा करके streak बचाएं।",
-    navChat: "Chat",
-    navQuiz: "Quiz",
-    navPyq: "PYQ",
-    navPlan: "Study Plan",
-    papersTitle: "Previous Year Papers",
-    papersNote: "एक पेपर चुनें और VidyaAI से practice शुरू कराएं।",
-    startPaper: "Practice",
+    navChat: "AI चैट",
+    navQuiz: "क्विज़",
+    navPyq: "पुराने प्रश्नपत्र",
+    navPlan: "अध्ययन योजना",
+    papersTitle: "पिछले वर्षों के प्रश्नपत्र",
+    papersNote: "एक प्रश्नपत्र चुनें और VidyaAI के साथ अभ्यास शुरू करें।",
+    startPaper: "अभ्यास",
   },
   en: {
     greeting: (name) => `Hello, ${name}`,
@@ -522,7 +523,7 @@ function AssistantResponse({ message, animationRegistry, onProgress }) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [lang, setLang] = useState("hi");
+  const [lang, setLang] = useState(() => localStorage.getItem("vidyaai_student_lang") || "hi");
   const [studentName, setStudentName] = useState("विद्यार्थी");
   const [studentProfile, setStudentProfile] = useState(null);
   const [question, setQuestion] = useState("");
@@ -559,6 +560,11 @@ export default function Dashboard() {
   const animatedMessagesRef = useRef(new Set());
 
   const t = translations[lang];
+  const toggleLanguage = () => setLang((currentLang) => {
+    const nextLang = currentLang === "hi" ? "en" : "hi";
+    localStorage.setItem("vidyaai_student_lang", nextLang);
+    return nextLang;
+  });
   const todayIndex = Math.floor(new Date().getTime() / 86400000) % dailyTargets.length;
   const todaysTargets = dailyTargets[todayIndex];
   const completedCount = todaysTargets.filter((item) => completedTargets.includes(item.id)).length;
@@ -673,6 +679,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
+      if (askedQuestions.length === 0) {
+        if (windowRef.current) windowRef.current.scrollTop = 0;
+        return;
+      }
       if (messagesEndRef.current) {
         messagesEndRef.current.scrollIntoView({ block: "end" });
       } else if (windowRef.current) {
@@ -680,7 +690,7 @@ export default function Dashboard() {
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [messages, isLoading]);
+  }, [messages, isLoading, askedQuestions.length]);
 
   useEffect(() => {
     localStorage.setItem("vidyaai_exam_date", examDate);
@@ -1124,6 +1134,7 @@ export default function Dashboard() {
 
   return (
     <div className="page-shell dashboard-app-shell">
+      <a className="skip-link" href="#student-main">{lang === "hi" ? "मुख्य सामग्री पर जाएँ" : "Skip to main content"}</a>
       <aside className="dashboard-left-nav">
         <div className="sidebar-brand">
           <div className="sidebar-brand-mark" aria-hidden="true">
@@ -1146,7 +1157,7 @@ export default function Dashboard() {
           <button type="button" className="nav-action nav-action-admin" onClick={() => navigate("/admin")}>Admin Panel</button>
         )}
         {accountRole === "teacher" && (
-          <button type="button" className="nav-action teacher-workspace-link" onClick={() => navigate("/teacher")}>← Teacher Workspace</button>
+          <button type="button" className="nav-action teacher-workspace-link" onClick={() => navigate("/teacher")}><Icon name="arrowLeft" size={18} /> Teacher Workspace</button>
         )}
 
         <div className="sidebar-section quick-prompt-section">
@@ -1175,12 +1186,12 @@ export default function Dashboard() {
         </div>
 
         <div className="sidebar-section sidebar-tool-section">
-          <p>Study Tools</p>
+          <p>{lang === "hi" ? "अध्ययन उपकरण" : "Study Tools"}</p>
           {[
             { id: "chat", label: t.navChat, helper: lang === "hi" ? "मुख्य चैट" : "Main chat" },
-            { id: "pyq", label: t.navPyq, helper: lang === "hi" ? "Previous papers" : "Previous papers" },
-            { id: "plan", label: t.navPlan, helper: lang === "hi" ? "Daily roadmap" : "Daily roadmap" },
-            { id: "quiz", label: t.navQuiz, helper: lang === "hi" ? "MCQ practice" : "MCQ practice" },
+            { id: "pyq", label: t.navPyq, helper: lang === "hi" ? "पुराने प्रश्नपत्र" : "Previous papers" },
+            { id: "plan", label: t.navPlan, helper: lang === "hi" ? "दैनिक अध्ययन योजना" : "Daily roadmap" },
+            { id: "quiz", label: t.navQuiz, helper: lang === "hi" ? "बहुविकल्पीय अभ्यास" : "MCQ practice" },
           ].map((item) => (
             <button
               key={item.id}
@@ -1192,6 +1203,7 @@ export default function Dashboard() {
               }}
               title={item.label}
               aria-label={item.label}
+              aria-current={activeSection === item.id ? "page" : undefined}
             >
               <span className={`nav-icon nav-icon-${item.id}`} aria-hidden="true">
                 {item.id === "chat" && (
@@ -1257,7 +1269,7 @@ export default function Dashboard() {
             <div className="recent-chat-popover-head">
               <strong>{t.recentChatsTitle}</strong>
               <button type="button" onClick={() => setShowRecentPanel(false)} aria-label="Close recent chats">
-                ×
+                <Icon name="close" size={18} />
               </button>
             </div>
             {recentQuestions.length > 0 ? (
@@ -1283,7 +1295,7 @@ export default function Dashboard() {
 
       </aside>
 
-      <section className="dashboard-main-chat">
+      <section className="dashboard-main-chat" id="student-main" tabIndex="-1">
         <header className={`dashboard-main-top ${showProfileMenu ? "profile-menu-open" : ""}`}>
           <div className="header-left-cluster">
             <div className="top-wordmark">Vidya AI</div>
@@ -1336,7 +1348,7 @@ export default function Dashboard() {
             <button
               type="button"
               className={`header-language-switch ${lang === "en" ? "english" : "hindi"}`}
-              onClick={() => setLang((currentLang) => currentLang === "hi" ? "en" : "hi")}
+              onClick={toggleLanguage}
               aria-label={lang === "hi" ? "Switch to English" : "हिंदी में बदलें"}
             >
               <span>अ</span>
@@ -1344,7 +1356,7 @@ export default function Dashboard() {
             </button>
 
             <div className="mobile-profile-wrap">
-              <button type="button" className="mobile-profile-chip" onClick={() => setShowProfileMenu((open) => !open)} title={t.profileTitle} aria-expanded={showProfileMenu}>
+              <button type="button" className="mobile-profile-chip" onClick={() => setShowProfileMenu((open) => !open)} title={t.profileTitle} aria-expanded={showProfileMenu} aria-controls="student-profile-menu" aria-haspopup="dialog">
                 <span className="mobile-profile-avatar" aria-hidden="true">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
                 </span>
@@ -1357,7 +1369,7 @@ export default function Dashboard() {
             </div>
 
             {showProfileMenu && (
-              <div className="mobile-profile-menu">
+              <div className="mobile-profile-menu" id="student-profile-menu" role="dialog" aria-label={t.profileTitle}>
                 <div className="mobile-profile-menu-head">
                   <strong>{studentName}</strong>
                   <span>{isGuest ? t.profileLabels.guest : t.profileLabels.loggedIn}</span>
@@ -1369,14 +1381,14 @@ export default function Dashboard() {
                 </dl>
                 <div className="mobile-learning-panel">
                   <div className="mobile-learning-head">
-                    <strong>Learning Tracker</strong>
-                    <span>{studentProfile?.quiz?.completed ?? 0}/{studentProfile?.quiz?.started ?? 0} quizzes</span>
+                    <strong>{lang === "hi" ? "सीखने की प्रगति" : "Learning Tracker"}</strong>
+                    <span>{studentProfile?.quiz?.completed ?? 0}/{studentProfile?.quiz?.started ?? 0} {lang === "hi" ? "क्विज़" : "quizzes"}</span>
                   </div>
                   <div className="mobile-learning-grid">
-                    <div><span>Quiz Avg</span><strong>{studentProfile?.quiz?.avg_score ?? 0}%</strong></div>
-                    <div><span>Improve</span><strong>{studentProfile?.quiz?.improvement ?? 0}%</strong></div>
-                    <div><span>Subjects</span><strong>{learningSubjects.length}</strong></div>
-                    <div><span>Weak</span><strong>{studentProfile?.weak_topics?.length ?? 0}</strong></div>
+                    <div><span>{lang === "hi" ? "क्विज़ औसत" : "Quiz Avg"}</span><strong>{studentProfile?.quiz?.avg_score ?? 0}%</strong></div>
+                    <div><span>{lang === "hi" ? "सुधार" : "Improve"}</span><strong>{studentProfile?.quiz?.improvement ?? 0}%</strong></div>
+                    <div><span>{lang === "hi" ? "विषय" : "Subjects"}</span><strong>{learningSubjects.length}</strong></div>
+                    <div><span>{lang === "hi" ? "कमज़ोर" : "Weak"}</span><strong>{studentProfile?.weak_topics?.length ?? 0}</strong></div>
                   </div>
                   {learningSubjects.length > 0 && (
                     <div className="mobile-learning-subjects">
@@ -1422,7 +1434,7 @@ export default function Dashboard() {
                   type="button"
                   className="profile-menu-action"
                   onClick={() => {
-                    setLang((currentLang) => currentLang === "hi" ? "en" : "hi");
+                    toggleLanguage();
                     setShowProfileMenu(false);
                   }}
                 >
@@ -1455,6 +1467,7 @@ export default function Dashboard() {
                 type="button"
                 className={activeSection === item.id ? "active" : ""}
                 onClick={() => setActiveSection(item.id)}
+                aria-current={activeSection === item.id ? "page" : undefined}
               >
                 {item.label}
               </button>
@@ -1683,25 +1696,13 @@ export default function Dashboard() {
             </div>
 
             <form className="dashboard-chatgpt-form sticky-input" onSubmit={handleSubmit}>
-              <button type="button" className="composer-icon-btn composer-attach-btn" title="Add attachment" aria-label="Add attachment">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="m21.44 11.05-8.49 8.49a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 1 1-2.83-2.83l8.49-8.48" />
-                </svg>
-              </button>
               <input
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 placeholder={t.placeholder}
+                aria-label={lang === "hi" ? "VidyaAI से प्रश्न पूछें" : "Ask VidyaAI a question"}
               />
-              <button type="button" className="composer-icon-btn composer-mic-btn" title="Voice input" aria-label="Voice input">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" />
-                  <path d="M19 11a7 7 0 0 1-14 0" />
-                  <path d="M12 18v4" />
-                  <path d="M8 22h8" />
-                </svg>
-              </button>
-              <button type="submit" disabled={isLoading}>
+              <button type="submit" disabled={isLoading || !question.trim()} aria-label={t.submit}>
                 <span className="send-label">{isLoading ? t.loading : t.submit}</span>
                 <svg className="send-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M12 19V5" />
@@ -1716,10 +1717,10 @@ export default function Dashboard() {
             <div className="study-tool-panel">
               <div className="tool-panel-head">
                 <div>
-                  <h2>Subject Quizzes</h2>
-                  <p>Choose a subject and take optional MCQ practice when you are ready.</p>
+                  <h2>{lang === "hi" ? "विषय क्विज़" : "Subject Quizzes"}</h2>
+                  <p>{lang === "hi" ? "अपना विषय चुनें और तैयार होने पर MCQ अभ्यास शुरू करें।" : "Choose a subject and take optional MCQ practice when you are ready."}</p>
                 </div>
-                <span>{studentProfile?.quiz?.avg_score ?? 0}% avg</span>
+                <span>{studentProfile?.quiz?.avg_score ?? 0}% {lang === "hi" ? "औसत" : "avg"}</span>
               </div>
 
               <div className="tool-subject-grid">
@@ -1741,15 +1742,15 @@ export default function Dashboard() {
 
               <div className="tool-action-row">
                 <button type="button" className="primary-tool-btn" onClick={() => generateSubjectQuiz(quizSubject)} disabled={quizLoading}>
-                  {quizLoading ? "Creating quiz..." : `Start ${quizSubject} Quiz`}
+                  {quizLoading ? (lang === "hi" ? "क्विज़ बन रही है…" : "Creating quiz...") : (lang === "hi" ? `${subjects.find((item) => item.id === quizSubject)?.hi || quizSubject} क्विज़ शुरू करें` : `Start ${quizSubject} Quiz`)}
                 </button>
               </div>
 
               <div className="standalone-quiz-wrap">
                 {standaloneQuiz ? renderQuizCard(standaloneQuiz) : (
                   <div className="empty-tool-state">
-                    <strong>No quiz started</strong>
-                    <span>Your chat will no longer be interrupted by MCQs. Start one here whenever you want practice.</span>
+                    <strong>{lang === "hi" ? "अभी कोई क्विज़ शुरू नहीं हुई" : "No quiz started"}</strong>
+                    <span>{lang === "hi" ? "अभ्यास के लिए तैयार होने पर यहीं से क्विज़ शुरू करें। आपकी चैट बाधित नहीं होगी।" : "Your chat will no longer be interrupted by MCQs. Start one here whenever you want practice."}</span>
                   </div>
                 )}
               </div>
@@ -1763,7 +1764,7 @@ export default function Dashboard() {
                   <h2>{t.papersTitle}</h2>
                   <p>{t.papersNote}</p>
                 </div>
-                <span>Class {classLevel}</span>
+                <span>{lang === "hi" ? "कक्षा" : "Class"} {classLevel}</span>
               </div>
 
               {pyqSubjects.length > 0 ? (
@@ -1788,7 +1789,7 @@ export default function Dashboard() {
                     <div className="pyq-subject-head">
                       <div>
                         <strong>{selectedPyqSubjectMeta?.[lang] || pyqSubject}</strong>
-                        <span>{selectedPyqPapers.length} papers</span>
+                        <span>{selectedPyqPapers.length} {lang === "hi" ? "प्रश्नपत्र" : "papers"}</span>
                       </div>
                     </div>
                     <div className="pyq-list">
@@ -1799,10 +1800,10 @@ export default function Dashboard() {
                             <span>{paper.year} · Set {paper.set} · {paper.medium}</span>
                           </div>
                           <div className="pyq-actions">
-                            <a className="pyq-open-action" href={paper.fileUrl} target="_blank" rel="noreferrer">Open</a>
-                            <a className="pyq-download-action" href={paper.fileUrl} download>Download</a>
+                            <a className="pyq-open-action" href={paper.fileUrl} target="_blank" rel="noreferrer">{lang === "hi" ? "खोलें" : "Open"}</a>
+                            <a className="pyq-download-action" href={paper.fileUrl} download>{lang === "hi" ? "डाउनलोड" : "Download"}</a>
                             <button type="button" disabled={Boolean(pyqLoadingFile)} onClick={() => generatePyqQuiz(paper)}>
-                              {pyqLoadingFile === paper.fileUrl.split("/").pop() ? "Preparing..." : t.startPaper}
+                              {pyqLoadingFile === paper.fileUrl.split("/").pop() ? (lang === "hi" ? "तैयार हो रहा है…" : "Preparing...") : t.startPaper}
                             </button>
                           </div>
                         </article>
@@ -1811,8 +1812,8 @@ export default function Dashboard() {
                     <div className="standalone-quiz-wrap pyq-practice-wrap">
                       {pyqQuiz ? renderQuizCard(pyqQuiz) : (
                         <div className="empty-tool-state">
-                          <strong>Select a paper to practice</strong>
-                          <span>Your paper-specific questions will appear here without leaving the PYQ page.</span>
+                          <strong>{lang === "hi" ? "अभ्यास के लिए प्रश्नपत्र चुनें" : "Select a paper to practice"}</strong>
+                          <span>{lang === "hi" ? "PYQ पेज छोड़े बिना प्रश्नपत्र आधारित सवाल यहीं दिखाई देंगे।" : "Your paper-specific questions will appear here without leaving the PYQ page."}</span>
                         </div>
                       )}
                     </div>
@@ -1931,23 +1932,23 @@ export default function Dashboard() {
         </section>
 
         <section className="right-section">
-          <p className="rail-heading">Learning Tracker</p>
+          <p className="rail-heading">{lang === "hi" ? "सीखने की प्रगति" : "Learning Tracker"}</p>
           <div className="learning-tracker-card">
             <div className="learning-score-grid">
               <div>
-                <span>Quiz Avg</span>
+                <span>{lang === "hi" ? "क्विज़ औसत" : "Quiz Avg"}</span>
                 <strong>{studentProfile?.quiz?.avg_score ?? 0}%</strong>
               </div>
               <div>
-                <span>Completed</span>
+                <span>{lang === "hi" ? "पूरे हुए" : "Completed"}</span>
                 <strong>{studentProfile?.quiz?.completed ?? 0}/{studentProfile?.quiz?.started ?? 0}</strong>
               </div>
               <div>
-                <span>Improvement</span>
+                <span>{lang === "hi" ? "सुधार" : "Improvement"}</span>
                 <strong>{studentProfile?.quiz?.improvement ?? 0}%</strong>
               </div>
               <div>
-                <span>Weak Topics</span>
+                <span>{lang === "hi" ? "कमज़ोर टॉपिक" : "Weak Topics"}</span>
                 <strong>{studentProfile?.weak_topics?.length ?? 0}</strong>
               </div>
             </div>
@@ -2001,10 +2002,10 @@ export default function Dashboard() {
         </section>
 
         <section className="right-section">
-          <p className="rail-heading">आज की गतिविधि</p>
+          <p className="rail-heading">{lang === "hi" ? "आज की गतिविधि" : "Today's activity"}</p>
           <div className="activity-grid">
-            <div><strong>{askedQuestions.length}</strong><span>प्रश्न पूछे</span></div>
-            <div><strong>{completedCount}</strong><span>लक्ष्य पूरे</span></div>
+            <div><strong>{askedQuestions.length}</strong><span>{lang === "hi" ? "प्रश्न पूछे" : "Questions asked"}</span></div>
+            <div><strong>{completedCount}</strong><span>{lang === "hi" ? "लक्ष्य पूरे" : "Targets completed"}</span></div>
           </div>
           <div className="mini-stat-row">
             <span>{t.countdownTitle}</span>

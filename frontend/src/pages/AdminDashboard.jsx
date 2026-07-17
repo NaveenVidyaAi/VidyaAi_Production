@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/client";
+import BrandMark from "../components/BrandMark";
+import Icon from "../components/Icon";
 
 /* ─────────────────── tiny SVG bar chart ─────────────────── */
 function BarChart({ data, labelKey, valueKey, color = "#6366f1" }) {
@@ -57,7 +59,7 @@ function DonutChart({ data, labelKey, valueKey }) {
   const circumference = 2 * Math.PI * R;
   return (
     <div className="adm-donut-wrap">
-      <svg width="140" height="140" viewBox="0 0 140 140">
+      <svg width="140" height="140" viewBox="0 0 140 140" role="img" aria-label={`Chart showing ${data.map((d) => `${d[labelKey]} ${d[valueKey]}`).join(", ")}`}>
         <circle cx={cx} cy={cy} r={R} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
         {data.map((d, i) => {
           const pct = d[valueKey] / total;
@@ -92,23 +94,35 @@ function DonutChart({ data, labelKey, valueKey }) {
 /* ─────────────────── stat card ─────────────────── */
 function StatCard({ label, value, sub, accent }) {
   return (
-    <div className="adm-stat-card" style={accent ? { borderTop: `3px solid ${accent}` } : {}}>
+    <article className="adm-stat-card" style={accent ? { borderTop: `3px solid ${accent}` } : {}}>
       <p className="adm-stat-label">{label}</p>
       <strong className="adm-stat-value">{value ?? "—"}</strong>
       {sub && <span className="adm-stat-sub">{sub}</span>}
-    </div>
+    </article>
   );
 }
 
 /* ─────────────────── user detail drawer ─────────────────── */
 function UserDrawer({ user, onClose }) {
+  const closeButtonRef = useRef(null);
+  useEffect(() => {
+    if (!user) return undefined;
+    const previousFocus = document.activeElement;
+    const handleKeyDown = (event) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handleKeyDown);
+    closeButtonRef.current?.focus();
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus?.();
+    };
+  }, [user, onClose]);
   if (!user) return null;
   const subjectData = Object.entries(user.subjects || {}).map(([subject, questions]) => ({ subject, questions }));
   return (
     <div className="adm-drawer-overlay" onClick={onClose}>
-      <aside className="adm-drawer" onClick={(e) => e.stopPropagation()}>
-        <button className="adm-drawer-close" onClick={onClose}>✕</button>
-        <h2 className="adm-drawer-name">{user.name}</h2>
+      <aside className="adm-drawer" role="dialog" aria-modal="true" aria-labelledby="admin-user-title" onClick={(e) => e.stopPropagation()}>
+        <button ref={closeButtonRef} type="button" className="adm-drawer-close" onClick={onClose} aria-label="Close user details"><Icon name="close" /></button>
+        <h2 id="admin-user-title" className="adm-drawer-name">{user.name}</h2>
         <p className="adm-drawer-email">{user.email} · Class {user.class_level} · {user.medium}</p>
 
         <div className="adm-drawer-stats">
@@ -239,24 +253,41 @@ export default function AdminDashboard() {
       return getValue(b) - getValue(a);
     });
 
-  if (loading) return <div className="adm-loading">Loading admin data...</div>;
-  if (error) return <div className="adm-error">{error} <button onClick={() => navigate("/dashboard")}>← Back</button></div>;
+  if (loading) return <div className="adm-loading route-loader" role="status"><span /><strong>VidyaAI Admin</strong><small>Loading analytics…</small></div>;
+  if (error) return (
+    <main className="adm-shell adm-state-shell">
+      <section className="adm-state-card" role="alert">
+        <BrandMark compact tagline="Administration & learning analytics" />
+        <span className="adm-state-icon"><Icon name="paper" size={24} /></span>
+        <h1>Analytics are temporarily unavailable</h1>
+        <p>{error} Check that the backend database is available, then try again.</p>
+        <div>
+          <button type="button" className="adm-export-btn" onClick={() => window.location.reload()}>Try again</button>
+          <button type="button" className="adm-back-btn" onClick={() => navigate("/dashboard")}><Icon name="arrowLeft" size={18} /> Student View</button>
+        </div>
+      </section>
+    </main>
+  );
 
   return (
-    <div className="adm-shell">
+    <main className="adm-shell" id="admin-main">
+      <a className="skip-link" href="#admin-main">Skip to admin content</a>
       <header className="adm-header">
-        <div>
-          <h1 className="adm-title">VidyaAI Admin Dashboard</h1>
-          <p className="adm-subtitle">Real-time usage analytics for all registered students</p>
+        <div className="adm-heading-group">
+          <BrandMark compact tagline="Administration & learning analytics" />
+          <div>
+            <h1 className="adm-title">Admin Dashboard</h1>
+            <p className="adm-subtitle">Real-time usage analytics for all registered students</p>
+          </div>
         </div>
         <div className="adm-header-actions">
-          <button className="adm-export-btn" onClick={handleStudentMetricsExport}>Export Excel CSV</button>
-          <button className="adm-back-btn" onClick={() => navigate("/dashboard")}>← Student View</button>
+          <button type="button" className="adm-export-btn" onClick={handleStudentMetricsExport}><Icon name="download" size={18} /> Export CSV</button>
+          <button type="button" className="adm-back-btn" onClick={() => navigate("/dashboard")}><Icon name="arrowLeft" size={18} /> Student View</button>
         </div>
       </header>
 
       {/* ── Summary KPIs ── */}
-      <section className="adm-kpis">
+      <section className="adm-kpis" aria-label="Key performance indicators">
         <StatCard label="Total Users" value={summary?.total_users} accent="#6366f1" />
         <StatCard label="Total Questions" value={summary?.total_questions} sub={`24h: ${summary?.questions_24h}`} accent="#10b981" />
         <StatCard label="Active Users (24h)" value={summary?.active_users_24h} sub={`Avg Q/user: ${summary?.avg_questions_per_user}`} accent="#f59e0b" />
@@ -273,7 +304,7 @@ export default function AdminDashboard() {
       </section>
 
       {/* ── Charts row ── */}
-      <section className="adm-charts-row">
+      <section className="adm-charts-row" aria-label="Analytics charts">
         <div className="adm-chart-card">
           <h3>Questions by Subject</h3>
           <BarChart data={topSubjects} labelKey="subject" valueKey="questions" color="#6366f1" />
@@ -302,13 +333,16 @@ export default function AdminDashboard() {
         <div className="adm-users-toolbar">
           <h3>All Users ({filtered.length})</h3>
           <div className="adm-toolbar-controls">
+            <label className="sr-only" htmlFor="admin-user-search">Search users</label>
             <input
+              id="admin-user-search"
               className="adm-search"
               placeholder="Search name or email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <select className="adm-sort" value={sortKey} onChange={(e) => setSortKey(e.target.value)}>
+            <label className="sr-only" htmlFor="admin-user-sort">Sort users</label>
+            <select id="admin-user-sort" className="adm-sort" value={sortKey} onChange={(e) => setSortKey(e.target.value)}>
               <option value="total_questions">Sort: Most Questions</option>
               <option value="estimated_minutes">Sort: Most Time</option>
               <option value="accuracy_score">Sort: Accuracy Score</option>
@@ -320,21 +354,22 @@ export default function AdminDashboard() {
 
         <div className="adm-table-wrap">
           <table className="adm-table">
+            <caption className="sr-only">Registered users and learning activity</caption>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Class</th>
-                <th>Questions</th>
-                <th>Time (min)</th>
-                <th>Subjects</th>
-                <th>Weak Topics</th>
-                <th>Accuracy</th>
-                <th>Quiz</th>
-                <th>Improvement</th>
-                <th>Last Active</th>
-                <th></th>
+                <th scope="col">#</th>
+                <th scope="col">Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Class</th>
+                <th scope="col">Questions</th>
+                <th scope="col">Time (min)</th>
+                <th scope="col">Subjects</th>
+                <th scope="col">Weak Topics</th>
+                <th scope="col">Accuracy</th>
+                <th scope="col">Quiz</th>
+                <th scope="col">Improvement</th>
+                <th scope="col">Last Active</th>
+                <th scope="col"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -371,7 +406,7 @@ export default function AdminDashboard() {
                       {u.last_active ? new Date(u.last_active).toLocaleDateString("en-IN") : "Never"}
                     </td>
                     <td>
-                      <button className="adm-view-btn" onClick={() => setSelectedUser(u)}>View</button>
+                      <button type="button" className="adm-view-btn" onClick={() => setSelectedUser(u)} aria-label={`View details for ${u.name}`}>View</button>
                     </td>
                   </tr>
                 );
@@ -452,6 +487,6 @@ export default function AdminDashboard() {
       </section>
 
       {selectedUser && <UserDrawer user={selectedUser} onClose={() => setSelectedUser(null)} />}
-    </div>
+    </main>
   );
 }
