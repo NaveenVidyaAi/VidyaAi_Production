@@ -129,6 +129,17 @@ export default function Login() {
           <p className="register-mobile-login">नया अकाउंट बनाना है? <Link to="/register">रजिस्टर करें</Link></p>
         </section>
       </main>
+
+      <footer className="auth-public-footer">
+        <span>VidyaAI by Gyanix AI Solutions</span>
+        <nav aria-label="Company and legal links">
+          <Link to="/about">About</Link>
+          <Link to="/contact">Contact</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/privacy">Privacy</Link>
+          <Link to="/ai-use">AI Use</Link>
+        </nav>
+      </footer>
     </div>
   );
 }

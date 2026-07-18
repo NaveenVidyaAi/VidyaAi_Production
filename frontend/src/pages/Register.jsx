@@ -136,12 +136,23 @@ export default function Register() {
               <span>{loading ? "अकाउंट बन रहा है…" : "मेरा अकाउंट बनाएँ"}</span>
               {!loading && <Icon name="arrowRight" size={18} />}
             </button>
-            <p className="register-consent"><Icon name="shield" size={15} /> जारी रखकर आप सुरक्षित और जिम्मेदार उपयोग के लिए सहमत होते हैं।</p>
+            <p className="register-consent"><Icon name="shield" size={15} /> जारी रखकर आप हमारी <Link to="/terms">शर्तों</Link>, <Link to="/privacy">Privacy Policy</Link> और <Link to="/ai-use">AI Use Policy</Link> से सहमत होते हैं।</p>
           </form>
 
           <p className="register-mobile-login">पहले से अकाउंट है? <Link to="/login">लॉगिन करें</Link></p>
         </section>
       </main>
+
+      <footer className="auth-public-footer">
+        <span>VidyaAI by Gyanix AI Solutions</span>
+        <nav aria-label="Company and legal links">
+          <Link to="/about">About</Link>
+          <Link to="/contact">Contact</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/privacy">Privacy</Link>
+          <Link to="/ai-use">AI Use</Link>
+        </nav>
+      </footer>
     </div>
   );
 }

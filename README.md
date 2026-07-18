@@ -13,6 +13,7 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 - [Local Runtime Versions](#local-runtime-versions)
 - [Environment Variables](#environment-variables)
 - [Running the Application](#running-the-application)
+- [Public Company and Legal Pages](#public-company-and-legal-pages)
 - [PDF Ingestion](#pdf-ingestion)
 - [Teacher Dashboard](#teacher-dashboard)
 - [Admin Dashboard](#admin-dashboard)
@@ -65,6 +66,14 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 - Students choose their exam date, subjects, daily available time, study days per week, and preparation goal
 - Plans support balanced preparation, weak-subject improvement, PYQ-heavy practice, and fast revision
 - Desktop and mobile account controls both provide login/logout access
+
+### Company and Legal Site
+- **Gyanix identity** — Public pages identify VidyaAI as a product of Gyanix AI Solutions and publish the official contact address `GyanixAiSolutions@gmail.com`
+- **About page** — Introduces Gyanix AI Solutions, VidyaAI, product principles, and Founder & CEO Naveen Chandrawanshi using the supplied official logo and founder portrait
+- **Contact page** — Provides a responsive, labelled contact form with inline validation and a direct official-email link
+- **Versioned legal pages** — Terms & Conditions, Privacy Policy, and Responsible AI Use Policy are published as version `1.0.0`, effective 18 July 2026
+- **Responsible disclosure** — The policies describe current Groq processing, stored learning activity, browser local storage, administrator review, improvement candidates, AI limitations, and the absence of advertising trackers
+- **Accessible public shell** — Shared company navigation and footer include keyboard focus handling, a skip link, active-route state, 44px touch targets, responsive navigation, declared image dimensions, and reduced-motion support
 
 ---
 
@@ -126,6 +135,10 @@ AI_Assistant_cgbse/
 │   ├── package.json
 │   ├── vite.config.js
 │   ├── tailwind.config.js
+│   ├── public/
+│   │   └── brand/
+│   │       ├── gyanix-ai-solutions-logo.png       ← Supplied official company logo
+│   │       └── naveen-chandrawanshi-founder.jpeg  ← Supplied Founder & CEO portrait
 │   └── src/
 │       ├── App.jsx                  ← React Router config (all routes)
 │       ├── main.jsx
@@ -135,11 +148,20 @@ AI_Assistant_cgbse/
 │       │   └── client.js            ← Axios instance with JWT interceptor
 │       │
 │       ├── components/              ← Shared UI components
+│       │   ├── BrandMark.jsx         ← VidyaAI lockup with configurable semantic tagline
+│       │   ├── Icon.jsx              ← Shared SVG icon set
+│       │   ├── LegalDocument.jsx     ← Versioned legal-page structure and section navigation
+│       │   ├── PublicLayout.jsx      ← Company header, navigation, footer, SEO and focus handling
 │       │   └── RichMarkdown.jsx      ← Markdown, Mermaid, tables, and Venn rendering
 │       │
 │       └── pages/
 │           ├── Login.jsx
 │           ├── Register.jsx
+│           ├── About.jsx            ← Gyanix, VidyaAI and founder story
+│           ├── Contact.jsx          ← Validated official-email composer
+│           ├── Terms.jsx            ← Terms & Conditions v1.0.0
+│           ├── Privacy.jsx          ← Privacy Policy v1.0.0
+│           ├── AIUse.jsx            ← Responsible AI Use Policy v1.0.0
 │           ├── Dashboard.jsx        ← Student dashboard + chat UI
 │           ├── TeacherDashboard.jsx ← Teacher planning and preparation workspace
 │           └── AdminDashboard.jsx   ← Admin analytics page (table + charts + drawer)
@@ -413,6 +435,158 @@ docker compose -f docker-compose.prod.yml logs -f backend
 ```bash
 cd frontend && npm run dev
 ```
+
+---
+
+## Public Company and Legal Pages
+
+VidyaAI includes a public-facing company and legal section for Gyanix AI
+Solutions. These routes do not require a login and share the responsive header,
+footer, SEO metadata, route-focus behavior, and visual system implemented in
+`frontend/src/components/PublicLayout.jsx`.
+
+### Company identity
+
+| Item | Published value |
+|---|---|
+| Company | Gyanix AI Solutions |
+| Product | VidyaAI |
+| Founder & CEO | Naveen Chandrawanshi |
+| Founder role | Senior Software Engineer and applied-AI builder |
+| Official email | `GyanixAiSolutions@gmail.com` |
+| AI quote | “AI should not replace human potential; it should remove the barriers that keep people from reaching it.” |
+
+The About page uses the official assets supplied by the company:
+
+- `frontend/public/brand/gyanix-ai-solutions-logo.png`
+- `frontend/public/brand/naveen-chandrawanshi-founder.jpeg`
+
+The founder description deliberately avoids invented employment dates, awards,
+client names, certifications, or years of experience. It describes the product's
+demonstrable applied-AI focus: generative AI, retrieval-augmented systems,
+multilingual interfaces, and production software.
+
+### Public routes
+
+| Route | Page | Purpose |
+|---|---|---|
+| `/about` | About | Gyanix AI Solutions, VidyaAI, founder story, principles, official logo and portrait |
+| `/contact` | Contact | Official email, enquiry categories, privacy notice, and validated email-composer form |
+| `/terms` | Terms & Conditions | Eligibility, accounts, acceptable use, AI limitations, content rights, termination and governing law |
+| `/privacy` | Privacy Policy | Data collection, Groq processing, admin access, browser storage, children, retention, security and user requests |
+| `/ai-use` | Responsible AI Use Policy | AI capabilities, provider processing, human review, assessment limits, academic integrity and reporting |
+
+Compatibility aliases redirect `/terms-and-conditions` to `/terms`,
+`/privacy-policy` to `/privacy`, and `/ai-policy` to `/ai-use`. Login and
+registration display persistent links to all five pages. Registration also links
+the consent text directly to Terms, Privacy, and AI Use.
+
+### Contact form behavior
+
+The Contact form is a controlled React form with visible labels, required-field
+semantics, validation on blur, inline error messages, first-invalid-field focus,
+and a screen-reader status message. It collects a sender name, reply email,
+enquiry topic, and message.
+
+Submitting the form constructs a URL-encoded `mailto:` message addressed to
+`GyanixAiSolutions@gmail.com` and opens the visitor's configured email
+application. It does **not** claim that the website sent or stored the message.
+The user must review the prepared email and press **Send** in their email client.
+
+Direct background delivery from the website is intentionally not implemented
+without credentials. To add it later, configure a transactional email provider
+or Gmail SMTP/App Password on the backend, keep credentials only in `.env`, add
+rate limiting and abuse protection, and update the Privacy Policy before routing
+the form through the server. Do not commit an email password or API key.
+
+### Legal document versioning
+
+The shared constants in `frontend/src/components/LegalDocument.jsx` currently
+publish:
+
+```text
+Policy version: 1.0.0
+Effective date: 18 July 2026
+```
+
+Use semantic versions for future legal revisions:
+
+- **Patch** (`1.0.1`) — spelling, formatting, or clarification that does not
+  change meaning.
+- **Minor** (`1.1.0`) — a new disclosure, provider, feature, or user-control
+  section that does not fundamentally replace the agreement.
+- **Major** (`2.0.0`) — a material change to user rights, data use, eligibility,
+  payment terms, dispute terms, or the service relationship.
+
+Before publishing an updated policy, preserve the previous text and its
+effective date, update the shared version constants, ensure registration points
+to the current routes, and record the accepted policy version once persisted
+consent records are implemented. The current text is an engineering-aligned
+draft and should receive review by qualified Indian legal counsel before being
+treated as legal sign-off.
+
+### Privacy and AI disclosures represented in the pages
+
+The policies intentionally match current code behavior:
+
+- Profile/access inputs can include name, email, selected role, class, medium,
+  and the access form fields.
+- VidyaAI stores raw questions, generated answers, sources, quiz answers and
+  scores, weak-topic signals, feedback, timestamps, and related learning
+  records in its operational data flows.
+- Relevant prompts, recent conversation context, selected class/subject,
+  retrieved source excerpts, teacher instructions, and some learning signals
+  may be sent to Groq-hosted AI models. Account names and email addresses are
+  not deliberately appended, but anything typed into free text may be sent.
+- Authorised administrators can view operational, profile, learning, quiz, and
+  feedback information for support, analytics, moderation, and review.
+- Conversations can become candidates for authorised human review and
+  controlled product-improvement exports. Common email/mobile patterns and
+  internal identifiers are minimised in the candidate workflow, but arbitrary
+  free text is not guaranteed to be anonymous.
+- A conversation does not automatically retrain model weights.
+- Browser local storage contains the access token, role, language and study
+  preferences; the teacher workspace can also retain a limited recent-resource
+  history. Logging out removes the token and role but may leave preferences or
+  locally saved resources until site data is cleared.
+- No application code currently implements advertising cookies, targeted ads,
+  payment collection, precise location, camera/microphone access, or answer-sheet
+  uploads.
+
+### Current compliance and product gaps
+
+Publishing a policy does not itself implement the described user controls. The
+following engineering work remains required:
+
+- `/auth/register` does not persist credentials and `/auth/login` does not
+  verify the submitted password; see
+  [Authentication, Authorization, and Privacy Boundaries](#authentication-authorization-and-privacy-boundaries).
+- There is no in-product age gate, verified parental-consent flow, or persisted
+  policy-acceptance record.
+- There is no self-service access, correction, export, consent-withdrawal, or
+  account-deletion dashboard. Requests currently go to the official email.
+- There is no automated record-retention scheduler, so the policy does not
+  promise unsupported deletion intervals.
+- A server-side contact endpoint requires an email provider, secret management,
+  rate limiting, spam protection, and delivery/error monitoring.
+
+### Validation
+
+The public pages are route-level lazy-loaded React components. The completed
+implementation was checked with:
+
+```bash
+cd frontend
+npm run build
+
+cd ..
+backend/.venv311/bin/python -m unittest discover -s backend/tests -p 'test_*.py'
+git diff --check
+```
+
+The initial implementation passed the Vite production build, all 69 backend
+tests, route/asset HTTP checks, desktop and responsive visual review, and the
+repository whitespace check.
 
 ---
 
@@ -1066,5 +1240,9 @@ Every implementation change must include a corresponding update to this `README.
 - **Estimated study time** — Calculated from session timestamps with a gap-based heuristic (≤8 min per gap). Not a direct time-on-page measurement.
 - **Admin email-only access** — Admin status is determined by email address in `ADMIN_EMAILS` env var, not a DB column. To add admins, update `.env` and rebuild the backend container.
 - **Development-only role selection** — Student/teacher role is selected during login and signed into the JWT, but it is not yet verified against a persisted user record. Production must require administrator approval or an institution invite for teacher accounts.
+- **No child-consent workflow yet** — The policy discloses supervised use for people under 18, but registration does not yet implement age verification, verifiable parental consent, or a persisted consent record.
+- **No self-service privacy controls yet** — Access, correction, export, consent withdrawal, and deletion requests currently rely on `GyanixAiSolutions@gmail.com`; automated retention and account-deletion workflows are not implemented.
+- **Contact uses the visitor's email client** — The public Contact form prepares a `mailto:` message. Server-side delivery requires SMTP or a transactional email service plus abuse protection and secret configuration.
+- **Legal drafts require counsel review** — Terms, Privacy, and AI Use are versioned engineering-aligned drafts, not a substitute for review by qualified legal counsel.
 - **Teacher outputs are drafts** — Generated curricula, papers, answer keys, and teaching guides require teacher review against the latest CGBSE syllabus and textbook. Recent teacher resources currently live only in browser local storage.
 - **Single Qdrant collection** — All subjects share `cgbse_knowledge`. Subject filtering is done at scoring time, not at vector DB query time.
