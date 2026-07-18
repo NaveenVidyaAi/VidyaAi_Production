@@ -151,6 +151,7 @@ AI_Assistant_cgbse/
 │       │   ├── BrandMark.jsx         ← VidyaAI lockup with configurable semantic tagline
 │       │   ├── Icon.jsx              ← Shared SVG icon set
 │       │   ├── LegalDocument.jsx     ← Versioned legal-page structure and section navigation
+│       │   ├── CompanyLegalFooter.jsx ← Shared company/legal links for auth and role workspaces
 │       │   ├── PublicLayout.jsx      ← Company header, navigation, footer, SEO and focus handling
 │       │   └── RichMarkdown.jsx      ← Markdown, Mermaid, tables, and Venn rendering
 │       │
@@ -478,8 +479,14 @@ multilingual interfaces, and production software.
 
 Compatibility aliases redirect `/terms-and-conditions` to `/terms`,
 `/privacy-policy` to `/privacy`, and `/ai-policy` to `/ai-use`. Login and
-registration display persistent links to all five pages. Registration also links
-the consent text directly to Terms, Privacy, and AI Use.
+registration display persistent links to all five pages. The same compact footer
+is available at the end of the Student Quiz, PYQ, and Study Plan sections and
+below the active Teacher mode workspace, using the shared
+`frontend/src/components/CompanyLegalFooter.jsx` component. It is intentionally
+excluded from the fixed Student AI Chat transcript so company links never sit
+between the conversation and its prompt composer. Teacher mode places it inside
+the main document flow. Registration also links the consent text directly to
+Terms, Privacy, and AI Use.
 
 ### Contact form behavior
 

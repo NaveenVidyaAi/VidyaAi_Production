@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../api/client";
 import BrandMark from "../components/BrandMark";
+import CompanyLegalFooter from "../components/CompanyLegalFooter";
 import Icon from "../components/Icon";
 
 export default function Login() {
@@ -130,16 +131,7 @@ export default function Login() {
         </section>
       </main>
 
-      <footer className="auth-public-footer">
-        <span>VidyaAI by Gyanix AI Solutions</span>
-        <nav aria-label="Company and legal links">
-          <Link to="/about">About</Link>
-          <Link to="/contact">Contact</Link>
-          <Link to="/terms">Terms</Link>
-          <Link to="/privacy">Privacy</Link>
-          <Link to="/ai-use">AI Use</Link>
-        </nav>
-      </footer>
+      <CompanyLegalFooter className="auth-public-footer" />
     </div>
   );
 }

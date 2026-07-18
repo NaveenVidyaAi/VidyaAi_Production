@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/client";
 import BrandMark from "../components/BrandMark";
+import CompanyLegalFooter from "../components/CompanyLegalFooter";
 import Icon from "../components/Icon";
 import RichMarkdown from "../components/RichMarkdown";
 import { assessmentPapers } from "../data/assessmentPapers";
@@ -476,6 +477,8 @@ export default function TeacherDashboard() {
             </div>
           </section>
         )}
+
+        <CompanyLegalFooter className="workspace-public-footer teacher-public-footer" />
       </main>
 
       <TeacherInsightsRail

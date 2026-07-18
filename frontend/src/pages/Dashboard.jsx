@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import RichMarkdown from "../components/RichMarkdown";
 import api from "../api/client";
+import CompanyLegalFooter from "../components/CompanyLegalFooter";
 import Icon from "../components/Icon";
 import { assessmentPapers } from "../data/assessmentPapers";
 
@@ -1108,16 +1109,7 @@ export default function Dashboard() {
       <section className="dashboard-main-chat" id="student-main" tabIndex="-1">
         <header className={`dashboard-main-top ${showProfileMenu ? "profile-menu-open" : ""}`}>
           <div className="header-left-cluster">
-            <div className="top-wordmark">Vidya AI</div>
-
             <div className="dashboard-title-block">
-              <div className="lesson-breadcrumb">
-                <span>{subjects.find((subject) => subject.id === selectedSubject)?.en || selectedSubject}</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="m9 18 6-6-6-6" />
-                </svg>
-                <strong>{selectedSubject === "Science" ? "Light Reflection" : lang === "hi" ? "Board Prep" : "Board Prep"}</strong>
-              </div>
               <h1>{lang === "hi" ? "नमस्ते, " : "Hello, "}<span>{studentName}</span></h1>
               <div className="student-tags">
                 <span>कक्षा {studentProfile?.class_level || "10"}</span>
@@ -1572,6 +1564,7 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
+              <CompanyLegalFooter className="workspace-public-footer" />
             </div>
           )}
 
@@ -1643,6 +1636,7 @@ export default function Dashboard() {
                   <span>Add PDFs under frontend/public/pyq and register them in the PYQ catalog to enable open/download buttons.</span>
                 </div>
               )}
+              <CompanyLegalFooter className="workspace-public-footer" />
             </div>
           )}
 
@@ -1719,6 +1713,7 @@ export default function Dashboard() {
                   <span>Choose your subjects, available time, weekly routine, and personal goal. The plan will follow your choices.</span>
                 </div>
               )}
+              <CompanyLegalFooter className="workspace-public-footer" />
             </div>
           )}
 

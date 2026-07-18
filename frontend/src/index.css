@@ -1359,48 +1359,6 @@ button:disabled {
   min-width: 0;
 }
 
-.top-wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: fit-content;
-  color: rgba(255, 255, 255, 0.76);
-  font-size: 0.78rem;
-  font-weight: 1000;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.top-wordmark::before {
-  content: "";
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #7dd3fc;
-  box-shadow: 0 0 0 6px rgba(125, 211, 252, 0.14);
-}
-
-.lesson-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.82rem;
-  font-weight: 900;
-}
-
-.lesson-breadcrumb span,
-.lesson-breadcrumb strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lesson-breadcrumb strong {
-  color: #fff;
-}
-
 .dashboard-title-block {
   min-width: 0;
 }
@@ -4669,7 +4627,6 @@ button:disabled {
   padding-block: 22px;
 }
 
-.top-wordmark::before { background: #c4b5fd; box-shadow: 0 0 0 6px rgba(196,181,253,0.16); }
 .dashboard-title-block h1 span { color: #ddd6fe; }
 .header-language-switch.hindi span:first-child,
 .header-language-switch.english span:last-child { color: var(--brand-strong); }
@@ -6747,25 +6704,39 @@ button:active:not(:disabled) { transform: scale(0.98); }
 .legal-callout { margin: 22px 0; border: 1px solid rgba(124, 58, 237, 0.17); border-left: 4px solid var(--brand); border-radius: 4px 15px 15px 4px; background: var(--brand-soft); color: var(--muted); padding: 18px 20px; line-height: 1.7; }
 .legal-callout strong { color: var(--ink); }
 
-.auth-public-footer {
+.company-legal-footer {
   position: relative;
   z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
+  border-top: 1px solid rgba(114, 91, 165, 0.14);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.auth-public-footer {
   width: min(1260px, calc(100% - 64px));
   margin: 10px auto 0;
-  border-top: 1px solid rgba(114, 91, 165, 0.14);
   padding: 18px 0 24px;
   color: #716a82;
-  font-size: 0.73rem;
 }
-.auth-public-footer > span { font-weight: 800; }
-.auth-public-footer nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px 15px; }
-.auth-public-footer a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; font-weight: 800; text-decoration: none; }
-.auth-public-footer a:hover { color: var(--brand-strong); }
+.workspace-public-footer {
+  flex: 0 0 auto;
+  width: 100%;
+  margin-top: clamp(34px, 5vw, 64px);
+  padding: 20px 0 10px;
+}
+.teacher-public-footer { margin-top: 56px; }
+.company-legal-footer > span { font-weight: 800; }
+.company-legal-footer nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px 15px; }
+.company-legal-footer a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; font-weight: 800; text-decoration: none; }
+.company-legal-footer a:hover { color: var(--brand-strong); }
 .register-consent a { color: inherit; font-weight: 1000; text-decoration: underline; text-underline-offset: 2px; }
+
+@media print {
+  .workspace-public-footer { display: none !important; }
+}
 
 @media (hover: hover) {
   .principles-grid article { transition: border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease; }
@@ -6803,8 +6774,10 @@ button:active:not(:disabled) { transform: scale(0.98); }
   .contact-layout { grid-template-columns: 1fr; }
   .contact-details { position: static; }
   .legal-page { padding-right: 18px; padding-left: 18px; }
-  .auth-public-footer { align-items: flex-start; flex-direction: column; width: calc(100% - 36px); }
-  .auth-public-footer nav { justify-content: flex-start; }
+  .company-legal-footer { align-items: flex-start; flex-direction: column; }
+  .company-legal-footer nav { justify-content: flex-start; }
+  .auth-public-footer { width: calc(100% - 36px); }
+  .workspace-public-footer { margin-top: 34px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 }
 
 @media (max-width: 520px) {
