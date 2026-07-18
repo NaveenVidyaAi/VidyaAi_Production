@@ -145,9 +145,15 @@ AI_Assistant_cgbse/
 │           └── AdminDashboard.jsx   ← Admin analytics page (table + charts + drawer)
 │
 ├── ingestion/
-│   ├── ingest.py                    ← PDF → chunks → Qdrant pipeline
+│   ├── document_catalog.py          ← Immutable document/version/checksum governance
+│   ├── document_catalog.json        ← Versioned source-of-truth for documents
+│   ├── ingest.py                    ← Catalog-aware PDF → chunks → Qdrant pipeline
+│   ├── qdrant_exports/              ← Versioned vector datasets + manifests
 │   └── data/
-│       └── textbooks/               ← Place PDF files here for ingestion
+│       ├── documents/               ← Active curricula and model-paper sources
+│       ├── Previous_Year_Questions/ ← Exact student download/practice papers
+│       ├── textbooks/               ← Legacy textbook sources
+│       └── archive/                 ← Preserved sources excluded from retrieval
 │
 └── training/
     ├── hybrid_adaptive_system.py    ← Hybrid fine-tuned vs Groq router
@@ -348,6 +354,21 @@ docker compose -f docker-compose.prod.yml exec backend \
   --port 6333
 ```
 
+Import the versioned teacher-resource dataset after the same deployment. Its
+sidecar manifest locks the JSONL checksum and records 173 real-embedding points
+from 12 curriculum/model-paper documents:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend \
+  python -m ingestion.ingest --prune-archived
+
+docker compose -f docker-compose.prod.yml exec backend \
+  python -m ingestion.import_qdrant \
+  --input ingestion/qdrant_exports/teacher_resources_catalog-v1.0.1.jsonl \
+  --host qdrant \
+  --port 6333
+```
+
 To verify the import, check the backend can still reach Qdrant and inspect logs:
 
 ```bash
@@ -415,6 +436,39 @@ backend/.venv311/bin/python -m ingestion.ingest --file "Class_X_Hindi_Chapter_1.
 - `Class10 - Hindi.pdf` (full book — legacy font encoded, partially garbled)
 
 **Note on Hindi PDFs:** PDFs using Kruti Dev or other legacy font encodings will produce garbled text (not proper Unicode Devanagari). Use chapter-level PDFs with proper Unicode fonts for best quality. Token-overlap scoring still partially works on garbled text.
+
+### Versioned document governance
+
+All curriculum, assessment, PYQ, and textbook sources are checksum locked in
+`ingestion/document_catalog.json`. New managed files use canonical names such as
+`cgbse-class-10-science-curriculum-2026-27-v1.0.0.pdf`. Never edit a managed PDF
+in place: add a new semantic version, supersede the old catalog record, and bump
+the catalog version. Validation fails if a PDF or its student-facing delivery
+copy changes without an explicit version update.
+
+```bash
+# Validate all cataloged documents and delivery copies
+backend/.venv311/bin/python -m ingestion.document_catalog validate
+
+# Inspect extraction/chunking without writing vectors
+backend/.venv311/bin/python -m ingestion.ingest \
+  --all-active \
+  --document-type curriculum \
+  --document-type model_question_paper \
+  --dry-run
+
+# Ingest only the active teacher-resource versions
+backend/.venv311/bin/python -m ingestion.ingest \
+  --all-active \
+  --document-type curriculum \
+  --document-type model_question_paper
+```
+
+Each Qdrant point records its document ID/version, catalog version, academic
+year, authority, document type, source checksum, and active-version status.
+Imports delete older active vectors for the same logical document before
+upserting the new version. See `ingestion/data/README.md` for naming and semantic
+version rules.
 
 ---
 
@@ -941,13 +995,14 @@ flowchart LR
     Check -->|No| Normalize[Unicode/text normalization]
     Tess --> Normalize
     Normalize --> Meta[Infer class, subject, chapter,<br/>topic, set/year and content type]
-    Meta --> Chunk[Lesson-aware overlapping chunks]
+    Meta --> Catalog[Resolve document ID, version,<br/>authority and checksum]
+    Catalog --> Chunk[Lesson-aware overlapping chunks]
     Chunk --> Vector[384-dimensional embedding]
-    Vector --> Replace[Delete points for the same source_file]
+    Vector --> Replace[Delete the older active version<br/>for the same document ID]
     Replace --> Upsert[Stable-ID upsert to<br/>cgbse_knowledge]
 ```
 
-The ingestion script is idempotent per filename: re-ingesting a PDF deletes its previous points before inserting the new set. In production, Qdrant unavailability stops ingestion to avoid writing to an accidental local store. In development, both ingestion and retrieval can use `qdrant_storage_local` as a fallback.
+The ingestion script is idempotent per logical document version. A checksum mismatch is rejected, and ingesting a newer active version deletes older vectors for that document ID before inserting stable versioned point IDs. Source-file history remains on disk and in the catalog. In production, Qdrant unavailability stops ingestion to avoid writing to an accidental local store. In development, both ingestion and retrieval can use `qdrant_storage_local` as a fallback.
 
 ### Safe Continuous-Improvement Flow
 

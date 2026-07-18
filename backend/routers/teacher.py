@@ -59,7 +59,13 @@ def _chapter_hint(value: str) -> str | None:
     return match.group(1) if match else None
 
 
-def _grounding_context(*, class_level: str, subject: str, query: str) -> tuple[str, list[str]]:
+def _grounding_context(
+    *,
+    class_level: str,
+    subject: str,
+    query: str,
+    document_type_boosts: dict[str, float],
+) -> tuple[str, list[str]]:
     try:
         rows = _retrieve_context(
             question=query,
@@ -68,11 +74,38 @@ def _grounding_context(*, class_level: str, subject: str, query: str) -> tuple[s
             weak_topics=[],
             chapter_hint=_chapter_hint(query),
             section_hint=None,
-            limit=4,
+            limit=24,
+            document_type_boosts=document_type_boosts,
+            strict_subject=True,
         )
     except Exception:
         logger.exception("Teacher resource retrieval failed")
         return "", []
+    # Preserve evidence diversity: a paper request should see both the official
+    # model pattern and curriculum scope instead of eight adjacent chunks from
+    # whichever single PDF scored highest.
+    selected_rows = []
+    selected_ids = set()
+    for document_type, boost in sorted(document_type_boosts.items(), key=lambda item: item[1], reverse=True):
+        if boost <= 0:
+            continue
+        label_token = document_type.replace("_", " ").lower()
+        match = next(
+            (row for row in rows if row[1] not in selected_ids and label_token in (row[3] or "").lower()),
+            None,
+        )
+        if match:
+            selected_rows.append(match)
+            selected_ids.add(match[1])
+    for row in rows:
+        if row[1] in selected_ids:
+            continue
+        selected_rows.append(row)
+        selected_ids.add(row[1])
+        if len(selected_rows) >= 8:
+            break
+    rows = selected_rows[:8]
+
     if not _retrieval_match_is_strong(rows, subject):
         return "", []
     blocks = [f"[Source: {row[3]}]\n{row[0]}" for row in rows]
@@ -144,7 +177,19 @@ Return polished Markdown only. Make it classroom-ready, specific, inclusive, and
 @router.post("/curriculum")
 async def create_curriculum(payload: CurriculumRequest, teacher=Depends(require_teacher)):
     query = f"Class {payload.class_level} {payload.subject} curriculum {payload.chapters} {payload.learning_goals}"
-    context, sources = _grounding_context(class_level=payload.class_level, subject=payload.subject, query=query)
+    context, sources = _grounding_context(
+        class_level=payload.class_level,
+        subject=payload.subject,
+        query=query,
+        document_type_boosts={
+            "learning_outcome": 10.0,
+            "curriculum": 8.0,
+            "academic_calendar": 7.0,
+            "textbook": 3.0,
+            "model_question_paper": 1.0,
+            "previous_year_question": 0.5,
+        },
+    )
     details = (
         f"Class: {payload.class_level}\nSubject: {payload.subject}\nMedium: {payload.medium}\n"
         f"Duration: {payload.duration_weeks} weeks\nPeriods per week: {payload.periods_per_week}\n"
@@ -167,7 +212,20 @@ async def create_curriculum(payload: CurriculumRequest, teacher=Depends(require_
 @router.post("/test-paper")
 async def create_test_paper(payload: TestPaperRequest, teacher=Depends(require_teacher)):
     query = f"Class {payload.class_level} {payload.subject} {payload.syllabus} important questions"
-    context, sources = _grounding_context(class_level=payload.class_level, subject=payload.subject, query=query)
+    context, sources = _grounding_context(
+        class_level=payload.class_level,
+        subject=payload.subject,
+        query=query,
+        document_type_boosts={
+            "marking_scheme": 11.0,
+            "assessment_blueprint": 10.0,
+            "model_question_paper": 9.0,
+            "answer_key": 8.0,
+            "curriculum": 6.0,
+            "previous_year_question": 4.0,
+            "textbook": 2.0,
+        },
+    )
     details = (
         f"Class: {payload.class_level}\nSubject: {payload.subject}\nMedium: {payload.medium}\n"
         f"Paper type: {payload.paper_type}\nSyllabus: {payload.syllabus}\nTotal marks: {payload.total_marks}\n"
@@ -191,7 +249,19 @@ async def create_test_paper(payload: TestPaperRequest, teacher=Depends(require_t
 @router.post("/lesson-guide")
 async def create_lesson_guide(payload: LessonGuideRequest, teacher=Depends(require_teacher)):
     query = f"Class {payload.class_level} {payload.subject} {payload.chapter_or_topic} explain concepts examples"
-    context, sources = _grounding_context(class_level=payload.class_level, subject=payload.subject, query=query)
+    context, sources = _grounding_context(
+        class_level=payload.class_level,
+        subject=payload.subject,
+        query=query,
+        document_type_boosts={
+            "teacher_guide": 10.0,
+            "textbook": 8.0,
+            "learning_outcome": 6.0,
+            "curriculum": 4.0,
+            "model_question_paper": 1.0,
+            "previous_year_question": 0.5,
+        },
+    )
     details = (
         f"Class: {payload.class_level}\nSubject: {payload.subject}\nTopic/chapter: {payload.chapter_or_topic}\n"
         f"Medium: {payload.medium}\nLesson length: {payload.lesson_minutes} minutes\n"

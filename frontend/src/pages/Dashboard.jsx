@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import RichMarkdown from "../components/RichMarkdown";
 import api from "../api/client";
 import Icon from "../components/Icon";
+import { assessmentPapers } from "../data/assessmentPapers";
 
 const translations = {
   hi: {
@@ -265,198 +266,7 @@ const pyqStyleQuestionsBySubject = {
   ],
 };
 
-const pyqPapers = [
-  {
-    title: "Class 10 English PYQ 2026 Set A",
-    classLevel: "10",
-    subject: "English",
-    year: "2026",
-    set: "A",
-    medium: "English",
-    fileUrl: "/pyq/class_10_english_PYQ26_SET_A.pdf",
-  },
-  {
-    title: "Class 10 English PYQ 2025 Set A",
-    classLevel: "10",
-    subject: "English",
-    year: "2025",
-    set: "A",
-    medium: "English",
-    fileUrl: "/pyq/class_10_english_PYQ25_SET_A.pdf",
-  },
-  {
-    title: "Class 10 Hindi PYQ 2025 Set B",
-    classLevel: "10",
-    subject: "Hindi",
-    year: "2025",
-    set: "B",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_hindi_PYQ25_SET_B.pdf",
-  },
-  {
-    title: "Class 10 Hindi PYQ 2025 Set C",
-    classLevel: "10",
-    subject: "Hindi",
-    year: "2025",
-    set: "C",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_hindi_PYQ25_SET_C.pdf",
-  },
-  {
-    title: "Class 10 Math PYQ 2025 Set A",
-    classLevel: "10",
-    subject: "Math",
-    year: "2025",
-    set: "A",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_math_PYQ25_SET_A.pdf",
-  },
-  {
-    title: "Class 10 Sanskrit PYQ 2025 Set A",
-    classLevel: "10",
-    subject: "Sanskrit",
-    year: "2025",
-    set: "A",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_sanskrit_PYQ25_SET_A.pdf",
-  },
-  {
-    title: "Class 10 Science PYQ 2025 Set A",
-    classLevel: "10",
-    subject: "Science",
-    year: "2025",
-    set: "A",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_science_PYQ25_SET_A.pdf",
-  },
-  {
-    title: "Class 10 Social Science PYQ 2025 Set A",
-    classLevel: "10",
-    subject: "Social Science",
-    year: "2025",
-    set: "A",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_social_science_PYQ25_SET_A.pdf",
-  },
-  {
-    title: "Class 10 Hindi PYQ 2024 Set A",
-    classLevel: "10",
-    subject: "Hindi",
-    year: "2024",
-    set: "A",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_hindi_PYQ24_SET_A.pdf",
-  },
-  {
-    title: "Class 10 Hindi PYQ 2024 Set A 2",
-    classLevel: "10",
-    subject: "Hindi",
-    year: "2024",
-    set: "A 2",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_hindi_PYQ24_SET_A_2.pdf",
-  },
-  {
-    title: "Class 10 Hindi PYQ 2024 Set B",
-    classLevel: "10",
-    subject: "Hindi",
-    year: "2024",
-    set: "B",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_hindi_PYQ24_SET_B.pdf",
-  },
-  {
-    title: "Class 10 Hindi PYQ 2024 Set C",
-    classLevel: "10",
-    subject: "Hindi",
-    year: "2024",
-    set: "C",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_hindi_PYQ24_SET_C.pdf",
-  },
-  {
-    title: "Class 10 Math PYQ 2024 Set A",
-    classLevel: "10",
-    subject: "Math",
-    year: "2024",
-    set: "A",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_math_PYQ24_SET_A.pdf",
-  },
-  {
-    title: "Class 10 Science PYQ 2024 Set A",
-    classLevel: "10",
-    subject: "Science",
-    year: "2024",
-    set: "A",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_science_PYQ24_SET_A.pdf",
-  },
-  {
-    title: "Class 10 Social Science PYQ 2024 Set C",
-    classLevel: "10",
-    subject: "Social Science",
-    year: "2024",
-    set: "C",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_social_science_PYQ24_SET_C.pdf",
-  },
-  {
-    title: "Class 10 Hindi PYQ 2023 Set A",
-    classLevel: "10",
-    subject: "Hindi",
-    year: "2023",
-    set: "A",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_hindi_PYQ23_SET_A.pdf",
-  },
-  {
-    title: "Class 10 Hindi PYQ 2023 Set A 2",
-    classLevel: "10",
-    subject: "Hindi",
-    year: "2023",
-    set: "A 2",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_hindi_PYQ23_SET_A_2.pdf",
-  },
-  {
-    title: "Class 10 Hindi PYQ 2023 Set B",
-    classLevel: "10",
-    subject: "Hindi",
-    year: "2023",
-    set: "B",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_hindi_PYQ23_SET_B.pdf",
-  },
-  {
-    title: "Class 10 Math PYQ 2023 Set A",
-    classLevel: "10",
-    subject: "Math",
-    year: "2023",
-    set: "A",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_math_PYQ23_SET_A.pdf",
-  },
-  {
-    title: "Class 10 Science PYQ 2023 Set A",
-    classLevel: "10",
-    subject: "Science",
-    year: "2023",
-    set: "A",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_science_PYQ23_SET_A.pdf",
-  },
-  {
-    title: "Class 10 Social Science PYQ 2023 Set A",
-    classLevel: "10",
-    subject: "Social Science",
-    year: "2023",
-    set: "A",
-    medium: "Hindi",
-    fileUrl: "/pyq/class_10_social_science_PYQ23_SET_A.pdf",
-  },
-];
-
+const pyqPapers = assessmentPapers;
 const dateKey = (date = new Date()) => date.toISOString().slice(0, 10);
 
 const addDays = (date, days) => {
@@ -1369,7 +1179,14 @@ export default function Dashboard() {
             </div>
 
             {showProfileMenu && (
-              <div className="mobile-profile-menu" id="student-profile-menu" role="dialog" aria-label={t.profileTitle}>
+              <>
+                <button
+                  type="button"
+                  className="mobile-profile-backdrop"
+                  onClick={() => setShowProfileMenu(false)}
+                  aria-label={lang === "hi" ? "प्रोफाइल बंद करें" : "Close profile"}
+                />
+                <div className="mobile-profile-menu" id="student-profile-menu" role="dialog" aria-modal="true" aria-label={t.profileTitle}>
                 <div className="mobile-profile-menu-head">
                   <strong>{studentName}</strong>
                   <span>{isGuest ? t.profileLabels.guest : t.profileLabels.loggedIn}</span>
@@ -1449,7 +1266,8 @@ export default function Dashboard() {
                     Logout
                   </button>
                 )}
-              </div>
+                </div>
+              </>
             )}
           </div>
         </header>

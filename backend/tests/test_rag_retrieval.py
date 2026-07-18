@@ -62,6 +62,94 @@ class RAGRetrievalTests(unittest.TestCase):
         self.assertTrue(sources)
         self.assertIsNotNone(client.filter)
 
+    def test_exact_paper_retrieval_accepts_versioned_model_paper(self):
+        source_file = "cgbse-class-10-science-model-paper-2025-26-v1.0.0.pdf"
+        model_point = FakePoint(
+            {
+                "subject": "Science",
+                "document_type": "model_question_paper",
+                "source_file": source_file,
+                "document_version": "1.0.0",
+            },
+            "Model question: Explain the reaction of acids with metals using a balanced equation.",
+        )
+        client = FakePyqClient([model_point])
+        original_client = rag._get_qdrant_client
+        try:
+            rag._get_qdrant_client = lambda: client
+            text, sources = rag.retrieve_pyq_paper_text("Science", source_file)
+        finally:
+            rag._get_qdrant_client = original_client
+
+        self.assertIn("Model question", text)
+        self.assertTrue(any("v1.0.0" in source for source in sources))
+
+    def test_teacher_document_type_boost_prioritizes_model_papers(self):
+        fake_client = FakeClient([
+            FakePoint(
+                {"subject": "Science", "class": "10", "document_type": "textbook"},
+                "Class 10 Science acids bases important questions and examples.",
+            ),
+            FakePoint(
+                {"subject": "Science", "class": "10", "document_type": "model_question_paper"},
+                "Class 10 Science acids bases important questions and examples.",
+            ),
+        ])
+        original_client_factory = rag._get_qdrant_client
+        original_mock = rag.embedding_service.use_mock
+        rag._get_qdrant_client = lambda: fake_client
+        rag.embedding_service.use_mock = True
+        try:
+            results = rag._retrieve_context(
+                question="Class 10 Science acids bases important questions",
+                subject="Science",
+                class_level="10",
+                weak_topics=[],
+                chapter_hint=None,
+                section_hint=None,
+                limit=2,
+                document_type_boosts={"model_question_paper": 8.0, "textbook": 1.0},
+            )
+        finally:
+            rag._get_qdrant_client = original_client_factory
+            rag.embedding_service.use_mock = original_mock
+
+        self.assertIn("Model Question Paper", results[0][3])
+
+    def test_teacher_strict_subject_excludes_other_subject_model_papers(self):
+        fake_client = FakeClient([
+            FakePoint(
+                {"subject": "Science", "class": "10", "document_type": "model_question_paper"},
+                "Class 10 model paper important questions and blueprint.",
+            ),
+            FakePoint(
+                {"subject": "Hindi", "class": "10", "document_type": "curriculum"},
+                "Class 10 Hindi model paper important questions and blueprint.",
+            ),
+        ])
+        original_client_factory = rag._get_qdrant_client
+        original_mock = rag.embedding_service.use_mock
+        rag._get_qdrant_client = lambda: fake_client
+        rag.embedding_service.use_mock = True
+        try:
+            results = rag._retrieve_context(
+                question="Class 10 Hindi model paper important questions",
+                subject="Hindi",
+                class_level="10",
+                weak_topics=[],
+                chapter_hint=None,
+                section_hint=None,
+                limit=4,
+                document_type_boosts={"model_question_paper": 20.0, "curriculum": 1.0},
+                strict_subject=True,
+            )
+        finally:
+            rag._get_qdrant_client = original_client_factory
+            rag.embedding_service.use_mock = original_mock
+
+        self.assertEqual(len(results), 1)
+        self.assertIn("Hindi", results[0][3])
+
     def test_hinglish_subject_terms_override_selected_subject(self):
         cases = {
             "ganit ka quadratic equation solve karo": "Math",

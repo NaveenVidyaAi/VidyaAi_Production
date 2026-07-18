@@ -1280,6 +1280,9 @@ def _format_source_label(payload: dict, source_id: str) -> str:
     chapter = str(payload.get("chapter", "")).strip()
     topic = _clean_metadata_text(str(payload.get("topic", "")).strip())
     source_file = str(payload.get("source_file", "")).strip()
+    document_type = str(payload.get("document_type", "")).strip().replace("_", " ")
+    document_version = str(payload.get("document_version", "")).strip()
+    academic_year = str(payload.get("academic_year", "")).strip()
 
     parts = []
     if subject:
@@ -1288,6 +1291,12 @@ def _format_source_label(payload: dict, source_id: str) -> str:
         parts.append(f"Chapter: {chapter}")
     if topic:
         parts.append(f"Topic: {topic}")
+    if document_type:
+        parts.append(document_type.title())
+    if academic_year:
+        parts.append(academic_year)
+    if document_version:
+        parts.append(f"v{document_version}")
     if source_file:
         parts.append(source_file)
 
@@ -1319,17 +1328,14 @@ def _get_qdrant_client() -> QdrantClient:
 
 
 def retrieve_pyq_paper_text(subject: str, source_file: str, limit: int = 8) -> tuple[str, list[str]]:
-    """Load chunks only from the exact ingested PYQ PDF selected by the student."""
+    """Load chunks only from the exact ingested PYQ or model paper selected by the student."""
     expected_file = os.path.basename(str(source_file or "").strip())
     if not expected_file:
         return "", []
     client = _get_qdrant_client()
     points, _ = client.scroll(
         collection_name=COLLECTION_NAME,
-        scroll_filter=Filter(must=[
-            FieldCondition(key="source_file", match=MatchValue(value=expected_file)),
-            FieldCondition(key="content_type", match=MatchValue(value="previous_year_question")),
-        ]),
+        scroll_filter=Filter(must=[FieldCondition(key="source_file", match=MatchValue(value=expected_file))]),
         with_payload=True,
         with_vectors=False,
         limit=max(1, min(limit, 20)),
@@ -1338,6 +1344,9 @@ def retrieve_pyq_paper_text(subject: str, source_file: str, limit: int = 8) -> t
     labels: list[str] = []
     for point in points:
         payload = point.payload or {}
+        document_type = str(payload.get("document_type") or payload.get("content_type") or "")
+        if document_type not in {"previous_year_question", "model_question_paper"}:
+            continue
         payload_subject = str(payload.get("subject") or "")
         if subject and payload_subject and payload_subject.lower() != subject.lower():
             continue
@@ -1401,6 +1410,8 @@ def _retrieve_context(
     chapter_hint: str | None,
     section_hint: str | None,
     limit: int = 4,
+    document_type_boosts: dict[str, float] | None = None,
+    strict_subject: bool = False,
 ) -> list[tuple[str, str, float, str]]:
     client = _get_qdrant_client()
     q_tokens = _tokenize(question)
@@ -1443,10 +1454,20 @@ def _retrieve_context(
         payload_topic = str(payload.get("topic", "")).lower()
         payload_chapter = str(payload.get("chapter", "")).strip()
         content_type = str(payload.get("content_type", "")).lower()
+        document_type = str(payload.get("document_type", content_type)).lower()
+
+        if payload.get("is_active_version") is False or str(payload.get("document_status", "active")).lower() != "active":
+            continue
 
         p_tokens = _tokenize(text)
         overlap = len(q_tokens.intersection(p_tokens))
         score = float(overlap) + (vector_score * 5.0)
+
+        if document_type_boosts:
+            score += float(document_type_boosts.get(document_type, 0.0))
+            authority = str(payload.get("authority", "")).lower()
+            if "cgbse" in authority or "scert" in authority:
+                score += 0.75
 
         for token in q_tokens:
             if token in normalized_text:
@@ -1466,6 +1487,8 @@ def _retrieve_context(
             if inferred_subject and inferred_subject in payload_subject:
                 score += 3.0
             elif inferred_subject and inferred_subject not in payload_subject:
+                if strict_subject:
+                    continue
                 score -= 1.5
         elif inferred_subject in text.lower():
             score += 1.0

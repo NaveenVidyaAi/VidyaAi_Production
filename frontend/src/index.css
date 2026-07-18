@@ -1633,6 +1633,7 @@ button:disabled {
 
 .mobile-brand-mark,
 .mobile-profile-wrap,
+.mobile-profile-backdrop,
 .mobile-profile-menu {
   display: none;
 }
@@ -5994,6 +5995,37 @@ button:active:not(:disabled) { transform: scale(0.98); }
 @media (max-width: 820px) {
   .dashboard-left-nav,
   .dashboard-right-rail { backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+  .mobile-profile-backdrop {
+    position: fixed;
+    z-index: 79;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: rgba(30, 27, 75, 0.42);
+    box-shadow: none;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    cursor: default;
+  }
+
+  .mobile-profile-backdrop:active:not(:disabled) {
+    transform: none;
+  }
+
+  .mobile-profile-menu {
+    z-index: 80;
+    border-color: rgba(255, 255, 255, 0.96);
+    background: linear-gradient(160deg, #fff 0%, #fbfaff 100%);
+    box-shadow: 0 24px 60px rgba(30, 27, 75, 0.24), inset 0 1px 0 #fff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 
   .teacher-sidebar {
     border-bottom-color: rgba(15, 118, 110, 0.15);

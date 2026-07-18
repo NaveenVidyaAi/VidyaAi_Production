@@ -19,6 +19,15 @@ if str(ROOT_DIR) not in sys.path:
 
 from backend.config import settings
 from backend.services.embeddings import embedding_service
+from ingestion.document_catalog import (
+    CATALOG_PATH,
+    ROOT_DIR as CATALOG_ROOT_DIR,
+    active_ingestion_entries,
+    catalog_entry_for_path,
+    file_sha256,
+    load_catalog,
+    validate_catalog,
+)
 
 COLLECTION_NAME = "cgbse_knowledge"
 CHUNK_SIZE = 260
@@ -130,7 +139,42 @@ def _metadata_from_filename(path: str) -> Dict[str, str]:
         "chapter": "",
         "topic": "",
         "subtopic": "",
+        "document_type": "textbook",
+        "document_version": "1.0.0",
     }
+
+    version_match = re.search(r"[-_]v(\d+\.\d+\.\d+)(?:\.pdf)?$", name, flags=re.IGNORECASE)
+    if version_match:
+        meta["document_version"] = version_match.group(1)
+
+    academic_year_match = re.search(r"(20\d{2})[-_](\d{2})", normalized)
+    if academic_year_match:
+        meta["academic_year"] = f"{academic_year_match.group(1)}-{academic_year_match.group(2)}"
+
+    if "curricul" in normalized.lower():
+        meta["document_type"] = "curriculum"
+        meta["content_type"] = "curriculum"
+        meta["topic"] = "Curriculum and assessment blueprint"
+
+    if re.search(r"model[_\s-]*paper|model[_\s-]*question", normalized, flags=re.IGNORECASE):
+        meta["document_type"] = "model_question_paper"
+        meta["content_type"] = "model_question_paper"
+        meta["topic"] = "Model Question Paper"
+
+    managed_type_patterns = (
+        (r"marking[_\s-]*scheme|ank[_\s-]*yojana", "marking_scheme", "Marking Scheme"),
+        (r"answer[_\s-]*key|uttar[_\s-]*mala", "answer_key", "Answer Key"),
+        (r"learning[_\s-]*outcome", "learning_outcome", "Learning Outcomes"),
+        (r"teacher[_\s-]*(?:guide|handbook)", "teacher_guide", "Teacher Guide"),
+        (r"assessment[_\s-]*blueprint|paper[_\s-]*blueprint", "assessment_blueprint", "Assessment Blueprint"),
+        (r"academic[_\s-]*calendar", "academic_calendar", "Academic Calendar"),
+    )
+    for pattern, document_type, topic_label in managed_type_patterns:
+        if re.search(pattern, normalized, flags=re.IGNORECASE):
+            meta["document_type"] = document_type
+            meta["content_type"] = document_type
+            meta["topic"] = topic_label
+            break
 
     is_pyq = bool(
         re.search(r"(?:^|_)pyq(?:_|$|\d)", normalized, flags=re.IGNORECASE)
@@ -138,6 +182,7 @@ def _metadata_from_filename(path: str) -> Dict[str, str]:
         or "previous year" in lower_path
     )
     if is_pyq:
+        meta["document_type"] = "previous_year_question"
         meta["content_type"] = "previous_year_question"
         meta["topic"] = "Previous Year Questions"
 
@@ -186,7 +231,7 @@ def _metadata_from_filename(path: str) -> Dict[str, str]:
     topic = re.sub(r"chapter[_\s]*\d{1,2}", "", topic, flags=re.IGNORECASE)
     topic = re.sub(r"_+", " ", topic).strip(" _")
     generic_topics = {"credits", "subject", "class subject", "ganit", "vigyan"}
-    if topic and topic.lower() not in generic_topics:
+    if topic and topic.lower() not in generic_topics and not meta.get("topic"):
         meta["topic"] = topic.title()
 
     return meta
@@ -412,6 +457,20 @@ def _delete_existing_source(client: QdrantClient, source_file: str) -> None:
     )
 
 
+def _delete_existing_document(client: QdrantClient, document_id: str, source_file: str) -> None:
+    """Replace the active knowledge version while preserving PDF history on disk."""
+    if document_id:
+        client.delete(
+            collection_name=COLLECTION_NAME,
+            points_selector=Filter(
+                must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+            ),
+        )
+    # Remove points created before document_id/version metadata existed.
+    if source_file:
+        _delete_existing_source(client, source_file)
+
+
 def get_qdrant_client() -> QdrantClient:
     try:
         client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port, timeout=5)
@@ -434,16 +493,74 @@ def get_qdrant_client() -> QdrantClient:
         return QdrantClient(path=fallback_path)
 
 
-def ingest_file(path: str, enable_ocr: bool = False):
-    print(f"Extracting text from {path} (OCR {'enabled' if enable_ocr else 'disabled'})...", flush=True)
-    text = extract_text_from_pdf(path, enable_ocr=enable_ocr)
+def _catalog_qdrant_metadata(entry: dict, catalog_version: str) -> Dict[str, str | bool]:
+    metadata: Dict[str, str | bool] = {
+        "document_id": str(entry.get("document_id", "")),
+        "document_version": str(entry.get("version", "1.0.0")),
+        "catalog_version": catalog_version,
+        "source_sha256": str(entry.get("sha256", "")),
+        "board": str(entry.get("board", "CGBSE")),
+        "class": str(entry.get("class", "")),
+        "subject": str(entry.get("subject", "")),
+        "medium": str(entry.get("medium", "")),
+        "academic_year": str(entry.get("academic_year", "")),
+        "document_type": str(entry.get("document_type", "")),
+        "authority": str(entry.get("authority", "")),
+        "document_status": str(entry.get("status", "active")),
+        "is_active_version": entry.get("status") == "active",
+        "source_path": str(entry.get("path", "")),
+    }
+    for key in ("year", "set"):
+        if entry.get(key):
+            metadata[key] = str(entry[key])
+    return {key: value for key, value in metadata.items() if value != ""}
+
+
+def ingest_file(path: str, enable_ocr: bool = False, dry_run: bool = False):
+    resolved_path = str(Path(path).resolve())
+    catalog = load_catalog() if CATALOG_PATH.is_file() else {"catalog_version": "0.0.0", "documents": []}
+    entry = catalog_entry_for_path(resolved_path, catalog)
+    if entry:
+        actual_sha = file_sha256(Path(resolved_path))
+        if actual_sha != entry.get("sha256"):
+            raise RuntimeError(
+                f"Checksum mismatch for {entry['document_id']} v{entry['version']}; "
+                "create a new document version instead of editing the PDF in place"
+            )
+        if entry.get("status") != "active" or not entry.get("ingestion_enabled"):
+            raise RuntimeError(f"Document is not active for ingestion: {entry['document_id']} v{entry['version']}")
+    effective_ocr = enable_ocr or bool(entry and entry.get("ocr_required"))
+    print(f"Extracting text from {path} (OCR {'enabled' if effective_ocr else 'disabled'})...", flush=True)
+    text = extract_text_from_pdf(resolved_path, enable_ocr=effective_ocr)
+    if len(text.strip()) < 100:
+        raise RuntimeError(f"Extracted text is too short for safe ingestion: {path}")
     file_metadata = _metadata_from_filename(path)
+    catalog_metadata = _catalog_qdrant_metadata(entry, str(catalog.get("catalog_version", "0.0.0"))) if entry else {}
+    for key, value in catalog_metadata.items():
+        if value != "":
+            file_metadata[key] = value
     chunks = chunk_text_with_metadata(text, file_metadata)
     print(f"Prepared {len(chunks)} chunks from {path}.", flush=True)
+    source_file = str(entry.get("source_file")) if entry and entry.get("source_file") else os.path.basename(path)
+    summary = {
+        "path": resolved_path,
+        "document_id": str(file_metadata.get("document_id", Path(path).stem)),
+        "document_version": str(file_metadata.get("document_version", "1.0.0")),
+        "document_type": str(file_metadata.get("document_type", "textbook")),
+        "subject": str(file_metadata.get("subject", "")),
+        "source_file": source_file,
+        "chunks": len(chunks),
+        "characters": len(text),
+        "ocr": effective_ocr,
+        "dry_run": dry_run,
+    }
+    if dry_run:
+        print(f"DRY RUN: {summary}", flush=True)
+        return summary
+
     client = get_qdrant_client()
     create_qdrant_collection(client)
-    source_file = os.path.basename(path)
-    _delete_existing_source(client, source_file)
+    _delete_existing_document(client, str(file_metadata.get("document_id", "")), source_file)
     points = []
     for idx, (chunk, base_metadata) in enumerate(chunks):
         metadata = detect_metadata(chunk)
@@ -455,7 +572,12 @@ def ingest_file(path: str, enable_ocr: bool = False):
         metadata["source_file"] = source_file
 
         vector = embedding_service.embed(chunk)
-        stable_id = int(hashlib.sha1(f"{source_file}::{idx}".encode("utf-8")).hexdigest()[:16], 16)
+        identity = (
+            f"{file_metadata.get('document_id', source_file)}::"
+            f"{file_metadata.get('document_version', '1.0.0')}::"
+            f"{file_metadata.get('source_sha256', '')}::{idx}"
+        )
+        stable_id = int(hashlib.sha1(identity.encode("utf-8")).hexdigest()[:16], 16)
         points.append(
             PointStruct(
                 id=stable_id,
@@ -465,14 +587,72 @@ def ingest_file(path: str, enable_ocr: bool = False):
         )
     client.upsert(collection_name=COLLECTION_NAME, points=points)
     print(f"Ingested {len(points)} chunks from {path} into Qdrant.")
+    return summary
+
+
+def prune_archived_documents(catalog: dict | None = None) -> int:
+    """Remove archived/superseded vector sources without deleting source history."""
+    catalog = catalog or load_catalog()
+    client = get_qdrant_client()
+    existing = [collection.name for collection in client.get_collections().collections]
+    if COLLECTION_NAME not in existing:
+        print(f"Collection {COLLECTION_NAME} does not exist; nothing to prune.", flush=True)
+        return 0
+    pruned = 0
+    for entry in catalog.get("documents", []):
+        if entry.get("status") != "archived":
+            continue
+        sources = [str(entry.get("source_file") or ""), *map(str, entry.get("superseded_source_files") or [])]
+        _delete_existing_document(client, str(entry.get("document_id") or ""), sources[0])
+        for source_file in sources[1:]:
+            if source_file:
+                _delete_existing_source(client, source_file)
+        pruned += 1
+    print(f"Pruned vectors for {pruned} archived document records.", flush=True)
+    return pruned
 
 
 def main():
     parser = argparse.ArgumentParser(description="Ingest CGBSE PDF into Qdrant.")
-    parser.add_argument("--file", required=True, help="PDF path, or a filename under ingestion/data/textbooks")
+    selection = parser.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--file", help="PDF path, or a filename under ingestion/data/textbooks")
+    selection.add_argument("--all-active", action="store_true", help="Ingest all active catalog entries")
+    selection.add_argument("--prune-archived", action="store_true", help="Delete vectors for cataloged archived/superseded sources")
+    parser.add_argument(
+        "--document-type",
+        action="append",
+        default=[],
+        help="With --all-active, include only this catalog document type (repeatable)",
+    )
     parser.add_argument("--enable-ocr", action="store_true", help="Render pages and OCR garbled text. Uses much more memory.")
+    parser.add_argument("--dry-run", action="store_true", help="Extract, classify, and chunk without writing to Qdrant")
     args = parser.parse_args()
-    ingest_file(_resolve_ingest_path(args.file), enable_ocr=args.enable_ocr)
+    if args.prune_archived:
+        catalog = load_catalog()
+        errors = validate_catalog(catalog)
+        if errors:
+            raise SystemExit("\n".join(errors))
+        prune_archived_documents(catalog)
+        return
+    if args.all_active:
+        catalog = load_catalog()
+        errors = validate_catalog(catalog)
+        if errors:
+            raise SystemExit("\n".join(errors))
+        entries = active_ingestion_entries(catalog)
+        if args.document_type:
+            allowed = set(args.document_type)
+            entries = [entry for entry in entries if entry.get("document_type") in allowed]
+        if not entries:
+            raise SystemExit("No active catalog documents matched the requested types")
+        for entry in entries:
+            ingest_file(
+                str(CATALOG_ROOT_DIR / entry["path"]),
+                enable_ocr=args.enable_ocr,
+                dry_run=args.dry_run,
+            )
+        return
+    ingest_file(_resolve_ingest_path(args.file), enable_ocr=args.enable_ocr, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

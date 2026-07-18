@@ -70,6 +70,28 @@ class IngestionChunkingTests(unittest.TestCase):
         self.assertEqual(metadata["subject"], "Sanskrit")
         self.assertEqual(metadata["content_type"], "previous_year_question")
 
+    def test_extracts_versioned_model_paper_metadata(self):
+        metadata = _metadata_from_filename(
+            "ingestion/data/documents/model_papers/cgbse-class-10-science-model-paper-2025-26-v1.0.0.pdf"
+        )
+
+        self.assertEqual(metadata["class"], "10")
+        self.assertEqual(metadata["subject"], "Science")
+        self.assertEqual(metadata["document_type"], "model_question_paper")
+        self.assertEqual(metadata["content_type"], "model_question_paper")
+        self.assertEqual(metadata["academic_year"], "2025-26")
+        self.assertEqual(metadata["document_version"], "1.0.0")
+
+    def test_extracts_versioned_curriculum_metadata(self):
+        metadata = _metadata_from_filename(
+            "ingestion/data/documents/curricula/cgbse-class-10-math-curriculum-2026-27-v1.0.0.pdf"
+        )
+
+        self.assertEqual(metadata["subject"], "Math")
+        self.assertEqual(metadata["document_type"], "curriculum")
+        self.assertEqual(metadata["academic_year"], "2026-27")
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,7 +2,7 @@ import argparse
 import json
 
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import Distance, PointStruct, VectorParams
+from qdrant_client.http.models import Distance, FieldCondition, Filter, MatchValue, PointStruct, VectorParams
 
 from ingestion.ingest import COLLECTION_NAME
 
@@ -21,11 +21,55 @@ def _ensure_collection(client: QdrantClient, vector_size: int) -> None:
     )
 
 
-def import_points(input_path: str, host: str, port: int, batch_size: int) -> None:
+def _replace_imported_documents(client: QdrantClient, document_ids: set[str], legacy_sources: set[str]) -> None:
+    for document_id in sorted(document_ids):
+        client.delete(
+            collection_name=COLLECTION_NAME,
+            points_selector=Filter(
+                must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+            ),
+        )
+    for source_file in sorted(legacy_sources):
+        client.delete(
+            collection_name=COLLECTION_NAME,
+            points_selector=Filter(
+                must=[FieldCondition(key="source_file", match=MatchValue(value=source_file))]
+            ),
+        )
+
+
+def import_points(input_path: str, host: str, port: int, batch_size: int, replace_active: bool = True) -> None:
     client = _client(host, port)
     batch: list[PointStruct] = []
     total = 0
     vector_size = None
+    document_versions: dict[str, set[str]] = {}
+    legacy_sources: set[str] = set()
+
+    # Validate the whole package before mutating Qdrant. One import must never
+    # contain competing active versions of the same logical document.
+    with open(input_path, "r", encoding="utf-8") as import_file:
+        for line in import_file:
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            vector = item["vector"]
+            vector_size = vector_size or len(vector)
+            payload = item.get("payload") or {}
+            document_id = str(payload.get("document_id") or "")
+            if document_id:
+                document_versions.setdefault(document_id, set()).add(str(payload.get("document_version") or "0.0.0"))
+            elif payload.get("source_file"):
+                legacy_sources.add(str(payload["source_file"]))
+
+    if vector_size is None:
+        raise ValueError(f"No Qdrant points found in {input_path}")
+    competing = {document_id: versions for document_id, versions in document_versions.items() if len(versions) > 1}
+    if competing:
+        raise ValueError(f"Import contains multiple versions of the same document: {competing}")
+    _ensure_collection(client, vector_size)
+    if replace_active:
+        _replace_imported_documents(client, set(document_versions), legacy_sources)
 
     with open(input_path, "r", encoding="utf-8") as import_file:
         for line in import_file:
@@ -33,10 +77,6 @@ def import_points(input_path: str, host: str, port: int, batch_size: int) -> Non
                 continue
             item = json.loads(line)
             vector = item["vector"]
-            if vector_size is None:
-                vector_size = len(vector)
-                _ensure_collection(client, vector_size)
-
             batch.append(
                 PointStruct(
                     id=item["id"],
@@ -53,7 +93,8 @@ def import_points(input_path: str, host: str, port: int, batch_size: int) -> Non
         client.upsert(collection_name=COLLECTION_NAME, points=batch)
         total += len(batch)
 
-    print(f"Imported {total} points into {COLLECTION_NAME}", flush=True)
+    mode = "replaced active versions and imported" if replace_active else "imported without replacement"
+    print(f"{mode.capitalize()} {total} points into {COLLECTION_NAME}", flush=True)
 
 
 def main() -> None:
@@ -62,8 +103,9 @@ def main() -> None:
     parser.add_argument("--host", default="qdrant")
     parser.add_argument("--port", type=int, default=6333)
     parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument("--no-replace-active", action="store_true", help="Upsert without deleting existing document versions first")
     args = parser.parse_args()
-    import_points(args.input, args.host, args.port, args.batch_size)
+    import_points(args.input, args.host, args.port, args.batch_size, replace_active=not args.no_replace_active)
 
 
 if __name__ == "__main__":

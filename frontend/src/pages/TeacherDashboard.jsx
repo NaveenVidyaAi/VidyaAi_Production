@@ -4,6 +4,7 @@ import api from "../api/client";
 import BrandMark from "../components/BrandMark";
 import Icon from "../components/Icon";
 import RichMarkdown from "../components/RichMarkdown";
+import { assessmentPapers } from "../data/assessmentPapers";
 
 const subjects = ["Hindi", "English", "Math", "Science", "Social Science", "Sanskrit"];
 
@@ -112,24 +113,6 @@ const toolMeta = {
     pyq: { title: "PYQ लाइब्रेरी", subtitle: "कक्षा और मूल्यांकन योजना के लिए पुराने बोर्ड प्रश्नपत्र देखें।" },
   },
 };
-
-const pyqFiles = [
-  "class_10_english_PYQ26_SET_A.pdf", "class_10_english_PYQ25_SET_A.pdf",
-  "class_10_hindi_PYQ25_SET_B.pdf", "class_10_hindi_PYQ25_SET_C.pdf",
-  "class_10_hindi_PYQ24_SET_A.pdf", "class_10_hindi_PYQ24_SET_A_2.pdf", "class_10_hindi_PYQ24_SET_B.pdf", "class_10_hindi_PYQ24_SET_C.pdf",
-  "class_10_hindi_PYQ23_SET_A.pdf", "class_10_hindi_PYQ23_SET_A_2.pdf", "class_10_hindi_PYQ23_SET_B.pdf",
-  "class_10_math_PYQ25_SET_A.pdf", "class_10_math_PYQ24_SET_A.pdf", "class_10_math_PYQ23_SET_A.pdf",
-  "class_10_sanskrit_PYQ25_SET_A.pdf",
-  "class_10_science_PYQ25_SET_A.pdf", "class_10_science_PYQ24_SET_A.pdf", "class_10_science_PYQ23_SET_A.pdf",
-  "class_10_social_science_PYQ25_SET_A.pdf", "class_10_social_science_PYQ24_SET_C.pdf", "class_10_social_science_PYQ23_SET_A.pdf",
-];
-
-const pyqPapers = pyqFiles.map((file) => {
-  const match = file.match(/^class_(\d+)_(.+)_PYQ(\d{2})_SET_(.+)\.pdf$/);
-  const subject = match[2].split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
-  const set = match[4].replaceAll("_", " ");
-  return { file, classLevel: match[1], subject, year: `20${match[3]}`, set, title: `Class ${match[1]} ${subject} PYQ 20${match[3]} Set ${set}` };
-});
 
 const initialCurriculum = { class_level: "10", subject: "Science", duration_weeks: 16, periods_per_week: 5, chapters: "", learning_goals: "", medium: "Hindi" };
 const initialPaper = { class_level: "10", subject: "Science", syllabus: "", total_marks: 50, question_count: 20, duration_minutes: 90, difficulty: "balanced", paper_type: "unit_test", medium: "Hindi", instructions: "" };
@@ -356,8 +339,8 @@ export default function TeacherDashboard() {
 
   const t = copy[lang];
   const meta = toolMeta[lang][activeTool] || toolMeta[lang].home;
-  const visiblePapers = pyqSubject === "All" ? pyqPapers : pyqPapers.filter((paper) => paper.subject === pyqSubject);
-  const pyqSubjects = [...new Set(pyqPapers.map((paper) => paper.subject))];
+  const visiblePapers = pyqSubject === "All" ? assessmentPapers : assessmentPapers.filter((paper) => paper.subject === pyqSubject);
+  const pyqSubjects = [...new Set(assessmentPapers.map((paper) => paper.subject))];
 
   return (
     <div className="teacher-shell">
@@ -486,7 +469,7 @@ export default function TeacherDashboard() {
               {visiblePapers.map((paper) => (
                 <article key={paper.file}>
                   <div className="teacher-pyq-file-icon">PDF</div>
-                  <div><strong>{t.classLabel} {paper.classLevel} {t.subjectNames[paper.subject]} PYQ {paper.year} {t.setLabel} {paper.set}</strong><span>{paper.year} · {t.setLabel} {paper.set} · {t.subjectNames[paper.subject]}</span></div>
+                  <div><strong>{paper.kind === "model" ? `${t.classLabel} ${paper.classLevel} ${t.subjectNames[paper.subject]} ${lang === "hi" ? "आदर्श प्रश्नपत्र" : "Model Paper"} ${paper.year}` : `${t.classLabel} ${paper.classLevel} ${t.subjectNames[paper.subject]} PYQ ${paper.year} ${t.setLabel} ${paper.set}`}</strong><span>{paper.year} · {paper.kind === "model" ? (lang === "hi" ? "आदर्श प्रश्नपत्र" : "Model Paper") : `${t.setLabel} ${paper.set}`} · v{paper.version}</span></div>
                   <div><a className="teacher-pyq-open" href={`/pyq/${paper.file}`} target="_blank" rel="noreferrer"><Icon name="externalLink" size={16} />{t.open}</a><a className="teacher-pyq-download" href={`/pyq/${paper.file}`} download><Icon name="download" size={16} />{t.download}</a></div>
                 </article>
               ))}
