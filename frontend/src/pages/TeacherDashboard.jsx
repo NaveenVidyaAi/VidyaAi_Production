@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/client";
 import BrandMark from "../components/BrandMark";
@@ -133,24 +133,120 @@ function FireIcon() {
   );
 }
 
-function TeacherProfile({ profile, logout, t, compact = false }) {
-  return (
-    <div className={`teacher-header-profile${compact ? " compact" : ""}`}>
-      <span>{profile.name?.charAt(0)?.toUpperCase() || "T"}</span>
-      <div><strong>{profile.name}</strong><small>{profile.email}</small></div>
-      <button type="button" onClick={logout} title={t.logout} aria-label={t.logout}><Icon name="logout" size={18} /></button>
-    </div>
-  );
-}
+function TeacherAppHeader({ profile, logout, t, lang, streak, recent, meta, menuOpen, setMenuOpen, menuRef, onToggleLanguage, onOpenRecent }) {
+  const profileTriggerRef = useRef(null);
+  const profileDialogRef = useRef(null);
+  const menuWasOpenRef = useRef(false);
+  const teacherName = profile.name?.trim() || "Teacher";
+  const classLevel = profile.class_level || "10";
+  const medium = profile.medium || "Hindi";
+  const curriculumCount = recent.filter((item) => item.type === "curriculum").length;
+  const paperCount = recent.filter((item) => item.type === "paper").length;
+  const guideCount = recent.filter((item) => item.type === "lesson").length;
+  const lastActive = streak.lastActive || recent[0]?.createdAt;
+  const profileLabel = lang === "hi" ? "शिक्षक प्रोफाइल" : "Teacher profile";
 
-function TeacherHeaderControls({ profile, logout, t, lang, streak, onToggleLanguage, mobile = false, onOpenChat }) {
+  useEffect(() => {
+    if (menuOpen) {
+      menuWasOpenRef.current = true;
+      const frame = requestAnimationFrame(() => profileDialogRef.current?.focus());
+      return () => cancelAnimationFrame(frame);
+    }
+    if (menuWasOpenRef.current) {
+      profileTriggerRef.current?.focus();
+      menuWasOpenRef.current = false;
+    }
+    return undefined;
+  }, [menuOpen]);
+
+  const keepDialogFocus = (event) => {
+    if (event.key !== "Tab" || !profileDialogRef.current) return;
+    const focusable = [...profileDialogRef.current.querySelectorAll("button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])")];
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === profileDialogRef.current)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
-    <div className={mobile ? "teacher-mobile-controls" : "teacher-header-actions"}>
-      {!mobile && <button type="button" className="teacher-ask-action" onClick={onOpenChat}>{t.ask}</button>}
-      <span className="teacher-streak" title={t.streak}><b><FireIcon /></b><strong>{streak.count || 0}</strong><small>{t.streak}</small></span>
-      <button type="button" className={`teacher-language-switch ${lang}`} onClick={onToggleLanguage} aria-label={lang === "hi" ? "Switch to English" : "हिंदी में बदलें"}><span>अ</span><span>A</span></button>
-      <TeacherProfile profile={profile} logout={logout} t={t} compact={mobile} />
-    </div>
+    <header className={`dashboard-main-top teacher-app-header${menuOpen ? " profile-menu-open" : ""}`}>
+      <div className="header-left-cluster">
+        <div className="dashboard-title-block">
+          <h1>{lang === "hi" ? "नमस्ते, " : "Hello, "}<span>{teacherName}</span></h1>
+          <div className="student-tags">
+            <span>{t.roleBadge}</span>
+            <span>{t.classLabel} {classLevel}</span>
+            <span>{medium}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="top-actions" ref={menuRef}>
+        <div className="mobile-brand-mark" aria-label="VidyaAI">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m3 10 9-5 9 5-9 5-9-5Z" />
+            <path d="M7 12v4.5c0 .8 2.2 2.5 5 2.5s5-1.7 5-2.5V12" />
+            <path d="M21 10v5" />
+          </svg>
+        </div>
+
+        <div className="header-status-chips" aria-label={t.insights.activeDays}>
+          <span title={t.streak}>
+            <b className="streak-flame" aria-hidden="true"><FireIcon /></b>
+            <strong className="streak-count-mobile">{streak.count || 0}</strong>
+            <strong className="streak-count-desktop">{streak.count || 0} {lang === "hi" ? "दिन" : "days"}</strong>
+            <small>{t.streak}</small>
+          </span>
+        </div>
+
+        <button type="button" className={`header-language-switch ${lang === "en" ? "english" : "hindi"}`} onClick={onToggleLanguage} aria-label={lang === "hi" ? "Switch to English" : "हिंदी में बदलें"}>
+          <span>अ</span><span>A</span>
+        </button>
+
+        <div className="mobile-profile-wrap">
+          <button ref={profileTriggerRef} type="button" className="mobile-profile-chip" onClick={() => setMenuOpen((open) => !open)} title={profileLabel} aria-expanded={menuOpen} aria-controls="teacher-profile-menu" aria-haspopup="dialog">
+            <span className="mobile-profile-avatar" aria-hidden="true">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21a8 8 0 0 0-16 0" /><circle cx="12" cy="7" r="4" /></svg>
+            </span>
+            <span className="mobile-profile-copy"><strong>{teacherName}</strong><small>{t.roleBadge} · {medium}</small></span>
+            <svg className="profile-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+        </div>
+
+        {menuOpen && (
+          <>
+            <button type="button" className="mobile-profile-backdrop" onClick={() => setMenuOpen(false)} aria-label={lang === "hi" ? "प्रोफाइल बंद करें" : "Close profile"} />
+            <div ref={profileDialogRef} className="mobile-profile-menu" id="teacher-profile-menu" role="dialog" aria-modal="true" aria-label={profileLabel} tabIndex="-1" onKeyDown={keepDialogFocus}>
+              <div className="mobile-profile-menu-head"><strong>{teacherName}</strong><span>{profile.email || t.roleBadge}</span></div>
+              <dl>
+                <div><dt>{lang === "hi" ? "भूमिका" : "Role"}</dt><dd>{lang === "hi" ? "शिक्षक" : "Teacher"}</dd></div>
+                <div><dt>{t.classLabel}</dt><dd>{classLevel}</dd></div>
+                <div><dt>{t.medium}</dt><dd>{medium}</dd></div>
+                <div><dt>Board</dt><dd>CGBSE</dd></div>
+              </dl>
+              <div className="mobile-learning-panel">
+                <div className="mobile-learning-head"><strong>{lang === "hi" ? "तैयारी गतिविधि" : "Preparation activity"}</strong><span>{meta.title}</span></div>
+                <div className="mobile-learning-grid">
+                  <div><span>{lang === "hi" ? "संसाधन" : "Resources"}</span><strong>{recent.length}</strong></div>
+                  <div><span>{t.insights.curricula}</span><strong>{curriculumCount}</strong></div>
+                  <div><span>{t.insights.papers}</span><strong>{paperCount}</strong></div>
+                  <div><span>{lang === "hi" ? "शिक्षण गाइड" : "Teaching guides"}</span><strong>{guideCount}</strong></div>
+                </div>
+                <div className="teacher-profile-activity-note"><span>{t.insights.activeDays}: <strong>{streak.count || 0}</strong></span><span>{lastActive ? `${t.insights.lastActive}: ${new Date(lastActive).toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN")}` : t.insights.noRecent}</span></div>
+                {recent.length > 0 && <div className="mobile-learning-subjects">{recent.slice(0, 3).map((item) => <button key={item.createdAt} type="button" onClick={() => { setMenuOpen(false); onOpenRecent(item); }}><span>{item.title}</span><small>{t.recent[item.type] || t.recent.curriculum}</small></button>)}</div>}
+              </div>
+              <button type="button" className="profile-menu-action teacher-profile-logout" onClick={logout}><Icon name="logout" size={17} />{t.logout}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </header>
   );
 }
 
@@ -209,7 +305,7 @@ function TeacherChat({ compact = false, t, lang, question, setQuestion, subject,
         {!compact && <label><span>{t.subject}</span><select value={subject} onChange={(event) => setSubject(event.target.value)}><option value="General">{t.options.general}</option>{subjects.map((item) => <option key={item} value={item}>{t.subjectNames[item]}</option>)}</select></label>}
         {compact ? <button type="button" onClick={onOpenFull}>{t.homeChat.open} <Icon name="arrowRight" size={17} /></button> : <button type="button" onClick={onClear}>{t.newChat}</button>}
       </div>
-      <div className="teacher-chat-window" aria-live="polite">
+      <div className="teacher-chat-window" role="log" aria-label={compact ? t.homeChat.title : t.nav.chat} aria-live="polite" tabIndex="0">
         {!messages.length && !loading && (
           <div className="teacher-chat-welcome"><span><Icon name="sparkle" size={30} /></span>{!compact && <h2>{t.ask}</h2>}<p>{t.chatWelcome}</p><div>{prompts.slice(0, compact ? 2 : 3).map((prompt) => <button key={prompt} type="button" onClick={() => setQuestion(prompt)}>{prompt}</button>)}</div></div>
         )}
@@ -233,7 +329,7 @@ export default function TeacherDashboard() {
   const navigate = useNavigate();
   const [activeTool, setActiveTool] = useState("home");
   const [lang, setLang] = useState(() => localStorage.getItem("vidyaai_teacher_lang") || "en");
-  const [profile, setProfile] = useState({ name: "Teacher", email: "" });
+  const [profile, setProfile] = useState({ name: "Teacher", email: "", class_level: "10", medium: "Hindi", role: "teacher" });
   const [curriculum, setCurriculum] = useState(initialCurriculum);
   const [paper, setPaper] = useState(initialPaper);
   const [lesson, setLesson] = useState(initialLesson);
@@ -245,6 +341,8 @@ export default function TeacherDashboard() {
   const [chatLoading, setChatLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [pyqSubject, setPyqSubject] = useState("All");
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef(null);
   const [streak, setStreak] = useState(() => {
     try { return JSON.parse(localStorage.getItem("vidyaai_streak") || "{\"count\":0,\"lastActive\":\"\"}"); } catch { return { count: 0, lastActive: "" }; }
   });
@@ -258,6 +356,22 @@ export default function TeacherDashboard() {
       setProfile(data);
     }).catch(() => navigate("/login", { replace: true }));
   }, [navigate]);
+
+  useEffect(() => {
+    if (!showProfileMenu) return;
+    const handlePointerDown = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) setShowProfileMenu(false);
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setShowProfileMenu(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showProfileMenu]);
 
   const recentKey = useMemo(() => `vidyaai_teacher_recent_${profile.email || "local"}`, [profile.email]);
   const [recent, setRecent] = useState([]);
@@ -327,6 +441,7 @@ export default function TeacherDashboard() {
   };
 
   const openTool = (tool) => {
+    setShowProfileMenu(false);
     setActiveTool(tool);
     setResult(null);
     setError("");
@@ -344,12 +459,25 @@ export default function TeacherDashboard() {
   const pyqSubjects = [...new Set(assessmentPapers.map((paper) => paper.subject))];
 
   return (
-    <div className="teacher-shell">
+    <div className={`teacher-shell teacher-tool-${activeTool}`}>
       <a className="skip-link" href="#teacher-main">{lang === "hi" ? "मुख्य सामग्री पर जाएँ" : "Skip to main content"}</a>
+      <TeacherAppHeader
+        profile={profile}
+        logout={logout}
+        t={t}
+        lang={lang}
+        streak={streak}
+        recent={recent}
+        meta={meta}
+        menuOpen={showProfileMenu}
+        setMenuOpen={setShowProfileMenu}
+        menuRef={profileMenuRef}
+        onToggleLanguage={toggleLanguage}
+        onOpenRecent={(item) => { setResult(item); setError(""); setActiveTool(item.type); }}
+      />
       <aside className="teacher-sidebar">
         <div className="teacher-sidebar-head">
           <BrandMark compact tone="teacher" tagline={t.brandTagline} />
-          <TeacherHeaderControls mobile profile={profile} logout={logout} t={t} lang={lang} streak={streak} onToggleLanguage={toggleLanguage} onOpenChat={() => openTool("chat")} />
         </div>
         <div className="teacher-role-badge">{t.roleBadge}</div>
         <nav>
@@ -370,11 +498,6 @@ export default function TeacherDashboard() {
       </aside>
 
       <main className="teacher-main" id="teacher-main" tabIndex="-1">
-        <header className="teacher-header">
-          <div><span className="teacher-kicker">{t.kicker}</span><h1>{meta.title}</h1><p>{meta.subtitle}</p></div>
-          <TeacherHeaderControls profile={profile} logout={logout} t={t} lang={lang} streak={streak} onToggleLanguage={toggleLanguage} onOpenChat={() => openTool("chat")} />
-        </header>
-
         {activeTool === "home" && (
           <>
             <section className="teacher-hero">
@@ -478,7 +601,7 @@ export default function TeacherDashboard() {
           </section>
         )}
 
-        <CompanyLegalFooter className="workspace-public-footer teacher-public-footer" />
+        {activeTool !== "chat" && <CompanyLegalFooter className="workspace-public-footer teacher-public-footer" />}
       </main>
 
       <TeacherInsightsRail
