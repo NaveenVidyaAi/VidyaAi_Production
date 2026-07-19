@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { cloneElement, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/client";
 import BrandMark from "../components/BrandMark";
@@ -8,6 +8,40 @@ import RichMarkdown from "../components/RichMarkdown";
 import { assessmentPapers } from "../data/assessmentPapers";
 
 const subjects = ["Hindi", "English", "Math", "Science", "Social Science", "Sanskrit"];
+let paperUiSequence = 0;
+const createPaperUiId = (prefix) => `${prefix}-${Date.now()}-${paperUiSequence += 1}`;
+const paperTypePresets = {
+  mcq: { label_hi: "बहुविकल्पीय प्रश्न", marks_each: 1, word_limit: "" },
+  very_short: { label_hi: "अति लघु उत्तरीय प्रश्न", marks_each: 2, word_limit: "30" },
+  short: { label_hi: "लघु उत्तरीय प्रश्न", marks_each: 3, word_limit: "50" },
+  long: { label_hi: "दीर्घ उत्तरीय प्रश्न", marks_each: 5, word_limit: "100" },
+};
+
+function paperSectionTotals(sections) {
+  return sections.reduce((totals, section) => {
+    const count = Number(section.count) || 0;
+    const marksEach = Number(section.marks_each) || 0;
+    return { questions: totals.questions + count, marks: totals.marks + (count * marksEach) };
+  }, { marks: 0, questions: 0 });
+}
+
+function nextPaperSectionName(sections) {
+  const names = new Set(sections.map((section) => String(section.name || "").trim().toUpperCase()));
+  for (let index = 0; index < 26; index += 1) {
+    const candidate = String.fromCharCode(65 + index);
+    if (!names.has(candidate)) return candidate;
+  }
+  return String(sections.length + 1);
+}
+
+function serializePaperSections(sections) {
+  return sections.map(({ ui_id, ui_open, custom_questions = [], ...section }) => ({
+    ...section,
+    count: Number(section.count),
+    marks_each: Number(section.marks_each),
+    custom_questions: custom_questions.map(({ ui_id: questionUiId, ...question }) => question),
+  }));
+}
 
 const copy = {
   en: {
@@ -44,10 +78,10 @@ const copy = {
     insights: { title: "Teacher pulse", note: "Your preparation activity", resources: "Resources", activeDays: "Active days", curricula: "Curricula", papers: "Papers", recent: "Recent activity", noRecent: "Create your first resource to start the activity timeline.", quick: "Quick create", lastActive: "Last active" },
     homeChat: { kicker: "TEACHER COPILOT", title: "Plan with VidyaAI without leaving your dashboard", note: "Ask a teaching question now, or open the full chat for a longer conversation.", open: "Open full chat" },
     curriculumForm: { title: "Curriculum details", note: "Give the planning boundaries; VidyaAI will organize the sequence.", weeks: "Duration (weeks)", periods: "Periods per week", teachingMedium: "Teaching medium", chapters: "Chapters or syllabus", chaptersPlaceholder: "Example: Chapters 1–6, or paste the chapter list", goals: "Learning goals", goalsPlaceholder: "What should students know or be able to do?", loading: "Building curriculum…", action: "Create curriculum plan" },
-    paperForm: { title: "Paper blueprint", note: "Marks and question count are validated in the generation prompt.", marks: "Total marks", questions: "Number of questions", duration: "Duration (minutes)", difficulty: "Difficulty", type: "Paper type", syllabus: "Syllabus / chapters", syllabusPlaceholder: "Example: Acids, Bases and Salts; Metals and Non-metals", instructions: "Additional instructions", instructionsPlaceholder: "Optional: include diagrams, competency-based questions, internal choice…", loading: "Setting the paper…", action: "Create question paper" },
+    paperForm: { title: "Model paper builder", note: "Choose exact RAG chapters, lock your own questions, and let VidyaAI fill only the remaining slots.", marks: "Total marks", questions: "Number of questions", targetNote: "Set the paper targets here. The section blueprint must match them before generation.", paperTarget: "Paper target", currentBlueprint: "Current sections", blueprintReady: "Targets and section blueprint match.", blueprintMismatch: "Targets do not match the section blueprint.", targetInvalid: "Use whole numbers: 5–200 marks and 1–100 questions. Total marks must be between 1× and 20× the question count.", adjustSections: "Change the section count or marks per question below, or use the current section totals.", useSectionTotals: "Use section totals", editSections: "Edit sections", class10Only: "Class 10 · curriculum RAG available", duration: "Duration (minutes)", difficulty: "Difficulty", type: "Paper type", syllabus: "Additional syllabus boundary", syllabusPlaceholder: "Optional: a subtopic or boundary not covered by the selected chapters", instructions: "Custom instructions", instructionsPlaceholder: "Optional instructions, one per line", chapters: "Chapters for RAG", chapterSearch: "Search official chapters…", chapterRequired: "Select at least one chapter or enter an additional syllabus boundary.", chapterNote: "Official curriculum topics used to focus retrieval and question generation.", chapterLoading: "Loading official chapters…", chapterEmpty: "No mapped chapters are available for this class and subject. Add a syllabus boundary instead.", chapterNoMatch: "No chapter matches this search.", chapterError: "Official chapters could not be loaded. You can retry by changing the subject, or add a syllabus boundary.", ragAligned: "RAG aligned", selected: "selected", selectAll: "Select all", selectVisible: "Select visible", clear: "Clear", removeChapter: "Remove chapter", sections: "Sections", addSection: "Add section", sectionLimit: "Maximum 12 sections", remove: "Remove", removeSectionConfirm: "This section contains teacher-written questions. Remove the section and those questions?", removeField: "Remove field", restoreField: "Add back", section: "Section", sectionLabel: "Label", questionType: "Type", count: "Count", marksEach: "Marks / question", wordLimit: "Word limit", addQuestion: "Add my question", customQuestions: "Teacher questions", questionText: "Question in Hindi", answer: "Answer / key", alternative: "Alternative question (optional)", option: "Option", markingPoints: "Marking points, one per line", optionalFields: "Add removed settings", optionalNote: "Removed settings are not sent to VidyaAI.", allFieldsShown: "All optional settings are shown.", addField: "Add field", loading: "Setting the paper…", action: "Generate questions" },
     lessonForm: { title: "Prepare tomorrow's lesson", note: "VidyaAI explains the topic first, then turns it into a teachable classroom sequence.", duration: "Lesson duration", readiness: "Student readiness", topic: "Chapter or topic", topicPlaceholder: "Example: Class 10 Science Chapter 2 — Acids, Bases and Salts", notes: "What should VidyaAI consider?", notesPlaceholder: "Optional: students struggle with equations; no lab available; need a bilingual explanation…", loading: "Preparing your lesson…", action: "Create teaching guide" },
     options: { hindi: "Hindi", english: "English", bilingual: "Bilingual", easy: "Easy", balanced: "Balanced", challenging: "Challenging", unit: "Unit test", term: "Term exam", practice: "Practice paper", worksheet: "Worksheet", mixed: "Mixed classroom", foundation: "Needs foundation", advanced: "Advanced", general: "General" },
-    result: { error: "Could not create resource", errorNote: "VidyaAI could not create this resource. Please try again.", loading: "VidyaAI is preparing a classroom-ready resource…", loadingNote: "Checking structure, teaching flow, and curriculum context.", empty: "Your generated resource will appear here", emptyNote: "Complete the form and VidyaAI will create an editable, copyable, print-ready draft.", generated: "Generated resource", copy: "Copy", print: "Print / PDF", sources: "Textbook context used" },
+    result: { error: "Could not create resource", errorNote: "VidyaAI could not create this resource. Please try again.", loading: "VidyaAI is preparing a classroom-ready resource…", loadingNote: "Checking structure, teaching flow, and curriculum context.", empty: "Your generated resource will appear here", emptyNote: "Complete the form and VidyaAI will create an editable, copyable, print-ready draft.", generated: "Generated resource", copy: "Copy", print: "Download PDF", answerPrint: "Download answer key", blueprint: "Blueprint", paper: "Student paper", answers: "Answer key", sources: "Sources used", previousPage: "Previous page", nextPage: "Next page", page: "Page" },
     papersCount: (count) => `Class 10 · ${count} papers`,
     setLabel: "Set",
     subjectNames: { Hindi: "Hindi", English: "English", Math: "Math", Science: "Science", "Social Science": "Social Science", Sanskrit: "Sanskrit" },
@@ -86,10 +120,10 @@ const copy = {
     insights: { title: "शिक्षक प्रगति", note: "आपकी तैयारी की गतिविधि", resources: "संसाधन", activeDays: "सक्रिय दिन", curricula: "पाठ्यक्रम", papers: "पेपर", recent: "हाल की गतिविधि", noRecent: "गतिविधि टाइमलाइन शुरू करने के लिए पहला संसाधन बनाएँ।", quick: "त्वरित निर्माण", lastActive: "अंतिम सक्रियता" },
     homeChat: { kicker: "शिक्षक कोपायलट", title: "डैशबोर्ड छोड़े बिना VidyaAI के साथ योजना बनाएँ", note: "अभी शिक्षण से जुड़ा प्रश्न पूछें या लंबी बातचीत के लिए पूरी चैट खोलें।", open: "पूरी चैट खोलें" },
     curriculumForm: { title: "पाठ्यक्रम विवरण", note: "योजना की सीमाएँ दें; VidyaAI क्रम को व्यवस्थित करेगा।", weeks: "अवधि (सप्ताह)", periods: "प्रति सप्ताह पीरियड", teachingMedium: "शिक्षण माध्यम", chapters: "अध्याय या पाठ्यक्रम", chaptersPlaceholder: "उदाहरण: अध्याय 1–6, या अध्याय सूची यहाँ लिखें", goals: "सीखने के लक्ष्य", goalsPlaceholder: "विद्यार्थियों को क्या जानना या कर पाना चाहिए?", loading: "पाठ्यक्रम बन रहा है…", action: "पाठ्यक्रम योजना बनाएँ" },
-    paperForm: { title: "प्रश्नपत्र रूपरेखा", note: "अंक और प्रश्न संख्या को निर्माण के दौरान जाँचा जाता है।", marks: "कुल अंक", questions: "प्रश्नों की संख्या", duration: "अवधि (मिनट)", difficulty: "कठिनाई", type: "पेपर का प्रकार", syllabus: "पाठ्यक्रम / अध्याय", syllabusPlaceholder: "उदाहरण: अम्ल, क्षार और लवण; धातु और अधातु", instructions: "अतिरिक्त निर्देश", instructionsPlaceholder: "वैकल्पिक: चित्र, योग्यता-आधारित प्रश्न, आंतरिक विकल्प…", loading: "पेपर बन रहा है…", action: "प्रश्नपत्र बनाएँ" },
+    paperForm: { title: "आदर्श प्रश्नपत्र निर्माता", note: "सटीक RAG अध्याय चुनें, अपने प्रश्न लॉक करें और शेष प्रश्न VidyaAI से भरवाएँ।", marks: "कुल अंक", questions: "प्रश्नों की संख्या", targetNote: "पेपर के लक्ष्य यहाँ तय करें। निर्माण से पहले खंडों का विन्यास इनसे मिलना चाहिए।", paperTarget: "पेपर लक्ष्य", currentBlueprint: "वर्तमान खंड", blueprintReady: "लक्ष्य और खंड-विन्यास मेल खाते हैं।", blueprintMismatch: "लक्ष्य और खंड-विन्यास मेल नहीं खाते।", targetInvalid: "पूर्ण संख्या भरें: 5–200 अंक और 1–100 प्रश्न। कुल अंक प्रश्न संख्या के 1 से 20 गुना के बीच हों।", adjustSections: "नीचे खंडों की प्रश्न संख्या या प्रति प्रश्न अंक बदलें, अथवा वर्तमान खंडों का योग अपनाएँ।", useSectionTotals: "खंडों का योग अपनाएँ", editSections: "खंड संपादित करें", class10Only: "कक्षा 10 · पाठ्यक्रम RAG उपलब्ध", duration: "अवधि (मिनट)", difficulty: "कठिनाई", type: "पेपर का प्रकार", syllabus: "अतिरिक्त पाठ्यक्रम सीमा", syllabusPlaceholder: "वैकल्पिक: चुने अध्याय से बाहर कोई उपविषय या सीमा", instructions: "विशेष निर्देश", instructionsPlaceholder: "वैकल्पिक निर्देश, प्रत्येक नई पंक्ति में", chapters: "RAG के लिए अध्याय", chapterSearch: "आधिकारिक अध्याय खोजें…", chapterRequired: "कम-से-कम एक अध्याय चुनें या अतिरिक्त पाठ्यक्रम सीमा लिखें।", chapterNote: "आधिकारिक पाठ्यक्रम विषय, जिनसे खोज और प्रश्न निर्माण सटीक होता है।", chapterLoading: "आधिकारिक अध्याय लोड हो रहे हैं…", chapterEmpty: "इस कक्षा और विषय के लिए अध्याय सूची उपलब्ध नहीं है। अतिरिक्त पाठ्यक्रम सीमा जोड़ें।", chapterNoMatch: "इस खोज से मिलता कोई अध्याय नहीं मिला।", chapterError: "आधिकारिक अध्याय लोड नहीं हो सके। विषय बदलकर फिर जाँचें या पाठ्यक्रम सीमा जोड़ें।", ragAligned: "RAG संरेखित", selected: "चयनित", selectAll: "सभी चुनें", selectVisible: "दिख रहे चुनें", clear: "हटाएँ", removeChapter: "अध्याय हटाएँ", sections: "खंड", addSection: "खंड जोड़ें", sectionLimit: "अधिकतम 12 खंड", remove: "हटाएँ", removeSectionConfirm: "इस खंड में शिक्षक द्वारा लिखे प्रश्न हैं। खंड और उसके प्रश्न हटाएँ?", removeField: "फ़ील्ड हटाएँ", restoreField: "फिर जोड़ें", section: "खंड", sectionLabel: "हिंदी नाम", questionType: "प्रकार", count: "संख्या", marksEach: "प्रति प्रश्न अंक", wordLimit: "शब्द सीमा", addQuestion: "अपना प्रश्न जोड़ें", customQuestions: "शिक्षक के प्रश्न", questionText: "हिंदी में प्रश्न", answer: "उत्तर / कुंजी", alternative: "वैकल्पिक प्रश्न", option: "विकल्प", markingPoints: "अंक बिंदु, प्रत्येक नई पंक्ति में", optionalFields: "हटाई गई सेटिंग जोड़ें", optionalNote: "हटाई गई सेटिंग VidyaAI को नहीं भेजी जाती।", allFieldsShown: "सभी वैकल्पिक सेटिंग दिख रही हैं।", addField: "फ़ील्ड जोड़ें", loading: "पेपर बन रहा है…", action: "प्रश्न तैयार करें" },
     lessonForm: { title: "कल का पाठ तैयार करें", note: "VidyaAI पहले विषय समझाता है, फिर उसे पढ़ाने योग्य कक्षा क्रम में बदलता है।", duration: "पाठ की अवधि", readiness: "विद्यार्थियों की तैयारी", topic: "अध्याय या विषय", topicPlaceholder: "उदाहरण: कक्षा 10 विज्ञान अध्याय 2 — अम्ल, क्षार और लवण", notes: "VidyaAI किन बातों का ध्यान रखे?", notesPlaceholder: "वैकल्पिक: विद्यार्थियों को समीकरण कठिन लगते हैं; लैब उपलब्ध नहीं है…", loading: "पाठ तैयार हो रहा है…", action: "शिक्षण मार्गदर्शिका बनाएँ" },
     options: { hindi: "हिंदी", english: "अंग्रेज़ी", bilingual: "द्विभाषी", easy: "सरल", balanced: "संतुलित", challenging: "कठिन", unit: "इकाई परीक्षा", term: "सत्र परीक्षा", practice: "अभ्यास पेपर", worksheet: "वर्कशीट", mixed: "मिश्रित कक्षा", foundation: "आधार की आवश्यकता", advanced: "उन्नत", general: "सामान्य" },
-    result: { error: "संसाधन नहीं बन सका", errorNote: "VidyaAI अभी यह संसाधन नहीं बना सका। कृपया फिर प्रयास करें।", loading: "VidyaAI कक्षा के लिए संसाधन तैयार कर रहा है…", loadingNote: "संरचना, शिक्षण क्रम और पाठ्यक्रम संदर्भ की जाँच हो रही है।", empty: "आपका बनाया संसाधन यहाँ दिखाई देगा", emptyNote: "फॉर्म पूरा करें और VidyaAI संपादन, कॉपी और प्रिंट के लिए तैयार ड्राफ्ट बनाएगा।", generated: "तैयार संसाधन", copy: "कॉपी", print: "प्रिंट / PDF", sources: "प्रयुक्त पाठ्यपुस्तक संदर्भ" },
+    result: { error: "संसाधन नहीं बन सका", errorNote: "VidyaAI अभी यह संसाधन नहीं बना सका। कृपया फिर प्रयास करें।", loading: "VidyaAI कक्षा के लिए संसाधन तैयार कर रहा है…", loadingNote: "संरचना, शिक्षण क्रम और पाठ्यक्रम संदर्भ की जाँच हो रही है।", empty: "आपका बनाया संसाधन यहाँ दिखाई देगा", emptyNote: "फॉर्म पूरा करें और VidyaAI संपादन, कॉपी और प्रिंट के लिए तैयार ड्राफ्ट बनाएगा।", generated: "तैयार संसाधन", copy: "कॉपी", print: "PDF डाउनलोड करें", answerPrint: "उत्तर कुंजी डाउनलोड करें", blueprint: "प्रश्नपत्र रूपरेखा", paper: "विद्यार्थी प्रश्नपत्र", answers: "उत्तर कुंजी", sources: "प्रयुक्त स्रोत", previousPage: "पिछला पृष्ठ", nextPage: "अगला पृष्ठ", page: "पृष्ठ" },
     papersCount: (count) => `कक्षा 10 · ${count} पेपर`,
     setLabel: "सेट",
     subjectNames: { Hindi: "हिंदी", English: "अंग्रेज़ी", Math: "गणित", Science: "विज्ञान", "Social Science": "सामाजिक विज्ञान", Sanskrit: "संस्कृत" },
@@ -116,11 +150,165 @@ const toolMeta = {
 };
 
 const initialCurriculum = { class_level: "10", subject: "Science", duration_weeks: 16, periods_per_week: 5, chapters: "", learning_goals: "", medium: "Hindi" };
-const initialPaper = { class_level: "10", subject: "Science", syllabus: "", total_marks: 50, question_count: 20, duration_minutes: 90, difficulty: "balanced", paper_type: "unit_test", medium: "Hindi", instructions: "" };
+const initialPaperSections = [
+  { ui_id: "paper-section-a", ui_open: true, name: "A", type: "mcq", label_hi: "बहुविकल्पीय प्रश्न", count: 10, marks_each: 1, word_limit: "", custom_questions: [] },
+  { ui_id: "paper-section-b", name: "B", type: "very_short", label_hi: "अति लघु उत्तरीय प्रश्न", count: 5, marks_each: 2, word_limit: "30", custom_questions: [] },
+  { ui_id: "paper-section-c", name: "C", type: "short", label_hi: "लघु उत्तरीय प्रश्न", count: 5, marks_each: 3, word_limit: "50", custom_questions: [] },
+  { ui_id: "paper-section-d", name: "D", type: "long", label_hi: "दीर्घ उत्तरीय प्रश्न", count: 3, marks_each: 5, word_limit: "100", custom_questions: [] },
+];
+const initialPaper = { class_level: "10", subject: "Science", syllabus: "", selected_chapters: [], total_marks: 50, question_count: 23, duration_minutes: 90, difficulty: "balanced", paper_type: "unit_test", medium: "Hindi", instructions: "", enabled_fields: ["duration", "difficulty", "paper_type", "medium", "instructions", "syllabus"], sections: initialPaperSections };
 const initialLesson = { class_level: "10", subject: "Science", chapter_or_topic: "", lesson_minutes: 45, medium: "Hindi", student_level: "mixed", teacher_notes: "" };
+const paperOptionalFields = [
+  ["duration", "duration"],
+  ["difficulty", "difficulty"],
+  ["paper_type", "type"],
+  ["medium", "medium"],
+  ["syllabus", "syllabus"],
+  ["instructions", "instructions"],
+];
 
-function Field({ label, children, wide = false }) {
-  return <label className={wide ? "teacher-field wide" : "teacher-field"}><span>{label}</span>{children}</label>;
+function Field({ label, children, wide = false, removable = false, onRemove, removeLabel = "Remove" }) {
+  const fieldId = useId();
+  return <div className={wide ? "teacher-field wide" : "teacher-field"}>
+    <span className="teacher-field-heading"><label htmlFor={fieldId}>{label}</label>{removable && <button type="button" onClick={onRemove} aria-label={`${removeLabel}: ${label}`} title={`${removeLabel}: ${label}`}><span aria-hidden="true">×</span></button>}</span>
+    {cloneElement(children, { id: children.props.id || fieldId })}
+  </div>;
+}
+
+function ChapterPicker({ options, selected, onChange, loading, error, t }) {
+  const [search, setSearch] = useState("");
+  const headingId = useId();
+  const searchId = useId();
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const visibleOptions = useMemo(() => options.filter((option) => `${option.code || option.id} ${option.label} ${option.group || ""}`.toLocaleLowerCase().includes(normalizedSearch)), [normalizedSearch, options]);
+  const visibleGroups = useMemo(() => {
+    const groups = new Map();
+    visibleOptions.forEach((option) => {
+      const group = option.group || "";
+      groups.set(group, [...(groups.get(group) || []), option]);
+    });
+    return [...groups.entries()];
+  }, [visibleOptions]);
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const selectedOptions = useMemo(() => selected.map((id) => options.find((option) => option.id === id)).filter(Boolean), [options, selected]);
+  useEffect(() => setSearch(""), [options]);
+  const toggle = (id) => onChange(selectedSet.has(id) ? selected.filter((item) => item !== id) : [...selected, id]);
+  const selectOptions = (items) => onChange([...new Set([...selected, ...items.map((option) => option.id)])]);
+
+  return (
+    <section className="paper-chapter-picker" aria-labelledby={headingId} aria-busy={loading}>
+      <header>
+        <div><strong id={headingId}>{t.paperForm.chapters}</strong><p>{t.paperForm.chapterNote}</p></div>
+        <span className="paper-rag-badge"><span aria-hidden="true" />{t.paperForm.ragAligned}</span>
+      </header>
+      <div className="paper-chapter-toolbar">
+        <label htmlFor={searchId} className="paper-chapter-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg><span className="sr-only">{t.paperForm.chapterSearch}</span><input id={searchId} type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.paperForm.chapterSearch} /></label>
+        <span className="paper-chapter-count" aria-live="polite"><strong>{selected.length}</strong> {t.paperForm.selected}</span>
+      </div>
+      {selectedOptions.length > 0 && <div className="paper-selected-chapters" aria-label={`${selected.length} ${t.paperForm.selected}`}>
+        {selectedOptions.map((option) => <button key={option.id} type="button" onClick={() => toggle(option.id)} aria-label={`${t.paperForm.removeChapter}: ${option.label}`}><span>{option.code || option.id}</span>{option.label}<b aria-hidden="true">×</b></button>)}
+      </div>}
+      <div className="paper-chapter-actions">
+        <button type="button" disabled={loading || !visibleOptions.length} onClick={() => selectOptions(visibleOptions)}>{normalizedSearch ? t.paperForm.selectVisible : t.paperForm.selectAll}</button>
+        <button type="button" disabled={!selected.length} onClick={() => onChange([])}>{t.paperForm.clear}</button>
+      </div>
+      {loading ? <div className="paper-chapter-state" role="status"><span className="paper-chapter-spinner" aria-hidden="true" />{t.paperForm.chapterLoading}</div>
+        : error ? <div className="paper-chapter-state error" role="alert">{t.paperForm.chapterError}</div>
+          : !visibleOptions.length ? <div className="paper-chapter-state">{normalizedSearch ? t.paperForm.chapterNoMatch : t.paperForm.chapterEmpty}</div>
+            : <div className="paper-chapter-options" role="group" aria-label={t.paperForm.chapters}>
+              {visibleGroups.map(([group, groupOptions]) => <section className="paper-chapter-group" key={group || "chapters"} aria-label={group || t.paperForm.chapters}>
+                {group && <h3>{group}</h3>}
+                <div>{groupOptions.map((option) => <label key={option.id} className={selectedSet.has(option.id) ? "selected" : ""}><input type="checkbox" checked={selectedSet.has(option.id)} onChange={() => toggle(option.id)} /><span className="paper-chapter-check" aria-hidden="true">✓</span><span className="paper-chapter-code">{option.code || option.id}</span><strong>{option.label}</strong></label>)}</div>
+              </section>)}
+            </div>}
+    </section>
+  );
+}
+
+function OptionalPaperSettings({ enabled, onRestore, t }) {
+  const hiddenFields = paperOptionalFields.filter(([id]) => !enabled.includes(id));
+  if (!hiddenFields.length) return null;
+  return <section className="paper-optional-settings">
+    <header><div><strong>{t.paperForm.optionalFields}</strong><p>{t.paperForm.optionalNote}</p></div><span>{enabled.length}/{paperOptionalFields.length}</span></header>
+    <div>{hiddenFields.map(([id, copyKey]) => <button key={id} type="button" onClick={() => onRestore(id)}><span aria-hidden="true">+</span>{copyKey === "medium" ? t.medium : t.paperForm[copyKey]}<small>{t.paperForm.restoreField}</small></button>)}</div>
+  </section>;
+}
+
+function PaperSectionBuilder({ sections, onChange, t, units }) {
+  const [openSectionIds, setOpenSectionIds] = useState(() => new Set(sections.filter((section) => section.ui_open).map((section) => section.ui_id)));
+  const setSectionOpen = (sectionId, open) => setOpenSectionIds((current) => {
+    if (current.has(sectionId) === open) return current;
+    const next = new Set(current);
+    if (open) next.add(sectionId);
+    else next.delete(sectionId);
+    return next;
+  });
+  const update = (index, field, value) => onChange(sections.map((section, itemIndex) => itemIndex === index ? { ...section, [field]: value } : section));
+  const updateType = (index, value) => onChange(sections.map((section, itemIndex) => itemIndex !== index ? section : {
+    ...section,
+    ...paperTypePresets[value],
+    type: value,
+    custom_questions: (section.custom_questions || []).map((question) => ({ ...question, options_hi: value === "mcq" ? Array.from({ length: 4 }, (_, optionIndex) => question.options_hi?.[optionIndex] || "") : [] })),
+  }));
+  const commitNumber = (index, field, rawValue, minimum, maximum) => {
+    const parsed = Math.round(Number(rawValue));
+    update(index, field, Number.isFinite(parsed) ? Math.min(maximum, Math.max(minimum, parsed)) : minimum);
+  };
+  const remove = (index) => {
+    const section = sections[index];
+    if ((section.custom_questions || []).length && !window.confirm(t.paperForm.removeSectionConfirm)) return;
+    onChange(sections.filter((_, itemIndex) => itemIndex !== index));
+  };
+  const add = () => {
+    if (sections.length >= 12) return;
+    const name = nextPaperSectionName(sections);
+    const uiId = createPaperUiId("paper-section");
+    setSectionOpen(uiId, true);
+    onChange([...sections, { ui_id: uiId, ui_open: true, name, type: "short", ...paperTypePresets.short, count: 1, custom_questions: [] }]);
+  };
+  const updateQuestion = (sectionIndex, questionIndex, field, value) => onChange(sections.map((section, index) => index !== sectionIndex ? section : { ...section, custom_questions: section.custom_questions.map((question, itemIndex) => itemIndex === questionIndex ? { ...question, [field]: value } : question) }));
+  const addQuestion = (sectionIndex) => onChange(sections.map((section, index) => {
+    if (index !== sectionIndex) return section;
+    const customQuestions = [...(section.custom_questions || []), { ui_id: createPaperUiId("teacher-question"), text_hi: "", options_hi: section.type === "mcq" ? ["", "", "", ""] : [], or_text_hi: "", answer_hi: "", marking_points_hi: [] }];
+    return { ...section, custom_questions: customQuestions, count: Math.max(Number(section.count) || 0, customQuestions.length) };
+  }));
+  const removeQuestion = (sectionIndex, questionIndex) => onChange(sections.map((section, index) => index !== sectionIndex ? section : { ...section, custom_questions: section.custom_questions.filter((_, itemIndex) => itemIndex !== questionIndex) }));
+  return (
+    <fieldset id="paper-section-builder" className="paper-builder-sections" tabIndex="-1" aria-describedby="paper-blueprint-status">
+      <legend>{t.paperForm.sections}</legend>
+      {sections.map((section, index) => (
+        <details className="paper-section-rule" key={section.ui_id} open={openSectionIds.has(section.ui_id)} onToggle={(event) => setSectionOpen(section.ui_id, event.currentTarget.open)}>
+          <summary><span><strong>{t.paperForm.section} {section.name || index + 1}</strong><small>{Number(section.count) || 0} {units.questions} × {Number(section.marks_each) || 0} {(Number(section.marks_each) || 0) === 1 ? units.mark : units.marks} = {(Number(section.count) || 0) * (Number(section.marks_each) || 0)} {units.marks}</small></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
+          <div className="paper-section-content">
+          {sections.length > 1 && <div className="paper-section-actions"><button type="button" onClick={() => remove(index)} aria-label={`${t.paperForm.remove}: ${t.paperForm.section} ${section.name || index + 1}`}>{t.paperForm.remove}</button></div>}
+          <div className="paper-section-fields">
+            <Field label={t.paperForm.section}><input value={section.name} onChange={(event) => update(index, "name", event.target.value)} /></Field>
+            <Field label={t.paperForm.questionType}><select value={section.type} onChange={(event) => updateType(index, event.target.value)}><option value="mcq">MCQ / बहुविकल्पीय</option><option value="very_short">Very short / अति लघु</option><option value="short">Short answer / लघु</option><option value="long">Long answer / दीर्घ</option></select></Field>
+            <Field label={t.paperForm.count}><input type="number" inputMode="numeric" min={Math.max(1, section.custom_questions?.length || 0)} max="30" value={section.count} onChange={(event) => update(index, "count", event.target.value)} onBlur={(event) => commitNumber(index, "count", event.target.value, Math.max(1, section.custom_questions?.length || 0), 30)} /></Field>
+            <Field label={t.paperForm.marksEach}><input type="number" inputMode="numeric" min="1" max="20" value={section.marks_each} onChange={(event) => update(index, "marks_each", event.target.value)} onBlur={(event) => commitNumber(index, "marks_each", event.target.value, 1, 20)} /></Field>
+            <Field label={t.paperForm.wordLimit}><input value={section.word_limit} onChange={(event) => update(index, "word_limit", event.target.value)} /></Field>
+            <Field label={t.paperForm.sectionLabel}><input value={section.label_hi} onChange={(event) => update(index, "label_hi", event.target.value)} /></Field>
+          </div>
+          {(section.custom_questions || []).length > 0 && <div className="paper-custom-question-list">
+            <strong>{t.paperForm.customQuestions}</strong>
+            {section.custom_questions.map((question, questionIndex) => <fieldset className="paper-custom-question" key={question.ui_id || questionIndex}>
+              <legend>{t.paperForm.questionText} {questionIndex + 1}</legend>
+              <button type="button" className="paper-custom-question-remove" onClick={() => removeQuestion(index, questionIndex)} aria-label={`${t.paperForm.remove}: ${t.paperForm.questionText} ${questionIndex + 1}`}>×</button>
+              <Field label={t.paperForm.questionText} wide><textarea required rows="2" value={question.text_hi} onChange={(event) => updateQuestion(index, questionIndex, "text_hi", event.target.value)} /></Field>
+              {section.type === "mcq" && <div className="paper-custom-options">{[0, 1, 2, 3].map((optionIndex) => <Field key={optionIndex} label={`${t.paperForm.option} ${["क", "ख", "ग", "घ"][optionIndex]}`}><input required value={question.options_hi?.[optionIndex] || ""} onChange={(event) => { const options = Array.from({ length: 4 }, (_, index) => question.options_hi?.[index] || ""); options[optionIndex] = event.target.value; updateQuestion(index, questionIndex, "options_hi", options); }} /></Field>)}</div>}
+              <Field label={t.paperForm.alternative} wide><textarea rows="2" value={question.or_text_hi || ""} onChange={(event) => updateQuestion(index, questionIndex, "or_text_hi", event.target.value)} /></Field>
+              <Field label={t.paperForm.answer} wide><textarea rows="2" value={question.answer_hi || ""} onChange={(event) => updateQuestion(index, questionIndex, "answer_hi", event.target.value)} /></Field>
+              <Field label={t.paperForm.markingPoints} wide><textarea rows="2" value={(question.marking_points_hi || []).join("\n")} onChange={(event) => updateQuestion(index, questionIndex, "marking_points_hi", event.target.value.split("\n").map((item) => item.trim()).filter(Boolean))} /></Field>
+            </fieldset>)}
+          </div>}
+          <button className="paper-add-question" type="button" onClick={() => addQuestion(index)}>+ {t.paperForm.addQuestion}</button>
+          </div>
+        </details>
+      ))}
+      <button className="paper-add-section" type="button" onClick={add} disabled={sections.length >= 12}>+ {t.paperForm.addSection}</button>
+      {sections.length >= 12 && <small className="paper-section-limit" role="status">{t.paperForm.sectionLimit}</small>}
+    </fieldset>
+  );
 }
 
 function FireIcon() {
@@ -332,6 +520,13 @@ export default function TeacherDashboard() {
   const [profile, setProfile] = useState({ name: "Teacher", email: "", class_level: "10", medium: "Hindi", role: "teacher" });
   const [curriculum, setCurriculum] = useState(initialCurriculum);
   const [paper, setPaper] = useState(initialPaper);
+  const [chapterOptions, setChapterOptions] = useState([]);
+  const [chapterLoading, setChapterLoading] = useState(false);
+  const [chapterError, setChapterError] = useState("");
+  const [paperScopeError, setPaperScopeError] = useState("");
+  const [paperBlueprintTouched, setPaperBlueprintTouched] = useState(false);
+  const paperBlueprintStatusRef = useRef(null);
+  const previousPaperRef = useRef(paper);
   const [lesson, setLesson] = useState(initialLesson);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -356,6 +551,38 @@ export default function TeacherDashboard() {
       setProfile(data);
     }).catch(() => navigate("/login", { replace: true }));
   }, [navigate]);
+
+  useEffect(() => {
+    let active = true;
+    const requestedSubject = paper.subject;
+    const requestedClass = paper.class_level;
+    setChapterLoading(true);
+    setChapterError("");
+    api.get("/teacher/chapter-options", { params: { subject: requestedSubject, class_level: requestedClass } })
+      .then(({ data }) => {
+        if (!active) return;
+        const chapters = Array.isArray(data?.chapters)
+          ? data.chapters.filter((chapter) => chapter?.id && chapter?.label).map((chapter) => ({ id: String(chapter.id), code: String(chapter.code || chapter.id), label: String(chapter.label), group: String(chapter.group || "") }))
+          : [];
+        const validIds = new Set(chapters.map((chapter) => chapter.id));
+        setChapterOptions(chapters);
+        setPaper((current) => current.subject === requestedSubject && current.class_level === requestedClass
+          ? { ...current, selected_chapters: current.selected_chapters.filter((id) => validIds.has(id)) }
+          : current);
+      })
+      .catch(() => {
+        if (!active) return;
+        setChapterOptions([]);
+        setChapterError("chapter-options");
+      })
+      .finally(() => { if (active) setChapterLoading(false); });
+    return () => { active = false; };
+  }, [paper.class_level, paper.subject]);
+
+  useEffect(() => {
+    if (previousPaperRef.current !== paper && result?.type === "paper") setResult(null);
+    previousPaperRef.current = paper;
+  }, [paper]);
 
   useEffect(() => {
     if (!showProfileMenu) return;
@@ -419,7 +646,27 @@ export default function TeacherDashboard() {
     setResult(null);
     try {
       const response = await api.post(endpoint, payload);
-      const entry = { title, type, content: response.data.content, sources: response.data.sources || [], createdAt: new Date().toISOString() };
+      const entry = {
+        title,
+        type,
+        content: response.data.content,
+        paper_content: response.data.paper_content || "",
+        answer_key: response.data.answer_key || "",
+        blueprint: response.data.blueprint || "",
+        medium: response.data.medium || payload.medium,
+        paper_meta: response.data.paper_meta || (type === "paper" ? {
+          board: "CGBSE",
+          session: "2026–27",
+          class_level: payload.class_level,
+          subject: payload.subject,
+          total_marks: payload.total_marks,
+          duration_minutes: payload.duration_minutes,
+          paper_type: payload.paper_type,
+        } : null),
+        paper_data: response.data.paper_data || null,
+        sources: response.data.sources || [],
+        createdAt: new Date().toISOString(),
+      };
       setResult(entry);
       saveRecent(entry);
     } catch (err) {
@@ -457,6 +704,48 @@ export default function TeacherDashboard() {
   const meta = toolMeta[lang][activeTool] || toolMeta[lang].home;
   const visiblePapers = pyqSubject === "All" ? assessmentPapers : assessmentPapers.filter((paper) => paper.subject === pyqSubject);
   const pyqSubjects = [...new Set(assessmentPapers.map((paper) => paper.subject))];
+  const enabledPaperFields = paper.enabled_fields || [];
+  const paperUnits = lang === "hi" ? { questions: "प्रश्न", mark: "अंक", marks: "अंक" } : { questions: "questions", mark: "mark", marks: "marks" };
+  const blueprintTotals = paperSectionTotals(paper.sections);
+  const targetMarks = Number(paper.total_marks);
+  const targetQuestions = Number(paper.question_count);
+  const blueprintCanBeTarget = blueprintTotals.marks >= 5 && blueprintTotals.marks <= 200
+    && blueprintTotals.questions >= 1 && blueprintTotals.questions <= 100
+    && blueprintTotals.marks >= blueprintTotals.questions && blueprintTotals.marks <= blueprintTotals.questions * 20;
+  const paperTargetsValid = Number.isInteger(targetMarks) && targetMarks >= 5 && targetMarks <= 200
+    && Number.isInteger(targetQuestions) && targetQuestions >= 1 && targetQuestions <= 100
+    && targetMarks >= targetQuestions && targetMarks <= targetQuestions * 20;
+  const paperBlueprintMatches = paperTargetsValid && targetMarks === blueprintTotals.marks && targetQuestions === blueprintTotals.questions;
+  const setPaperScope = (field, value) => {
+    setPaperScopeError("");
+    setPaper((current) => ({ ...current, [field]: value, selected_chapters: [] }));
+  };
+  const removePaperField = (field) => setPaper((current) => ({ ...current, enabled_fields: current.enabled_fields.filter((item) => item !== field) }));
+  const restorePaperField = (field) => setPaper((current) => ({ ...current, enabled_fields: [...new Set([...current.enabled_fields, field])] }));
+  const useCurrentSectionTotals = () => {
+    setPaperBlueprintTouched(false);
+    setPaper((current) => ({ ...current, total_marks: blueprintTotals.marks, question_count: blueprintTotals.questions }));
+  };
+  const focusPaperBlueprint = () => requestAnimationFrame(() => paperBlueprintStatusRef.current?.focus());
+  const submitPaper = (event) => {
+    event.preventDefault();
+    const hasTypedScope = enabledPaperFields.includes("syllabus") && paper.syllabus.trim().length > 0;
+    const missingScope = !paper.selected_chapters.length && !hasTypedScope;
+    setPaperScopeError(missingScope ? t.paperForm.chapterRequired : "");
+    setPaperBlueprintTouched(!paperBlueprintMatches);
+    if (!paperBlueprintMatches || missingScope) {
+      if (!paperBlueprintMatches) focusPaperBlueprint();
+      return;
+    }
+    const payload = { class_level: paper.class_level, subject: paper.subject, selected_chapters: paper.selected_chapters, sections: serializePaperSections(paper.sections), total_marks: targetMarks, question_count: targetQuestions };
+    if (enabledPaperFields.includes("duration")) payload.duration_minutes = paper.duration_minutes;
+    if (enabledPaperFields.includes("difficulty")) payload.difficulty = paper.difficulty;
+    if (enabledPaperFields.includes("paper_type")) payload.paper_type = paper.paper_type;
+    if (enabledPaperFields.includes("medium")) payload.medium = paper.medium;
+    if (enabledPaperFields.includes("syllabus")) payload.syllabus = paper.syllabus;
+    if (enabledPaperFields.includes("instructions")) payload.instructions = paper.instructions;
+    runTool("/teacher/test-paper", payload, `${paper.class_level} ${paper.subject} ${targetMarks}-mark paper`, "paper");
+  };
 
   return (
     <div className={`teacher-shell teacher-tool-${activeTool}`}>
@@ -539,23 +828,44 @@ export default function TeacherDashboard() {
 
         {activeTool === "paper" && (
           <section className="teacher-workspace">
-            <form onSubmit={(e) => { e.preventDefault(); runTool("/teacher/test-paper", paper, `${paper.class_level} ${paper.subject} ${paper.total_marks}-mark paper`, "paper"); }} className="teacher-generator-form">
+            <form onSubmit={submitPaper} className="teacher-generator-form paper-builder-form">
               <div className="teacher-form-title"><span>02</span><div><h2>{t.paperForm.title}</h2><p>{t.paperForm.note}</p></div></div>
               <div className="teacher-form-grid">
-                <Field label={t.classLabel}><select value={paper.class_level} onChange={(e) => setPaper({ ...paper, class_level: e.target.value })}>{Array.from({ length: 12 }, (_, i) => <option key={i + 1}>{i + 1}</option>)}</select></Field>
-                <Field label={t.subject}><select value={paper.subject} onChange={(e) => setPaper({ ...paper, subject: e.target.value })}>{subjects.map((item) => <option key={item} value={item}>{t.subjectNames[item]}</option>)}</select></Field>
-                <Field label={t.paperForm.marks}><input type="number" min="5" max="200" value={paper.total_marks} onChange={(e) => setPaper({ ...paper, total_marks: Number(e.target.value) })} /></Field>
-                <Field label={t.paperForm.questions}><input type="number" min="1" max="100" value={paper.question_count} onChange={(e) => setPaper({ ...paper, question_count: Number(e.target.value) })} /></Field>
-                <Field label={t.paperForm.duration}><input type="number" min="10" max="360" value={paper.duration_minutes} onChange={(e) => setPaper({ ...paper, duration_minutes: Number(e.target.value) })} /></Field>
-                <Field label={t.paperForm.difficulty}><select value={paper.difficulty} onChange={(e) => setPaper({ ...paper, difficulty: e.target.value })}><option value="easy">{t.options.easy}</option><option value="balanced">{t.options.balanced}</option><option value="challenging">{t.options.challenging}</option></select></Field>
-                <Field label={t.paperForm.type}><select value={paper.paper_type} onChange={(e) => setPaper({ ...paper, paper_type: e.target.value })}><option value="unit_test">{t.options.unit}</option><option value="term_exam">{t.options.term}</option><option value="practice">{t.options.practice}</option><option value="worksheet">{t.options.worksheet}</option></select></Field>
-                <Field label={t.medium}><select value={paper.medium} onChange={(e) => setPaper({ ...paper, medium: e.target.value })}><option value="Hindi">{t.options.hindi}</option><option value="English">{t.options.english}</option><option value="Bilingual">{t.options.bilingual}</option></select></Field>
-                <Field label={t.paperForm.syllabus} wide><textarea required rows="4" value={paper.syllabus} onChange={(e) => setPaper({ ...paper, syllabus: e.target.value })} placeholder={t.paperForm.syllabusPlaceholder} /></Field>
-                <Field label={t.paperForm.instructions} wide><textarea rows="3" value={paper.instructions} onChange={(e) => setPaper({ ...paper, instructions: e.target.value })} placeholder={t.paperForm.instructionsPlaceholder} /></Field>
+                <Field label={t.classLabel}><select value={paper.class_level} onChange={(e) => setPaperScope("class_level", e.target.value)}>{Array.from({ length: 12 }, (_, i) => <option key={i + 1}>{i + 1}</option>)}</select></Field>
+                <Field label={t.subject}><select value={paper.subject} onChange={(e) => setPaperScope("subject", e.target.value)}>{subjects.map((item) => <option key={item} value={item}>{t.subjectNames[item]}</option>)}</select></Field>
+                <Field label={t.paperForm.marks}><input className="paper-target-input" type="number" inputMode="numeric" min="5" max="200" step="1" value={paper.total_marks} aria-describedby="paper-target-note paper-blueprint-status" aria-invalid={paperBlueprintTouched && !paperTargetsValid} onChange={(e) => setPaper((current) => ({ ...current, total_marks: e.target.value }))} onBlur={() => setPaperBlueprintTouched(true)} /></Field>
+                <Field label={t.paperForm.questions}><input className="paper-target-input" type="number" inputMode="numeric" min="1" max="100" step="1" value={paper.question_count} aria-describedby="paper-target-note paper-blueprint-status" aria-invalid={paperBlueprintTouched && !paperTargetsValid} onChange={(e) => setPaper((current) => ({ ...current, question_count: e.target.value }))} onBlur={() => setPaperBlueprintTouched(true)} /></Field>
+                <p className="paper-target-note" id="paper-target-note">{t.paperForm.targetNote}</p>
+                <section ref={paperBlueprintStatusRef} id="paper-blueprint-status" className={`paper-blueprint-status ${paperBlueprintMatches ? "matched" : paperTargetsValid ? "mismatch" : "invalid"}`} tabIndex="-1" role={paperBlueprintTouched && !paperBlueprintMatches ? "alert" : "status"} aria-live="polite">
+                  <span className="paper-blueprint-status-icon" aria-hidden="true">{paperBlueprintMatches ? "✓" : "!"}</span>
+                  <div>
+                    <strong>{paperBlueprintMatches ? t.paperForm.blueprintReady : paperTargetsValid ? t.paperForm.blueprintMismatch : t.paperForm.targetInvalid}</strong>
+                    <div className="paper-blueprint-values">
+                      <span><small>{t.paperForm.paperTarget}</small><b>{paper.total_marks || "—"} {paperUnits.marks} · {paper.question_count || "—"} {paperUnits.questions}</b></span>
+                      <span><small>{t.paperForm.currentBlueprint}</small><b>{blueprintTotals.marks} {paperUnits.marks} · {blueprintTotals.questions} {paperUnits.questions}</b></span>
+                    </div>
+                    {!paperBlueprintMatches && paperTargetsValid && <p>{t.paperForm.adjustSections}</p>}
+                  </div>
+                  {!paperBlueprintMatches && <div className="paper-blueprint-actions">
+                    <button type="button" disabled={!blueprintCanBeTarget} onClick={useCurrentSectionTotals}>{t.paperForm.useSectionTotals}</button>
+                    <button type="button" onClick={() => { const builder = document.getElementById("paper-section-builder"); builder?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); builder?.focus({ preventScroll: true }); }}>{t.paperForm.editSections}</button>
+                  </div>}
+                </section>
+                {enabledPaperFields.includes("duration") && <Field label={t.paperForm.duration} removable onRemove={() => removePaperField("duration")} removeLabel={t.paperForm.removeField}><input type="number" min="10" max="360" value={paper.duration_minutes} onChange={(e) => setPaper({ ...paper, duration_minutes: Number(e.target.value) })} /></Field>}
+                {enabledPaperFields.includes("difficulty") && <Field label={t.paperForm.difficulty} removable onRemove={() => removePaperField("difficulty")} removeLabel={t.paperForm.removeField}><select value={paper.difficulty} onChange={(e) => setPaper({ ...paper, difficulty: e.target.value })}><option value="easy">{t.options.easy}</option><option value="balanced">{t.options.balanced}</option><option value="challenging">{t.options.challenging}</option></select></Field>}
+                {enabledPaperFields.includes("paper_type") && <Field label={t.paperForm.type} removable onRemove={() => removePaperField("paper_type")} removeLabel={t.paperForm.removeField}><select value={paper.paper_type} onChange={(e) => setPaper({ ...paper, paper_type: e.target.value })}><option value="unit_test">{t.options.unit}</option><option value="term_exam">{t.options.term}</option><option value="practice">{t.options.practice}</option><option value="worksheet">{t.options.worksheet}</option></select></Field>}
+                {enabledPaperFields.includes("medium") && <Field label={t.medium} removable onRemove={() => removePaperField("medium")} removeLabel={t.paperForm.removeField}><select value={paper.medium} onChange={(e) => setPaper({ ...paper, medium: e.target.value })}><option value="Hindi">{t.options.hindi}</option><option value="English">{t.options.english}</option><option value="Bilingual">{t.options.bilingual}</option></select></Field>}
+                <ChapterPicker options={chapterOptions} selected={paper.selected_chapters} onChange={(selected_chapters) => { setPaperScopeError(""); setPaper((current) => ({ ...current, selected_chapters })); }} loading={chapterLoading} error={chapterError} t={t} />
+                {paperScopeError && <p className="paper-scope-error" role="alert">{paperScopeError}</p>}
+                {enabledPaperFields.includes("syllabus") && <Field label={t.paperForm.syllabus} wide removable onRemove={() => removePaperField("syllabus")} removeLabel={t.paperForm.removeField}><textarea rows="4" value={paper.syllabus} onChange={(e) => { setPaperScopeError(""); setPaper({ ...paper, syllabus: e.target.value }); }} placeholder={t.paperForm.syllabusPlaceholder} /></Field>}
+                {enabledPaperFields.includes("instructions") && <Field label={t.paperForm.instructions} wide removable onRemove={() => removePaperField("instructions")} removeLabel={t.paperForm.removeField}><textarea rows="3" value={paper.instructions} onChange={(e) => setPaper({ ...paper, instructions: e.target.value })} placeholder={t.paperForm.instructionsPlaceholder} /></Field>}
+                <OptionalPaperSettings enabled={enabledPaperFields} onRestore={restorePaperField} t={t} />
               </div>
+              <PaperSectionBuilder sections={paper.sections} onChange={(sections) => setPaper((current) => ({ ...current, sections }))} t={t} units={paperUnits} />
+              {error && <p className="paper-form-error" role="alert">{error}</p>}
               <button className="teacher-generate" type="submit" disabled={loading}>{loading ? t.paperForm.loading : t.paperForm.action}</button>
             </form>
-            {renderResult(result, error, loading, copyResult, t)}
+            {renderResult(result, error, loading, copyResult, t, paper)}
           </section>
         )}
 
@@ -616,9 +926,154 @@ export default function TeacherDashboard() {
   );
 }
 
-function renderResult(result, error, loading, onCopy, t) {
+function makePaperDraft(paper) {
+  let number = 1;
+  const totalMarks = paper.sections.reduce((sum, section) => sum + section.count * section.marks_each, 0);
+  return {
+    title: "Live paper preview",
+    type: "paper",
+    draft: true,
+    medium: paper.medium,
+    paper_content: "preview",
+    paper_meta: { board: "CGBSE", session: "2026–27", class_level: paper.class_level, subject: paper.subject, total_marks: totalMarks, duration_minutes: paper.duration_minutes, paper_type: paper.paper_type },
+    paper_data: {
+      instructions: paper.enabled_fields?.includes("instructions") && paper.instructions.trim().split("\n").filter(Boolean).length ? paper.instructions.trim().split("\n").filter(Boolean) : paper.sections.map((section) => `खंड ${section.name} में ${section.count} ${section.label_hi} हैं; प्रत्येक प्रश्न ${section.marks_each} अंक का है${section.word_limit ? ` और शब्द सीमा ${section.word_limit} है` : ""}।`),
+      sections: paper.sections.map((section) => ({ ...section, questions: Array.from({ length: section.count }, (_, index) => {
+        const custom = section.custom_questions?.[index];
+        return { number: number++, text_hi: custom?.text_hi || "प्रश्न निर्माण के बाद यहाँ दिखाई देगा।", options_hi: section.type === "mcq" ? (custom?.options_hi?.some(Boolean) ? custom.options_hi : ["विकल्प क", "विकल्प ख", "विकल्प ग", "विकल्प घ"]) : [], or_text_hi: custom?.or_text_hi || "" };
+      }) })),
+    },
+    sources: [],
+  };
+}
+
+function renderResult(result, error, loading, onCopy, t, paperDraft = null) {
   if (error) return <section className="teacher-result error-state"><strong>{t.result.error}</strong><p>{error}</p></section>;
   if (loading) return <section className="teacher-result loading-state"><div className="teacher-loader" /><strong>{t.result.loading}</strong><p>{t.result.loadingNote}</p></section>;
+  if (!result && paperDraft) return <GeneratedResource result={makePaperDraft(paperDraft)} onCopy={onCopy} t={t} />;
   if (!result) return <section className="teacher-result empty-state"><span><Icon name="sparkle" size={34} /></span><strong>{t.result.empty}</strong><p>{t.result.emptyNote}</p></section>;
-  return <section className="teacher-result generated-resource"><header><div><span>{t.result.generated}</span><h2>{result.title}</h2></div><div><button type="button" onClick={onCopy}>{t.result.copy}</button><button type="button" onClick={() => window.print()}>{t.result.print}</button></div></header><article><RichMarkdown>{result.content}</RichMarkdown></article>{result.sources?.length > 0 && <footer><strong>{t.result.sources}</strong>{result.sources.map((source) => <span key={source}>{source}</span>)}</footer>}</section>;
+  return <GeneratedResource result={result} onCopy={onCopy} t={t} />;
+}
+
+function GeneratedResource({ result, onCopy, t }) {
+  const isPaper = result.type === "paper" && result.paper_content;
+  const [paperTab, setPaperTab] = useState("paper");
+  const downloadPdf = (part) => {
+    document.body.dataset.teacherPrint = part;
+    const originalTitle = document.title;
+    document.title = `${result.paper_meta?.board || "CGBSE"}-${result.paper_meta?.class_level || "10"}-${result.paper_meta?.subject || "paper"}`;
+    window.print();
+    document.title = originalTitle;
+    delete document.body.dataset.teacherPrint;
+  };
+  const subjectHindi = copy.hi.subjectNames[result.paper_meta?.subject] || result.paper_meta?.subject || "";
+  const paperTypeHindi = {
+    unit_test: "इकाई परीक्षा",
+    term_exam: "सत्र परीक्षा",
+    practice: "अभ्यास प्रश्नपत्र",
+    worksheet: "अभ्यास पत्रक",
+  }[result.paper_meta?.paper_type] || "प्रश्नपत्र";
+  const documentTitle = paperTab === "paper" ? paperTypeHindi : paperTab === "answers" ? t.result.answers : t.result.blueprint;
+
+  return (
+    <section className={`teacher-result generated-resource${isPaper ? " paper-resource" : ""}`}>
+      <header>
+        <div><span>{t.result.generated}</span><h2>{result.title}</h2></div>
+        <div>
+          {!result.draft && <button type="button" onClick={onCopy}>{t.result.copy}</button>}
+          <button type="button" className="paper-download-action" onClick={() => downloadPdf(isPaper && paperTab === "answers" ? "answers" : "paper")}><Icon name="download" size={16} />{paperTab === "answers" ? t.result.answerPrint : t.result.print}</button>
+        </div>
+      </header>
+      {isPaper ? (
+        <>
+          {!result.draft && <nav className="paper-result-tabs" aria-label={t.result.generated}>
+            <button type="button" className={paperTab === "paper" ? "active" : ""} onClick={() => setPaperTab("paper")}>{t.result.paper}</button>
+            <button type="button" className={paperTab === "answers" ? "active" : ""} onClick={() => setPaperTab("answers")}>{t.result.answers}</button>
+            <button type="button" className={paperTab === "blueprint" ? "active" : ""} onClick={() => setPaperTab("blueprint")}>{t.result.blueprint}</button>
+          </nav>}
+          <article className={`paper-print-sheet paper-part-${paperTab}`} lang={result.medium === "Hindi" ? "hi" : undefined}>
+            <header className="paper-document-header">
+              <div className="paper-board-name">{result.paper_meta?.board || "CGBSE"}</div>
+              <div className="paper-document-title">{documentTitle}</div>
+              <div className="paper-session">शैक्षणिक सत्र {result.paper_meta?.session || "2026–27"}</div>
+              {paperTab === "paper" && <div className="paper-school-fields"><span>विद्यालय: ______________________________</span><span>रोल नंबर: ______________</span></div>}
+              <div className="paper-meta-grid">
+                <span>कक्षा — {result.paper_meta?.class_level || "10"}</span>
+                <span>समय — {result.paper_meta?.duration_minutes || "—"} मिनट</span>
+                <span>विषय — {subjectHindi}</span>
+                <span>पूर्णांक — {result.paper_meta?.total_marks || "—"}</span>
+              </div>
+            </header>
+            <div className="paper-document-body">{paperTab === "paper" && result.paper_data ? <StructuredPaper data={result.paper_data} t={t} /> : <RichMarkdown>{paperTab === "paper" ? result.paper_content : paperTab === "answers" ? result.answer_key : result.blueprint}</RichMarkdown>}</div>
+            <footer className="paper-document-footer"><span>{subjectHindi} · {result.paper_meta?.board || "CGBSE"}</span><span>VidyaAI द्वारा तैयार</span></footer>
+          </article>
+        </>
+      ) : <article><RichMarkdown>{result.content}</RichMarkdown></article>}
+      {result.sources?.length > 0 && <footer><strong>{t.result.sources}</strong>{result.sources.map((source) => <span key={source}>{source}</span>)}</footer>}
+    </section>
+  );
+}
+
+function buildPaperPages(data) {
+  const pages = [];
+  let current = { instructions: data.instructions, sections: [] };
+  let capacity = 5;
+  data.sections.forEach((section) => {
+    for (let index = 0; index < section.questions.length; index += capacity) {
+      const questions = section.questions.slice(index, index + capacity);
+      if (current.sections.length) {
+        pages.push(current);
+        current = { instructions: null, sections: [] };
+        capacity = 7;
+      }
+      current.sections.push({ ...section, questions });
+    }
+  });
+  if (current.instructions || current.sections.length) pages.push(current);
+  return pages;
+}
+
+function StructuredPaper({ data, t }) {
+  const pages = useMemo(() => buildPaperPages(data), [data]);
+  const [page, setPage] = useState(0);
+  const [direction, setDirection] = useState("next");
+  useEffect(() => setPage((current) => Math.min(current, pages.length - 1)), [pages.length]);
+  const goTo = (nextPage) => {
+    if (nextPage < 0 || nextPage >= pages.length || nextPage === page) return;
+    setDirection(nextPage > page ? "next" : "previous");
+    setPage(nextPage);
+  };
+  const handleKeys = (event) => {
+    if (event.key === "ArrowLeft") goTo(page - 1);
+    if (event.key === "ArrowRight") goTo(page + 1);
+  };
+  return (
+    <div className="paper-book-viewer" tabIndex="0" onKeyDown={handleKeys} aria-label={`${t.result.page} ${page + 1}`}>
+      <div className="paper-flip-stage">
+        {pages.map((paperPage, pageIndex) => <div key={pageIndex} className={`paper-flip-page${pageIndex === page ? ` active flip-${direction}` : ""}`} aria-hidden={pageIndex !== page}>
+          {paperPage.instructions && <section className="paper-instructions"><strong>निर्देश</strong><ol>{paperPage.instructions.map((instruction, index) => <li key={index}>{instruction}</li>)}</ol></section>}
+          {paperPage.sections.map((section) => (
+        <section className="paper-question-section" key={section.name}>
+          <h2>खंड {section.name} — {section.label_hi} [{section.marks_each} × {section.questions.length} = {section.marks_each * section.questions.length}]</h2>
+          {section.questions.map((question) => (
+            <article className="paper-question" key={question.number}>
+              <span className="paper-question-marks">({section.marks_each})</span>
+              <strong>प्रश्न {question.number}.</strong>
+              <p>{question.text_hi}</p>
+              {question.options_hi?.length > 0 && <div className="paper-options">{question.options_hi.map((option, index) => <span key={option}>({["क", "ख", "ग", "घ"][index]}) {option}</span>)}</div>}
+              {question.or_text_hi && <><div className="paper-or">अथवा</div><p>{question.or_text_hi}</p></>}
+            </article>
+          ))}
+        </section>
+          ))}
+          <div className="paper-page-number">{t.result.page} {pageIndex + 1}</div>
+        </div>)}
+      </div>
+      {pages.length > 1 && <nav className="paper-page-controls" aria-label={t.result.page}>
+        <button type="button" disabled={page === 0} onClick={() => goTo(page - 1)} aria-label={t.result.previousPage}><Icon name="arrowRight" size={18} /></button>
+        <span>{t.result.page} {page + 1} / {pages.length}</span>
+        <button type="button" disabled={page === pages.length - 1} onClick={() => goTo(page + 1)} aria-label={t.result.nextPage}><Icon name="arrowRight" size={18} /></button>
+      </nav>}
+    </div>
+  );
 }

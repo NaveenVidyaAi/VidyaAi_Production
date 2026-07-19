@@ -48,10 +48,10 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 ### Teacher Features
 - **Role-aware entry** — Login and registration ask whether the user is a student or teacher and open the matching workspace
 - **Curriculum Creator** — Builds a week-wise curriculum with outcomes, period allocation, activities, assessments, differentiation, revision, and a teacher checklist
-- **Test & Paper Creator** — Accepts class, subject, syllabus, marks, question count, duration, difficulty, medium, and paper type; returns a printable paper, answer key, and marking scheme
+- **Test & Paper Creator** — Uses official subject/chapter choices for RAG; lets teachers edit total marks, question count, sections, marks per question, word limits, optional settings, and teacher-written questions; returns a Hindi CGBSE-style paper, blueprint, answer key, and marking scheme
 - **How to Teach** — Prepares the teacher with a topic explanation, prerequisites, important points, misconceptions, minute-by-minute lesson flow, board work, examples, classroom questions, activities, differentiation, assessment, and likely student doubts
 - **Shared AI Chat and PYQ** — Teachers use the same curriculum-grounded chat and exact-paper PYQ library as students
-- **Reusable outputs** — Generated teacher resources can be copied, printed/saved as PDF, and reopened from browser-local recent history
+- **Reusable outputs** — Generated resources can be copied and reopened from browser-local recent history; question papers and answer keys expose PDF download/save actions without a separate direct-print action
 
 ### AI / RAG Features
 - **Hybrid RAG** — Retrieves relevant chunks from Qdrant vector DB, sends to Groq LLM with context
@@ -315,6 +315,7 @@ Create a `.env` file in the project root:
 # Groq LLM
 GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxx
 GROQ_MODEL=llama-3.1-8b-instant
+GROQ_PAPER_MODEL=openai/gpt-oss-20b
 
 # PostgreSQL (used inside Docker network)
 DATABASE_URL=postgresql://vidyaai:password@postgres:5432/vidyaai_db
@@ -326,12 +327,14 @@ QDRANT_PORT=6333
 # JWT
 JWT_SECRET=your-secret-key-change-this-in-production
 
-# Embeddings — set to false to use real sentence-transformers
-USE_MOCK_EMBEDDINGS=true
+# Embeddings — keep false for textbook-aware semantic retrieval
+USE_MOCK_EMBEDDINGS=false
 
 # Comma-separated list of admin email addresses
 ADMIN_EMAILS=admin@vidyaai.in
 ```
+
+`GROQ_MODEL` serves general chat and teaching helpers. `GROQ_PAPER_MODEL` is isolated so the paper creator can use strict JSON-schema generation and a token allowance suitable for a complete paper; the tested default is `openai/gpt-oss-20b`. Real RAG retrieval also requires the pinned `sentence-transformers` dependency and a locally cached embedding model when `ALLOW_EMBEDDING_DOWNLOAD=false`.
 
 ---
 
@@ -662,12 +665,16 @@ At login or registration, select **Teacher** to receive a JWT with `role: "teach
 | Workspace | Teacher inputs | Generated output |
 |---|---|---|
 | Curriculum Creator | Class, subject, duration, weekly periods, medium, chapters, learning goals | Outcomes, week-wise sequence, period allocation, pedagogy, resources, assessments, differentiation, revision, and checklist |
-| Test & Paper Creator | Class, subject, syllabus, total marks, question count, duration, difficulty, paper type, medium, instructions | Blueprint, printable numbered paper, answer key, marking scheme, and validation checklist |
+| Test & Paper Creator | Class/subject, exact official chapters, optional syllabus boundary, editable total marks/question count, removable optional settings, and an editable section blueprint with teacher-written questions | Hindi CGBSE-style numbered paper, blueprint, answer key, marking scheme, grounded source labels, and PDF-ready student/teacher views |
 | How to Teach | Class, subject, chapter/topic, lesson duration, medium, student readiness, teacher notes | Teacher concept briefing, lesson objectives, important points, misconceptions, timed lesson flow, board plan, examples, questions, activity, differentiation, checks, homework, and likely doubts |
 
-Teacher generators search the same Qdrant curriculum collection used by student chat. Strongly matched chunks are supplied to Groq as factual context and returned as source labels. When no strong source is found, the generated resource explicitly tells the teacher to verify chapter-specific details. If Groq is unavailable, the API returns a structured draft instead of failing with an empty screen.
+Teacher generators search the same Qdrant curriculum collection used by student chat. The paper creator retrieves the official model-paper pattern separately from every selected chapter scope, then adds locally available curriculum/model/PYQ excerpts when the vector index is incomplete. Legacy textbook chunks whose document type predates the catalog are normalized as textbook evidence during retrieval, so their textbook boost and source label are preserved. Strongly matched chunks are supplied to Groq as factual context and returned as source labels.
 
-Generated resources are kept in browser-local recent history, not in PostgreSQL. Teachers can copy the Markdown or use the print action to save it as PDF. **AI-generated curricula, assessments, answer keys, and teaching explanations remain drafts and should be checked against the current board syllabus and textbook before classroom use.**
+The paper form keeps the teacher in control: total marks and question count are editable targets, but generation is blocked until the section totals match them. Teachers can add/remove sections (up to 12), edit section names/types/counts/marks/word limits, and add their own questions, options, alternatives, answers, and marking points. Optional duration, difficulty, paper type, medium, syllabus-boundary, and instruction fields can be removed and restored. Teacher-written values are locked server-side; the backend also owns section metadata and consecutive numbering.
+
+Question-paper generation uses `GROQ_PAPER_MODEL` independently from the general chat model. It requests strict JSON-schema output, sends a compact balanced evidence excerpt, rejects incomplete/duplicate/non-Hindi or numerically invalid papers, and preserves the submitted blueprint. Provider failures return a clear error while leaving the teacher's form state intact; curriculum and lesson-guide generators retain their structured fallback drafts.
+
+The paper workspace shows a live paper-style draft before generation. A generated paper has separate Student paper, Answer key, and Blueprint tabs; the student paper is paginated in a keyboard-accessible 3D page-flip viewer with previous/next controls. Papers and answer keys use a PDF download/save action and do not expose a separate Print button. Generated resources are kept in browser-local recent history, not in PostgreSQL. **AI-generated curricula, assessments, answer keys, and teaching explanations remain drafts and should be checked against the current board syllabus and textbook before classroom use.**
 
 The **AI Chat** and **PYQ Library** are native sections of the teacher dashboard. Teachers can ask curriculum-grounded questions and browse, open, or download previous papers without leaving `/teacher`. The teacher header also keeps the active-day streak visible and includes a Hindi/English interface switch.
 
@@ -769,9 +776,36 @@ Click **"View"** on any row to open the user detail drawer.
 
 | Method | Endpoint | Description |
 |---|---|---|
+| GET | `/teacher/chapter-options?subject=Science&class_level=10` | Return the canonical grouped chapter choices and stable IDs used by paper RAG |
 | POST | `/teacher/curriculum` | Generate a curriculum plan from class, subject, weeks, periods, chapters, and goals |
-| POST | `/teacher/test-paper` | Generate a constrained question paper, answer key, and marking scheme |
+| POST | `/teacher/test-paper` | Validate the editable targets/section blueprint, retrieve selected-chapter evidence, and generate a strict Hindi paper, blueprint, answer key, and marking scheme |
 | POST | `/teacher/lesson-guide` | Generate a topic briefing and classroom teaching plan |
+
+Example paper request (the section counts and marks must equal the submitted targets):
+
+```json
+{
+  "class_level": "10",
+  "subject": "Science",
+  "selected_chapters": ["science-2"],
+  "syllabus": "",
+  "total_marks": 50,
+  "question_count": 23,
+  "duration_minutes": 90,
+  "difficulty": "balanced",
+  "paper_type": "unit_test",
+  "medium": "Hindi",
+  "instructions": "",
+  "sections": [
+    {"name": "A", "label_hi": "बहुविकल्पीय प्रश्न", "type": "mcq", "count": 10, "marks_each": 1, "word_limit": "", "custom_questions": []},
+    {"name": "B", "label_hi": "अति लघु उत्तरीय प्रश्न", "type": "very_short", "count": 5, "marks_each": 2, "word_limit": "30", "custom_questions": []},
+    {"name": "C", "label_hi": "लघु उत्तरीय प्रश्न", "type": "short", "count": 5, "marks_each": 3, "word_limit": "50", "custom_questions": []},
+    {"name": "D", "label_hi": "दीर्घ उत्तरीय प्रश्न", "type": "long", "count": 3, "marks_each": 5, "word_limit": "100", "custom_questions": []}
+  ]
+}
+```
+
+The response separates `paper_content`, `answer_key`, and `blueprint`, and also returns structured `paper_data`, `paper_meta`, and the exact `sources` displayed under the generated paper. Invalid target/section totals or unknown chapter IDs return `422` before an AI request is made.
 
 ### PYQ Practice
 
@@ -1232,6 +1266,7 @@ Production PostgreSQL, Qdrant, and FastAPI ports bind to loopback; Nginx is the 
 | Embedding model missing | The service uses fixed mock vectors and relies on lexical/metadata scoring unless downloads are explicitly allowed. |
 | Weak or irrelevant retrieval | Context is withheld from Groq; strict chapter-dependent language/literature requests are not guessed. |
 | Groq unavailable or returns unusable quiz JSON | RAG uses its local fallback answer behavior; quiz generation uses deterministic fallback MCQs when source text exists. |
+| Paper provider rejects or returns an invalid paper | The paper route retries a reduced request when appropriate, validates the complete structure, and returns a clear error without changing the teacher's chapter, target, section, or custom-question controls. |
 | Backend restart | Process-local cache, guest history, and pending chapter choices are lost; PostgreSQL and Qdrant data remain. |
 
 ### Documentation Rule

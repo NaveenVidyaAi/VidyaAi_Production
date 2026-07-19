@@ -116,6 +116,64 @@ class RAGRetrievalTests(unittest.TestCase):
 
         self.assertIn("Model Question Paper", results[0][3])
 
+    def test_legacy_textbook_content_types_use_textbook_document_type(self):
+        for content_type in ("theory", "example", "question"):
+            with self.subTest(content_type=content_type):
+                self.assertEqual(
+                    rag._payload_document_type({"content_type": content_type}),
+                    "textbook",
+                )
+
+        self.assertEqual(
+            rag._payload_document_type(
+                {"document_type": "curriculum", "content_type": "theory"}
+            ),
+            "curriculum",
+        )
+        self.assertEqual(
+            rag._payload_document_type({"content_type": "reading"}),
+            "reading",
+        )
+        self.assertEqual(
+            rag._format_source_label(
+                {"subject": "English", "content_type": "reading"},
+                "legacy-reading",
+            ),
+            "English",
+        )
+
+    def test_teacher_textbook_boost_includes_legacy_theory_chunks(self):
+        fake_client = FakeClient([
+            FakePoint(
+                {"subject": "Science", "class": "10", "content_type": "theory"},
+                "Class 10 Science acids bases important concepts and examples.",
+            ),
+            FakePoint(
+                {"subject": "Science", "class": "10", "document_type": "curriculum"},
+                "Class 10 Science acids bases important concepts and examples.",
+            ),
+        ])
+        original_client_factory = rag._get_qdrant_client
+        original_mock = rag.embedding_service.use_mock
+        rag._get_qdrant_client = lambda: fake_client
+        rag.embedding_service.use_mock = True
+        try:
+            results = rag._retrieve_context(
+                question="Class 10 Science acids bases important concepts",
+                subject="Science",
+                class_level="10",
+                weak_topics=[],
+                chapter_hint=None,
+                section_hint=None,
+                limit=2,
+                document_type_boosts={"textbook": 6.0, "curriculum": 0.0},
+            )
+        finally:
+            rag._get_qdrant_client = original_client_factory
+            rag.embedding_service.use_mock = original_mock
+
+        self.assertIn("Textbook", results[0][3])
+
     def test_teacher_strict_subject_excludes_other_subject_model_papers(self):
         fake_client = FakeClient([
             FakePoint(

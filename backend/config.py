@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     groq_api_key: str = ""
     groq_model: str = "llama-3.1-8b-instant"
+    groq_paper_model: str = "openai/gpt-oss-20b"
     database_url: str
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333

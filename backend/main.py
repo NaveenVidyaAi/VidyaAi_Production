@@ -14,7 +14,10 @@ from backend.config import settings
 from backend.database import init_db
 import asyncio
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
+# PDF text extraction is intentionally verbose at DEBUG and can bury the
+# actionable paper-generation error in thousands of glyph-level log lines.
+logging.getLogger("pdfminer").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="VidyaAI")

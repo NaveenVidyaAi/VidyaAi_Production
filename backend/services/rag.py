@@ -61,6 +61,12 @@ CLASS_10_SCIENCE_CHAPTER_KEYWORDS = {
 
 MENDEL_TERMS = ["mendel", "mendal", "मेंडल", "मेण्डल", "मेन्डल"]
 
+# Textbook chunks ingested before document-level catalog metadata was added use
+# these content-level labels without a ``document_type``. Keep the compatibility
+# mapping deliberately narrow so newer or unrelated resource types retain their
+# existing retrieval behavior.
+LEGACY_TEXTBOOK_CONTENT_TYPES = frozenset({"theory", "example", "question"})
+
 MATH_KEYWORD_PATTERN = re.compile(
     r"\b("
     r"maths?|mathematics|ganit|solve|calculate|simplify|factor(?:ise|ize)?|equation|"
@@ -1280,7 +1286,10 @@ def _format_source_label(payload: dict, source_id: str) -> str:
     chapter = str(payload.get("chapter", "")).strip()
     topic = _clean_metadata_text(str(payload.get("topic", "")).strip())
     source_file = str(payload.get("source_file", "")).strip()
-    document_type = str(payload.get("document_type", "")).strip().replace("_", " ")
+    document_type = str(payload.get("document_type") or "").strip().lower()
+    if not document_type and _payload_document_type(payload) == "textbook":
+        document_type = "textbook"
+    document_type = document_type.replace("_", " ")
     document_version = str(payload.get("document_version", "")).strip()
     academic_year = str(payload.get("academic_year", "")).strip()
 
@@ -1303,6 +1312,18 @@ def _format_source_label(payload: dict, source_id: str) -> str:
     if parts:
         return " | ".join(parts)
     return "Hindi Textbook Context"
+
+
+def _payload_document_type(payload: dict) -> str:
+    """Return the effective document type for current and legacy payloads."""
+    document_type = str(payload.get("document_type") or "").strip().lower()
+    if document_type:
+        return document_type
+
+    content_type = str(payload.get("content_type") or "").strip().lower()
+    if content_type in LEGACY_TEXTBOOK_CONTENT_TYPES:
+        return "textbook"
+    return content_type
 
 
 def _get_qdrant_client() -> QdrantClient:
@@ -1344,7 +1365,7 @@ def retrieve_pyq_paper_text(subject: str, source_file: str, limit: int = 8) -> t
     labels: list[str] = []
     for point in points:
         payload = point.payload or {}
-        document_type = str(payload.get("document_type") or payload.get("content_type") or "")
+        document_type = _payload_document_type(payload)
         if document_type not in {"previous_year_question", "model_question_paper"}:
             continue
         payload_subject = str(payload.get("subject") or "")
@@ -1454,7 +1475,7 @@ def _retrieve_context(
         payload_topic = str(payload.get("topic", "")).lower()
         payload_chapter = str(payload.get("chapter", "")).strip()
         content_type = str(payload.get("content_type", "")).lower()
-        document_type = str(payload.get("document_type", content_type)).lower()
+        document_type = _payload_document_type(payload)
 
         if payload.get("is_active_version") is False or str(payload.get("document_status", "active")).lower() != "active":
             continue
