@@ -316,6 +316,7 @@ Create a `.env` file in the project root:
 GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxx
 GROQ_MODEL=llama-3.1-8b-instant
 GROQ_PAPER_MODEL=openai/gpt-oss-20b
+GROQ_PAPER_FALLBACK_MODEL=openai/gpt-oss-120b
 
 # PostgreSQL (used inside Docker network)
 DATABASE_URL=postgresql://vidyaai:password@postgres:5432/vidyaai_db
@@ -334,7 +335,7 @@ USE_MOCK_EMBEDDINGS=false
 ADMIN_EMAILS=admin@vidyaai.in
 ```
 
-`GROQ_MODEL` serves general chat and teaching helpers. `GROQ_PAPER_MODEL` is isolated so the paper creator can use strict JSON-schema generation and a token allowance suitable for a complete paper; the tested default is `openai/gpt-oss-20b`. Real RAG retrieval also requires the pinned `sentence-transformers` dependency and a locally cached embedding model when `ALLOW_EMBEDDING_DOWNLOAD=false`.
+`GROQ_MODEL` serves general chat and teaching helpers. `GROQ_PAPER_MODEL` is the primary structured-generation model for papers and curricula; `GROQ_PAPER_FALLBACK_MODEL` provides a separate recovery pool when the primary model returns malformed JSON, exceeds its request allowance, or reaches its model-specific rate limit. The tested defaults are `openai/gpt-oss-20b` and `openai/gpt-oss-120b`. Real RAG retrieval also requires the pinned `sentence-transformers` dependency and a locally cached embedding model when `ALLOW_EMBEDDING_DOWNLOAD=false`.
 
 ---
 
@@ -668,11 +669,13 @@ At login or registration, select **Teacher** to receive a JWT with `role: "teach
 | Test & Paper Creator | Class/subject, exact official chapters, optional syllabus boundary, editable total marks/question count, removable optional settings, and an editable section blueprint with teacher-written questions | Hindi CGBSE-style numbered paper, blueprint, answer key, marking scheme, grounded source labels, and PDF-ready student/teacher views |
 | How to Teach | Class, subject, chapter/topic, lesson duration, medium, student readiness, teacher notes | Teacher concept briefing, lesson objectives, important points, misconceptions, timed lesson flow, board plan, examples, questions, activity, differentiation, checks, homework, and likely doubts |
 
-Teacher generators search the same Qdrant curriculum collection used by student chat. The paper creator retrieves the official model-paper pattern separately from every selected chapter scope, then adds locally available curriculum/model/PYQ excerpts when the vector index is incomplete. Legacy textbook chunks whose document type predates the catalog are normalized as textbook evidence during retrieval, so their textbook boost and source label are preserved. Strongly matched chunks are supplied to Groq as factual context and returned as source labels.
+Teacher generators search the same Qdrant curriculum collection used by student chat. The paper creator retrieves the official model-paper pattern separately from every selected chapter scope, then adds locally available curriculum/model/PYQ excerpts when the vector index is incomplete. Curriculum Creator also merges relevant local curriculum/model-paper excerpts, so it remains grounded when Qdrant is unavailable. Legacy textbook chunks whose document type predates the catalog are normalized as textbook evidence during retrieval, so their textbook boost and source label are preserved. Strongly matched chunks are supplied to Groq as factual context and returned as source labels.
 
 The paper form keeps the teacher in control: total marks and question count are editable targets, but generation is blocked until the section totals match them. Teachers can add/remove sections (up to 12), edit section names/types/counts/marks/word limits, and add their own questions, options, alternatives, answers, and marking points. Optional duration, difficulty, paper type, medium, syllabus-boundary, and instruction fields can be removed and restored. Teacher-written values are locked server-side; the backend also owns section metadata and consecutive numbering.
 
-Question-paper generation uses `GROQ_PAPER_MODEL` independently from the general chat model. It requests strict JSON-schema output, sends a compact balanced evidence excerpt, rejects incomplete/duplicate/non-Hindi or numerically invalid papers, and preserves the submitted blueprint. Provider failures return a clear error while leaving the teacher's form state intact; curriculum and lesson-guide generators retain their structured fallback drafts.
+Question-paper generation uses JSON-object mode with server-owned normalization and validation. It sends a compact balanced evidence excerpt, rejects incomplete/duplicate/non-Hindi or numerically invalid papers, preserves the submitted blueprint and teacher-written questions, and switches to `GROQ_PAPER_FALLBACK_MODEL` instead of retrying a broken response against the same model pool. Concise small papers use a size-aware Hindi check, while sectionless API requests receive an exact mark distribution when possible.
+
+Curriculum Creator validates that the generated plan contains the requested week rows, Hindi/English medium, assessments, and required planning sections. If both generation models are unavailable or return an incomplete plan, it returns a complete deterministic teacher-ready plan built from the exact chapters, goals, week count, and periods per week—never the old placeholder text. The UI presents curricula as a branded downloadable document and identifies this structured recovery mode without discarding the teacher's result.
 
 The paper workspace shows a live paper-style draft before generation. A generated paper has separate Student paper, Answer key, and Blueprint tabs; the student paper is paginated in a keyboard-accessible 3D page-flip viewer with previous/next controls. Papers and answer keys use a PDF download/save action and do not expose a separate Print button. Generated resources are kept in browser-local recent history, not in PostgreSQL. **AI-generated curricula, assessments, answer keys, and teaching explanations remain drafts and should be checked against the current board syllabus and textbook before classroom use.**
 

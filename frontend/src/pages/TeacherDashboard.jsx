@@ -81,7 +81,7 @@ const copy = {
     paperForm: { title: "Model paper builder", note: "Choose exact RAG chapters, lock your own questions, and let VidyaAI fill only the remaining slots.", marks: "Total marks", questions: "Number of questions", targetNote: "Set the paper targets here. The section blueprint must match them before generation.", paperTarget: "Paper target", currentBlueprint: "Current sections", blueprintReady: "Targets and section blueprint match.", blueprintMismatch: "Targets do not match the section blueprint.", targetInvalid: "Use whole numbers: 5–200 marks and 1–100 questions. Total marks must be between 1× and 20× the question count.", adjustSections: "Change the section count or marks per question below, or use the current section totals.", useSectionTotals: "Use section totals", editSections: "Edit sections", class10Only: "Class 10 · curriculum RAG available", duration: "Duration (minutes)", difficulty: "Difficulty", type: "Paper type", syllabus: "Additional syllabus boundary", syllabusPlaceholder: "Optional: a subtopic or boundary not covered by the selected chapters", instructions: "Custom instructions", instructionsPlaceholder: "Optional instructions, one per line", chapters: "Chapters for RAG", chapterSearch: "Search official chapters…", chapterRequired: "Select at least one chapter or enter an additional syllabus boundary.", chapterNote: "Official curriculum topics used to focus retrieval and question generation.", chapterLoading: "Loading official chapters…", chapterEmpty: "No mapped chapters are available for this class and subject. Add a syllabus boundary instead.", chapterNoMatch: "No chapter matches this search.", chapterError: "Official chapters could not be loaded. You can retry by changing the subject, or add a syllabus boundary.", ragAligned: "RAG aligned", selected: "selected", selectAll: "Select all", selectVisible: "Select visible", clear: "Clear", removeChapter: "Remove chapter", sections: "Sections", addSection: "Add section", sectionLimit: "Maximum 12 sections", remove: "Remove", removeSectionConfirm: "This section contains teacher-written questions. Remove the section and those questions?", removeField: "Remove field", restoreField: "Add back", section: "Section", sectionLabel: "Label", questionType: "Type", count: "Count", marksEach: "Marks / question", wordLimit: "Word limit", addQuestion: "Add my question", customQuestions: "Teacher questions", questionText: "Question in Hindi", answer: "Answer / key", alternative: "Alternative question (optional)", option: "Option", markingPoints: "Marking points, one per line", optionalFields: "Add removed settings", optionalNote: "Removed settings are not sent to VidyaAI.", allFieldsShown: "All optional settings are shown.", addField: "Add field", loading: "Setting the paper…", action: "Generate questions" },
     lessonForm: { title: "Prepare tomorrow's lesson", note: "VidyaAI explains the topic first, then turns it into a teachable classroom sequence.", duration: "Lesson duration", readiness: "Student readiness", topic: "Chapter or topic", topicPlaceholder: "Example: Class 10 Science Chapter 2 — Acids, Bases and Salts", notes: "What should VidyaAI consider?", notesPlaceholder: "Optional: students struggle with equations; no lab available; need a bilingual explanation…", loading: "Preparing your lesson…", action: "Create teaching guide" },
     options: { hindi: "Hindi", english: "English", bilingual: "Bilingual", easy: "Easy", balanced: "Balanced", challenging: "Challenging", unit: "Unit test", term: "Term exam", practice: "Practice paper", worksheet: "Worksheet", mixed: "Mixed classroom", foundation: "Needs foundation", advanced: "Advanced", general: "General" },
-    result: { error: "Could not create resource", errorNote: "VidyaAI could not create this resource. Please try again.", loading: "VidyaAI is preparing a classroom-ready resource…", loadingNote: "Checking structure, teaching flow, and curriculum context.", empty: "Your generated resource will appear here", emptyNote: "Complete the form and VidyaAI will create an editable, copyable, print-ready draft.", generated: "Generated resource", copy: "Copy", print: "Download PDF", answerPrint: "Download answer key", blueprint: "Blueprint", paper: "Student paper", answers: "Answer key", sources: "Sources used", previousPage: "Previous page", nextPage: "Next page", page: "Page" },
+    result: { error: "Could not create resource", errorNote: "VidyaAI could not create this resource. Please try again.", loading: "VidyaAI is preparing a classroom-ready resource…", loadingNote: "Checking structure, teaching flow, and curriculum context.", empty: "Your generated resource will appear here", emptyNote: "Complete the form and VidyaAI will create an editable, copyable, print-ready draft.", generated: "Generated resource", copy: "Copy", print: "Download PDF", answerPrint: "Download answer key", blueprint: "Blueprint", paper: "Student paper", answers: "Answer key", sources: "Sources used", previousPage: "Previous page", nextPage: "Next page", page: "Page", structuredFallback: "The AI provider was temporarily busy, so VidyaAI built this complete plan from your exact weeks, periods, goals, and mapped curriculum scope. You can use or download it now." },
     papersCount: (count) => `Class 10 · ${count} papers`,
     setLabel: "Set",
     subjectNames: { Hindi: "Hindi", English: "English", Math: "Math", Science: "Science", "Social Science": "Social Science", Sanskrit: "Sanskrit" },
@@ -123,7 +123,7 @@ const copy = {
     paperForm: { title: "आदर्श प्रश्नपत्र निर्माता", note: "सटीक RAG अध्याय चुनें, अपने प्रश्न लॉक करें और शेष प्रश्न VidyaAI से भरवाएँ।", marks: "कुल अंक", questions: "प्रश्नों की संख्या", targetNote: "पेपर के लक्ष्य यहाँ तय करें। निर्माण से पहले खंडों का विन्यास इनसे मिलना चाहिए।", paperTarget: "पेपर लक्ष्य", currentBlueprint: "वर्तमान खंड", blueprintReady: "लक्ष्य और खंड-विन्यास मेल खाते हैं।", blueprintMismatch: "लक्ष्य और खंड-विन्यास मेल नहीं खाते।", targetInvalid: "पूर्ण संख्या भरें: 5–200 अंक और 1–100 प्रश्न। कुल अंक प्रश्न संख्या के 1 से 20 गुना के बीच हों।", adjustSections: "नीचे खंडों की प्रश्न संख्या या प्रति प्रश्न अंक बदलें, अथवा वर्तमान खंडों का योग अपनाएँ।", useSectionTotals: "खंडों का योग अपनाएँ", editSections: "खंड संपादित करें", class10Only: "कक्षा 10 · पाठ्यक्रम RAG उपलब्ध", duration: "अवधि (मिनट)", difficulty: "कठिनाई", type: "पेपर का प्रकार", syllabus: "अतिरिक्त पाठ्यक्रम सीमा", syllabusPlaceholder: "वैकल्पिक: चुने अध्याय से बाहर कोई उपविषय या सीमा", instructions: "विशेष निर्देश", instructionsPlaceholder: "वैकल्पिक निर्देश, प्रत्येक नई पंक्ति में", chapters: "RAG के लिए अध्याय", chapterSearch: "आधिकारिक अध्याय खोजें…", chapterRequired: "कम-से-कम एक अध्याय चुनें या अतिरिक्त पाठ्यक्रम सीमा लिखें।", chapterNote: "आधिकारिक पाठ्यक्रम विषय, जिनसे खोज और प्रश्न निर्माण सटीक होता है।", chapterLoading: "आधिकारिक अध्याय लोड हो रहे हैं…", chapterEmpty: "इस कक्षा और विषय के लिए अध्याय सूची उपलब्ध नहीं है। अतिरिक्त पाठ्यक्रम सीमा जोड़ें।", chapterNoMatch: "इस खोज से मिलता कोई अध्याय नहीं मिला।", chapterError: "आधिकारिक अध्याय लोड नहीं हो सके। विषय बदलकर फिर जाँचें या पाठ्यक्रम सीमा जोड़ें।", ragAligned: "RAG संरेखित", selected: "चयनित", selectAll: "सभी चुनें", selectVisible: "दिख रहे चुनें", clear: "हटाएँ", removeChapter: "अध्याय हटाएँ", sections: "खंड", addSection: "खंड जोड़ें", sectionLimit: "अधिकतम 12 खंड", remove: "हटाएँ", removeSectionConfirm: "इस खंड में शिक्षक द्वारा लिखे प्रश्न हैं। खंड और उसके प्रश्न हटाएँ?", removeField: "फ़ील्ड हटाएँ", restoreField: "फिर जोड़ें", section: "खंड", sectionLabel: "हिंदी नाम", questionType: "प्रकार", count: "संख्या", marksEach: "प्रति प्रश्न अंक", wordLimit: "शब्द सीमा", addQuestion: "अपना प्रश्न जोड़ें", customQuestions: "शिक्षक के प्रश्न", questionText: "हिंदी में प्रश्न", answer: "उत्तर / कुंजी", alternative: "वैकल्पिक प्रश्न", option: "विकल्प", markingPoints: "अंक बिंदु, प्रत्येक नई पंक्ति में", optionalFields: "हटाई गई सेटिंग जोड़ें", optionalNote: "हटाई गई सेटिंग VidyaAI को नहीं भेजी जाती।", allFieldsShown: "सभी वैकल्पिक सेटिंग दिख रही हैं।", addField: "फ़ील्ड जोड़ें", loading: "पेपर बन रहा है…", action: "प्रश्न तैयार करें" },
     lessonForm: { title: "कल का पाठ तैयार करें", note: "VidyaAI पहले विषय समझाता है, फिर उसे पढ़ाने योग्य कक्षा क्रम में बदलता है।", duration: "पाठ की अवधि", readiness: "विद्यार्थियों की तैयारी", topic: "अध्याय या विषय", topicPlaceholder: "उदाहरण: कक्षा 10 विज्ञान अध्याय 2 — अम्ल, क्षार और लवण", notes: "VidyaAI किन बातों का ध्यान रखे?", notesPlaceholder: "वैकल्पिक: विद्यार्थियों को समीकरण कठिन लगते हैं; लैब उपलब्ध नहीं है…", loading: "पाठ तैयार हो रहा है…", action: "शिक्षण मार्गदर्शिका बनाएँ" },
     options: { hindi: "हिंदी", english: "अंग्रेज़ी", bilingual: "द्विभाषी", easy: "सरल", balanced: "संतुलित", challenging: "कठिन", unit: "इकाई परीक्षा", term: "सत्र परीक्षा", practice: "अभ्यास पेपर", worksheet: "वर्कशीट", mixed: "मिश्रित कक्षा", foundation: "आधार की आवश्यकता", advanced: "उन्नत", general: "सामान्य" },
-    result: { error: "संसाधन नहीं बन सका", errorNote: "VidyaAI अभी यह संसाधन नहीं बना सका। कृपया फिर प्रयास करें।", loading: "VidyaAI कक्षा के लिए संसाधन तैयार कर रहा है…", loadingNote: "संरचना, शिक्षण क्रम और पाठ्यक्रम संदर्भ की जाँच हो रही है।", empty: "आपका बनाया संसाधन यहाँ दिखाई देगा", emptyNote: "फॉर्म पूरा करें और VidyaAI संपादन, कॉपी और प्रिंट के लिए तैयार ड्राफ्ट बनाएगा।", generated: "तैयार संसाधन", copy: "कॉपी", print: "PDF डाउनलोड करें", answerPrint: "उत्तर कुंजी डाउनलोड करें", blueprint: "प्रश्नपत्र रूपरेखा", paper: "विद्यार्थी प्रश्नपत्र", answers: "उत्तर कुंजी", sources: "प्रयुक्त स्रोत", previousPage: "पिछला पृष्ठ", nextPage: "अगला पृष्ठ", page: "पृष्ठ" },
+    result: { error: "संसाधन नहीं बन सका", errorNote: "VidyaAI अभी यह संसाधन नहीं बना सका। कृपया फिर प्रयास करें।", loading: "VidyaAI कक्षा के लिए संसाधन तैयार कर रहा है…", loadingNote: "संरचना, शिक्षण क्रम और पाठ्यक्रम संदर्भ की जाँच हो रही है।", empty: "आपका बनाया संसाधन यहाँ दिखाई देगा", emptyNote: "फॉर्म पूरा करें और VidyaAI संपादन, कॉपी और प्रिंट के लिए तैयार ड्राफ्ट बनाएगा।", generated: "तैयार संसाधन", copy: "कॉपी", print: "PDF डाउनलोड करें", answerPrint: "उत्तर कुंजी डाउनलोड करें", blueprint: "प्रश्नपत्र रूपरेखा", paper: "विद्यार्थी प्रश्नपत्र", answers: "उत्तर कुंजी", sources: "प्रयुक्त स्रोत", previousPage: "पिछला पृष्ठ", nextPage: "अगला पृष्ठ", page: "पृष्ठ", structuredFallback: "AI सेवा कुछ समय के लिए व्यस्त थी, इसलिए VidyaAI ने आपके सप्ताह, पीरियड, लक्ष्य और उपलब्ध आधिकारिक पाठ्यक्रम-सीमा से यह पूरी योजना बनाई है। इसे अभी उपयोग या डाउनलोड किया जा सकता है।" },
     papersCount: (count) => `कक्षा 10 · ${count} पेपर`,
     setLabel: "सेट",
     subjectNames: { Hindi: "हिंदी", English: "अंग्रेज़ी", Math: "गणित", Science: "विज्ञान", "Social Science": "सामाजिक विज्ञान", Sanskrit: "संस्कृत" },
@@ -664,6 +664,8 @@ export default function TeacherDashboard() {
           paper_type: payload.paper_type,
         } : null),
         paper_data: response.data.paper_data || null,
+        generation_mode: response.data.generation_mode || "ai",
+        curriculum_meta: response.data.curriculum_meta || null,
         sources: response.data.sources || [],
         createdAt: new Date().toISOString(),
       };
@@ -820,7 +822,7 @@ export default function TeacherDashboard() {
                 <Field label={t.curriculumForm.chapters} wide><textarea rows="4" value={curriculum.chapters} onChange={(e) => setCurriculum({ ...curriculum, chapters: e.target.value })} placeholder={t.curriculumForm.chaptersPlaceholder} /></Field>
                 <Field label={t.curriculumForm.goals} wide><textarea rows="3" value={curriculum.learning_goals} onChange={(e) => setCurriculum({ ...curriculum, learning_goals: e.target.value })} placeholder={t.curriculumForm.goalsPlaceholder} /></Field>
               </div>
-              <button className="teacher-generate" type="submit" disabled={loading}>{loading ? t.curriculumForm.loading : t.curriculumForm.action}</button>
+              <button className="teacher-generate" type="submit" disabled={loading} aria-busy={loading}>{loading ? t.curriculumForm.loading : t.curriculumForm.action}</button>
             </form>
             {renderResult(result, error, loading, copyResult, t)}
           </section>
@@ -948,8 +950,8 @@ function makePaperDraft(paper) {
 }
 
 function renderResult(result, error, loading, onCopy, t, paperDraft = null) {
-  if (error) return <section className="teacher-result error-state"><strong>{t.result.error}</strong><p>{error}</p></section>;
-  if (loading) return <section className="teacher-result loading-state"><div className="teacher-loader" /><strong>{t.result.loading}</strong><p>{t.result.loadingNote}</p></section>;
+  if (error) return <section className="teacher-result error-state" role="alert" aria-live="assertive"><strong>{t.result.error}</strong><p>{error}</p></section>;
+  if (loading) return <section className="teacher-result loading-state" role="status" aria-live="polite" aria-busy="true"><div className="teacher-loader" /><strong>{t.result.loading}</strong><p>{t.result.loadingNote}</p></section>;
   if (!result && paperDraft) return <GeneratedResource result={makePaperDraft(paperDraft)} onCopy={onCopy} t={t} />;
   if (!result) return <section className="teacher-result empty-state"><span><Icon name="sparkle" size={34} /></span><strong>{t.result.empty}</strong><p>{t.result.emptyNote}</p></section>;
   return <GeneratedResource result={result} onCopy={onCopy} t={t} />;
@@ -957,11 +959,13 @@ function renderResult(result, error, loading, onCopy, t, paperDraft = null) {
 
 function GeneratedResource({ result, onCopy, t }) {
   const isPaper = result.type === "paper" && result.paper_content;
+  const isCurriculum = result.type === "curriculum";
   const [paperTab, setPaperTab] = useState("paper");
   const downloadPdf = (part) => {
     document.body.dataset.teacherPrint = part;
     const originalTitle = document.title;
-    document.title = `${result.paper_meta?.board || "CGBSE"}-${result.paper_meta?.class_level || "10"}-${result.paper_meta?.subject || "paper"}`;
+    const documentMeta = result.paper_meta || result.curriculum_meta || {};
+    document.title = `${result.paper_meta?.board || "CGBSE"}-${documentMeta.class_level || "10"}-${documentMeta.subject || result.type}`;
     window.print();
     document.title = originalTitle;
     delete document.body.dataset.teacherPrint;
@@ -974,14 +978,16 @@ function GeneratedResource({ result, onCopy, t }) {
     worksheet: "अभ्यास पत्रक",
   }[result.paper_meta?.paper_type] || "प्रश्नपत्र";
   const documentTitle = paperTab === "paper" ? paperTypeHindi : paperTab === "answers" ? t.result.answers : t.result.blueprint;
+  const curriculumMeta = result.curriculum_meta || {};
+  const curriculumIsEnglish = curriculumMeta.medium === "English";
 
   return (
-    <section className={`teacher-result generated-resource${isPaper ? " paper-resource" : ""}`}>
+    <section className={`teacher-result generated-resource${isPaper ? " paper-resource" : ""}${isCurriculum ? " curriculum-resource" : ""}`}>
       <header>
         <div><span>{t.result.generated}</span><h2>{result.title}</h2></div>
         <div>
           {!result.draft && <button type="button" onClick={onCopy}>{t.result.copy}</button>}
-          <button type="button" className="paper-download-action" onClick={() => downloadPdf(isPaper && paperTab === "answers" ? "answers" : "paper")}><Icon name="download" size={16} />{paperTab === "answers" ? t.result.answerPrint : t.result.print}</button>
+          <button type="button" className="paper-download-action" onClick={() => downloadPdf(isPaper && paperTab === "answers" ? "answers" : isCurriculum ? "curriculum" : "resource")}><Icon name="download" size={16} />{paperTab === "answers" ? t.result.answerPrint : t.result.print}</button>
         </div>
       </header>
       {isPaper ? (
@@ -1006,6 +1012,23 @@ function GeneratedResource({ result, onCopy, t }) {
             </header>
             <div className="paper-document-body">{paperTab === "paper" && result.paper_data ? <StructuredPaper data={result.paper_data} t={t} /> : <RichMarkdown>{paperTab === "paper" ? result.paper_content : paperTab === "answers" ? result.answer_key : result.blueprint}</RichMarkdown>}</div>
             <footer className="paper-document-footer"><span>{subjectHindi} · {result.paper_meta?.board || "CGBSE"}</span><span>VidyaAI द्वारा तैयार</span></footer>
+          </article>
+        </>
+      ) : isCurriculum ? (
+        <>
+          {result.generation_mode === "structured_fallback" && <aside className="curriculum-generation-note" role="status"><Icon name="sparkle" size={18} /><span>{t.result.structuredFallback}</span></aside>}
+          <article className="curriculum-print-sheet" lang={curriculumIsEnglish ? "en" : "hi"}>
+            <header className="curriculum-document-header">
+              <span>VIDYAAI · {curriculumIsEnglish ? "CURRICULUM ROADMAP" : "पाठ्यक्रम कार्ययोजना"}</span>
+              <h1>{curriculumIsEnglish ? `Class ${curriculumMeta.class_level || "—"} ${curriculumMeta.subject || ""}` : `कक्षा ${curriculumMeta.class_level || "—"} · ${copy.hi.subjectNames[curriculumMeta.subject] || curriculumMeta.subject || ""}`}</h1>
+              <div>
+                <span>{curriculumMeta.duration_weeks || "—"} {curriculumIsEnglish ? "weeks" : "सप्ताह"}</span>
+                <span>{curriculumMeta.periods_per_week || "—"} {curriculumIsEnglish ? "periods / week" : "पीरियड / सप्ताह"}</span>
+                <span>{curriculumMeta.medium || "—"}</span>
+              </div>
+            </header>
+            <div className="curriculum-document-body"><RichMarkdown>{result.content}</RichMarkdown></div>
+            <footer className="curriculum-document-footer"><span>CGBSE-aligned teacher workspace</span><span>VidyaAI</span></footer>
           </article>
         </>
       ) : <article><RichMarkdown>{result.content}</RichMarkdown></article>}

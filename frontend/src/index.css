@@ -965,6 +965,30 @@ button:disabled {
 .generated-resource > footer { display: flex; flex-wrap: wrap; gap: 7px; border-top: 1px solid var(--line); padding-top: 15px; }
 .generated-resource > footer strong { width: 100%; color: var(--ink); font-size: 0.8rem; }
 .generated-resource > footer span { border-radius: 999px; background: var(--surface-soft); color: var(--muted); padding: 6px 9px; font-size: 0.7rem; }
+.curriculum-generation-note { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0 0; border: 1px solid rgba(13, 148, 136, 0.2); border-radius: 12px; background: #effcf8; color: #285b56; padding: 12px 14px; font-size: 0.78rem; font-weight: 750; line-height: 1.55; }
+.curriculum-generation-note svg { flex: 0 0 auto; margin-top: 2px; color: var(--brand-strong); }
+.generated-resource > article.curriculum-print-sheet { width: min(210mm, 100%); max-width: 100%; min-height: 297mm; margin: 18px auto 0; border: 1px solid rgba(15, 118, 110, 0.18); border-radius: 2px; background: #fffefa; color: #22302e; padding: 12mm 13mm; box-shadow: 0 16px 42px rgba(15, 78, 74, 0.12); font-family: "Noto Sans Devanagari", "Nirmala UI", Inter, Arial, sans-serif; font-size: 10.5pt; line-height: 1.68; }
+.curriculum-document-header { margin: -12mm -13mm 10mm; border-bottom: 4px solid #0f766e; background: linear-gradient(135deg, #f0fdfa, #f5fbff); padding: 10mm 13mm 8mm; }
+.curriculum-document-header > span { color: #0f766e; font-family: Inter, Arial, sans-serif; font-size: 8.5pt; font-weight: 900; letter-spacing: 0.09em; }
+.curriculum-document-header h1 { margin: 4px 0 9px; color: #153b37; font-size: 19pt; line-height: 1.25; }
+.curriculum-document-header > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.curriculum-document-header > div span { border: 1px solid rgba(15, 118, 110, 0.16); border-radius: 999px; background: rgba(255, 255, 255, 0.82); color: #315e59; padding: 4px 9px; font-size: 8.5pt; font-weight: 750; }
+.curriculum-document-body > h1 { display: none; }
+.curriculum-document-body > h2 { margin: 22px 0 9px; border-left: 4px solid #0d9488; color: #134e4a; padding-left: 10px; font-size: 13pt; line-height: 1.35; break-after: avoid; }
+.curriculum-document-body > h2:first-of-type { margin-top: 0; }
+.curriculum-document-body > p { margin: 7px 0 10px; }
+.curriculum-document-body > ul,
+.curriculum-document-body > ol { margin: 8px 0 12px; padding-left: 24px; }
+.curriculum-document-body li { margin: 4px 0; }
+.curriculum-document-body strong { color: #153f3a; }
+.curriculum-document-body .response-table-wrap { margin: 12px 0 18px; border-color: #b7d8d2; border-radius: 8px; }
+.curriculum-document-body .response-table-wrap table { min-width: 760px; font-size: 8.5pt; line-height: 1.45; }
+.curriculum-document-body .response-table-wrap th,
+.curriculum-document-body .response-table-wrap td { border-color: #cfe1dd; padding: 7px 8px; }
+.curriculum-document-body .response-table-wrap th { background: #e7f7f3; color: #174b45; }
+.curriculum-document-body .response-table-wrap tr { break-inside: avoid; }
+.curriculum-document-body input[type="checkbox"] { accent-color: var(--brand); }
+.curriculum-document-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 24px; border-top: 1px solid #cfe1dd; color: #52706d; padding-top: 7px; font-size: 8pt; }
 .paper-result-tabs { display: flex; gap: 6px; margin: 18px 0 0; border-bottom: 1px solid var(--line); }
 .paper-result-tabs button { min-height: 44px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); padding: 9px 13px; font-weight: 900; cursor: pointer; }
 .paper-result-tabs button.active { border-bottom-color: var(--brand); color: var(--brand-strong); }
@@ -1024,6 +1048,9 @@ button:disabled {
 .paper-page-controls span { min-width: 95px; color: var(--brand-strong); font-size: 0.78rem; font-weight: 900; text-align: center; }
 
 @media (max-width: 640px) {
+  .generated-resource > article.curriculum-print-sheet { min-height: 0; padding: 24px 18px; font-size: 10pt; }
+  .curriculum-document-header { margin: -24px -18px 24px; padding: 24px 18px 20px; }
+  .curriculum-document-header h1 { font-size: 16pt; }
   .generated-resource > article.paper-print-sheet { min-height: 0; padding: 22px 18px; font-size: 10pt; }
   .paper-school-fields { flex-direction: column; gap: 5px; }
   .paper-meta-grid { gap: 4px 14px; }
@@ -1277,6 +1304,12 @@ button:disabled {
   .teacher-main,
   .teacher-workspace { display: block; width: 100%; padding: 0; background: #fff; }
   .teacher-result { border: 0; box-shadow: none; padding: 0; }
+  body[data-teacher-print="curriculum"] .generated-resource > header,
+  body[data-teacher-print="curriculum"] .generated-resource > footer,
+  body[data-teacher-print="curriculum"] .curriculum-generation-note { display: none !important; }
+  body[data-teacher-print="curriculum"] .curriculum-print-sheet { width: 100% !important; min-height: 0 !important; margin: 0 !important; border: 0 !important; box-shadow: none !important; }
+  body[data-teacher-print="curriculum"] .curriculum-document-body .response-table-wrap { overflow: visible; }
+  body[data-teacher-print="curriculum"] .curriculum-document-body .response-table-wrap table { min-width: 0; }
 }
 
 /* Dashboard shell */

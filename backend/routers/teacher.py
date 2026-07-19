@@ -426,49 +426,6 @@ def _structured_paper_token_budget(question_count: int) -> int:
     return min(5000, max(3000, 1500 + (question_count * 160)))
 
 
-PAPER_RESPONSE_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "instructions": {"type": "array", "items": {"type": "string"}},
-        "sections": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "label_hi": {"type": "string"},
-                    "type": {"type": "string", "enum": ["mcq", "very_short", "short", "long"]},
-                    "marks_each": {"type": "integer"},
-                    "word_limit": {"type": "string"},
-                    "questions": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "number": {"type": "integer"},
-                                "text_hi": {"type": "string"},
-                                "options_hi": {"type": "array", "items": {"type": "string"}},
-                                "or_text_hi": {"type": "string"},
-                                "answer_hi": {"type": "string"},
-                                "marking_points_hi": {"type": "array", "items": {"type": "string"}},
-                            },
-                            "required": [
-                                "number", "text_hi", "options_hi", "or_text_hi", "answer_hi", "marking_points_hi"
-                            ],
-                            "additionalProperties": False,
-                        },
-                    },
-                },
-                "required": ["name", "label_hi", "type", "marks_each", "word_limit", "questions"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    "required": ["instructions", "sections"],
-    "additionalProperties": False,
-}
-
-
 def _compact_paper_context(context: str, max_chars: int = 12000) -> str:
     """Keep a balanced excerpt from every top-level evidence scope."""
     cleaned = re.sub(r"\n{3,}", "\n\n", (context or "").replace("\x00", "")).strip()
@@ -528,7 +485,7 @@ def _request_paper_completion(
     *,
     json_mode: bool = False,
     max_tokens: int = 7000,
-    response_schema: dict | None = None,
+    model: str | None = None,
 ) -> str:
     system_content = (
         "You are an expert CGBSE assessment designer and Hindi editor. "
@@ -542,7 +499,7 @@ def _request_paper_completion(
         )
     )
     request_payload = {
-        "model": settings.groq_paper_model or settings.groq_model,
+        "model": model or settings.groq_paper_model or settings.groq_model,
         "messages": [
             {
                 "role": "system",
@@ -553,16 +510,7 @@ def _request_paper_completion(
         "temperature": 0.15,
         "max_tokens": max_tokens,
     }
-    if response_schema:
-        request_payload["response_format"] = {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "cgbse_question_paper",
-                "strict": True,
-                "schema": response_schema,
-            },
-        }
-    elif json_mode:
+    if json_mode:
         request_payload["response_format"] = {"type": "json_object"}
     if request_payload["model"].startswith("openai/gpt-oss-"):
         request_payload["reasoning_effort"] = "low"
@@ -598,6 +546,10 @@ def _request_paper_completion(
 def _paper_request_errors(payload: TestPaperRequest) -> list[str]:
     """Reject contradictory teacher controls before spending a generation call."""
     if not payload.sections:
+        if payload.total_marks < payload.question_count or payload.total_marks > payload.question_count * 20:
+            return [
+                "बिना खंड-विन्यास के कुल अंक प्रश्न संख्या के 1 से 20 गुना के बीच होने चाहिए।"
+            ]
         return []
     errors: list[str] = []
     calculated_marks = 0
@@ -657,12 +609,55 @@ def _paper_request_errors(payload: TestPaperRequest) -> list[str]:
     return errors
 
 
+def _default_paper_rules(payload: TestPaperRequest) -> list[dict]:
+    """Distribute non-divisible marks exactly when API clients omit an explicit blueprint."""
+    base_marks, higher_mark_questions = divmod(payload.total_marks, payload.question_count)
+    groups: list[tuple[int, int]] = []
+    lower_mark_questions = payload.question_count - higher_mark_questions
+    if lower_mark_questions:
+        groups.append((lower_mark_questions, base_marks))
+    if higher_mark_questions:
+        groups.append((higher_mark_questions, base_marks + 1))
+
+    rules: list[dict] = []
+    for total_count, marks_each in groups:
+        remaining = total_count
+        while remaining:
+            count = min(30, remaining)
+            name = chr(ord("A") + len(rules))
+            rules.append({
+                "name": name,
+                "type": "short",
+                "label_hi": "लघु उत्तरीय प्रश्न",
+                "count": count,
+                "marks_each": marks_each,
+                "word_limit": "30",
+                "custom_questions": [],
+            })
+            remaining -= count
+    return rules
+
+
 def _validate_paper_data(data: dict, payload: TestPaperRequest) -> list[str]:
     errors: list[str] = []
+    if not isinstance(data, dict):
+        return ["response must be a JSON object"]
     sections = data.get("sections")
     if not isinstance(sections, list) or not sections:
         return ["sections must be a non-empty array"]
-    questions = [question for section in sections for question in section.get("questions", [])]
+    valid_sections = [section for section in sections if isinstance(section, dict)]
+    if len(valid_sections) != len(sections):
+        errors.append("every section must be an object")
+    questions: list[dict] = []
+    for section in valid_sections:
+        section_questions = section.get("questions")
+        if not isinstance(section_questions, list):
+            errors.append(f"section {section.get('name', '?')} questions must be an array")
+            continue
+        valid_questions = [question for question in section_questions if isinstance(question, dict)]
+        if len(valid_questions) != len(section_questions):
+            errors.append(f"section {section.get('name', '?')} contains an invalid question")
+        questions.extend(valid_questions)
     if payload.sections:
         if len(sections) != len(payload.sections):
             errors.append("generated section count does not match the blueprint")
@@ -670,20 +665,28 @@ def _validate_paper_data(data: dict, payload: TestPaperRequest) -> list[str]:
             if index >= len(sections):
                 break
             section = sections[index]
+            if not isinstance(section, dict):
+                continue
             if str(section.get("name")) != str(rule.get("name")):
                 errors.append(f"section {index + 1} name changed")
             if section.get("type") != rule.get("type"):
                 errors.append(f"section {rule.get('name')} type changed")
             if str(section.get("label_hi", "")).strip() != str(rule.get("label_hi", "")).strip():
                 errors.append(f"section {rule.get('name')} label changed")
-            if int(section.get("marks_each", 0)) != int(rule.get("marks_each", 0)):
+            try:
+                generated_marks = int(section.get("marks_each", 0))
+            except (TypeError, ValueError):
+                generated_marks = 0
+            if generated_marks != int(rule.get("marks_each", 0)):
                 errors.append(f"section {rule.get('name')} marks changed")
             if str(section.get("word_limit", "")).strip() != str(rule.get("word_limit", "")).strip():
                 errors.append(f"section {rule.get('name')} word limit changed")
-            if len(section.get("questions", [])) != int(rule.get("count", 0)):
-                errors.append(f"section {rule.get('name')} question count changed")
             generated_questions = section.get("questions", [])
-            for custom in rule.get("custom_questions", []):
+            if not isinstance(generated_questions, list):
+                generated_questions = []
+            if len(generated_questions) != int(rule.get("count", 0)):
+                errors.append(f"section {rule.get('name')} question count changed")
+            for custom in rule.get("custom_questions") or []:
                 custom_text = re.sub(r"\s+", " ", str(custom.get("text_hi", "")).strip())
                 match = next(
                     (question for question in generated_questions if re.sub(r"\s+", " ", str(question.get("text_hi", "")).strip()) == custom_text),
@@ -705,7 +708,14 @@ def _validate_paper_data(data: dict, payload: TestPaperRequest) -> list[str]:
     numbers = [question.get("number") for question in questions]
     if numbers != list(range(1, payload.question_count + 1)):
         errors.append("question numbers are not consecutive")
-    marks = sum(int(section.get("marks_each", 0)) * len(section.get("questions", [])) for section in sections)
+    marks = 0
+    for section in valid_sections:
+        try:
+            marks_each = int(section.get("marks_each", 0))
+        except (TypeError, ValueError):
+            marks_each = 0
+        section_questions = section.get("questions", [])
+        marks += marks_each * (len(section_questions) if isinstance(section_questions, list) else 0)
     if marks != payload.total_marks:
         errors.append(f"question marks total {marks}, not {payload.total_marks}")
     texts = [re.sub(r"\s+", " ", str(question.get("text_hi", "")).strip()).casefold() for question in questions]
@@ -713,11 +723,16 @@ def _validate_paper_data(data: dict, payload: TestPaperRequest) -> list[str]:
         errors.append("one or more Hindi questions are incomplete")
     if len(texts) != len(set(texts)):
         errors.append("questions contain exact duplicates")
-    if sum(len(re.findall(r"[\u0900-\u097f]", text)) for text in texts) < max(60, len(texts) * 12):
+    if sum(len(re.findall(r"[\u0900-\u097f]", text)) for text in texts) < max(18, len(texts) * 10):
         errors.append("questions are not predominantly Hindi")
-    for section in sections:
+    for section in valid_sections:
         expected_options = section.get("type") == "mcq"
-        for question in section.get("questions", []):
+        section_questions = section.get("questions", [])
+        if not isinstance(section_questions, list):
+            continue
+        for question in section_questions:
+            if not isinstance(question, dict):
+                continue
             options = question.get("options_hi") or []
             if expected_options and len(options) != 4:
                 errors.append(f"MCQ {question.get('number')} does not have four options")
@@ -733,6 +748,12 @@ def _normalize_paper_data(data: dict, payload: TestPaperRequest) -> dict:
     """Apply teacher-owned blueprint metadata and consecutive numbering server-side."""
     if not isinstance(data, dict) or not isinstance(data.get("sections"), list):
         return data
+    if isinstance(data.get("instructions"), str):
+        data["instructions"] = [
+            item.strip(" -\t")
+            for item in re.split(r"\n+", data["instructions"])
+            if item.strip(" -\t")
+        ]
     sections = data["sections"]
     rules = payload.sections
     if rules and len(sections) == len(rules):
@@ -767,6 +788,19 @@ def _normalize_paper_data(data: dict, payload: TestPaperRequest) -> dict:
                 continue
             question["number"] = next_number
             next_number += 1
+            question["text_hi"] = str(question.get("text_hi", "")).strip()
+            question["answer_hi"] = str(question.get("answer_hi", "")).strip()
+            question["or_text_hi"] = str(question.get("or_text_hi", "")).strip()
+            if not isinstance(question.get("options_hi"), list):
+                question["options_hi"] = []
+            else:
+                question["options_hi"] = [str(option).strip() for option in question["options_hi"]]
+            if not isinstance(question.get("marking_points_hi"), list):
+                question["marking_points_hi"] = []
+            else:
+                question["marking_points_hi"] = [
+                    str(point).strip() for point in question["marking_points_hi"] if str(point).strip()
+                ]
             question.setdefault("or_text_hi", "")
             question.setdefault("options_hi", [])
             question.setdefault("marking_points_hi", [])
@@ -778,7 +812,8 @@ def _normalize_paper_data(data: dict, payload: TestPaperRequest) -> dict:
 def _generate_structured_test_paper(*, payload: TestPaperRequest, context: str) -> dict:
     if not settings.groq_api_key:
         raise HTTPException(status_code=503, detail="GROQ_API_KEY is not configured.")
-    rules = payload.sections or [{"name": "A", "type": "short", "label_hi": "प्रश्न", "count": payload.question_count, "marks_each": max(1, payload.total_marks // payload.question_count), "word_limit": ""}]
+    rules = payload.sections or _default_paper_rules(payload)
+    validation_payload = payload if payload.sections else payload.model_copy(update={"sections": rules})
     chosen = {option["id"]: option for option in _chapter_options(payload.subject, payload.class_level)}
     selected_scope = [
         f"{chosen[chapter_id]['code']}: {chosen[chapter_id]['label']}"
@@ -806,8 +841,13 @@ EVIDENCE:
 """
     last_errors: list[str] = []
     token_budget = _structured_paper_token_budget(payload.question_count)
-    context_limit = 1800
-    for attempt in range(2):
+    context_limit = 2200
+    models = list(dict.fromkeys(filter(None, [
+        settings.groq_paper_model,
+        settings.groq_paper_fallback_model,
+        settings.groq_model,
+    ])))[:2]
+    for attempt, model in enumerate(models):
         prompt = build_prompt(_compact_paper_context(context, max_chars=context_limit))
         request = prompt if not last_errors else f"Fix these validation failures: {last_errors}. Regenerate from scratch.\n\n{prompt}"
         try:
@@ -815,25 +855,27 @@ EVIDENCE:
                 request,
                 json_mode=True,
                 max_tokens=token_budget,
-                response_schema=PAPER_RESPONSE_SCHEMA,
+                model=model,
             )
             raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.IGNORECASE)
-            data = _normalize_paper_data(json.loads(raw), payload)
-            last_errors = _validate_paper_data(data, payload)
+            data = _normalize_paper_data(json.loads(raw), validation_payload)
+            last_errors = _validate_paper_data(data, validation_payload)
             if not last_errors:
                 return data
-            logger.warning("Structured paper attempt %s failed validation: %s", attempt + 1, "; ".join(last_errors))
+            logger.warning(
+                "Structured paper model %s failed validation: %s",
+                model,
+                "; ".join(last_errors),
+            )
         except requests.HTTPError as exc:
             status_code = exc.response.status_code if exc.response is not None else None
-            logger.warning("Structured paper attempt %s failed: %s", attempt + 1, exc)
-            if status_code == 413 and attempt == 0:
+            logger.warning("Structured paper model %s failed: %s", model, exc)
+            if status_code == 413:
                 context_limit = 1000
                 token_budget = min(token_budget, 4200)
-                last_errors = []
-                continue
             last_errors = [f"provider returned HTTP {status_code or 'error'}"]
         except (requests.RequestException, json.JSONDecodeError, TypeError, ValueError) as exc:
-            logger.warning("Structured paper attempt %s failed: %s", attempt + 1, exc)
+            logger.warning("Structured paper model %s failed: %s", model, exc)
             last_errors = ["response was not valid JSON"]
     logger.error("Structured paper generation exhausted retries: %s", "; ".join(last_errors))
     raise HTTPException(
@@ -979,6 +1021,314 @@ Return polished Markdown only. Make it classroom-ready, specific, inclusive, and
     return fallback
 
 
+def _curriculum_items(payload: CurriculumRequest) -> tuple[list[str], list[str]]:
+    """Keep teacher-entered chapter names intact and supply official Class 10 scope when blank."""
+    chapters = [
+        re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", item).strip()
+        for item in re.split(r"[\n;]+", payload.chapters or "")
+        if item.strip()
+    ]
+    if not chapters:
+        chapters = [
+            f"{item['code']}. {item['label']}"
+            for item in _chapter_options(payload.subject, payload.class_level)
+        ]
+    if not chapters:
+        chapters = [
+            "शिक्षक द्वारा निर्धारित पाठ्यक्रम सीमा"
+            if payload.medium.strip().lower() != "english"
+            else "Teacher-defined syllabus scope"
+        ]
+    chapters = list(dict.fromkeys(chapters))
+
+    goals = [
+        re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", item).strip()
+        for item in re.split(r"[\n;]+", payload.learning_goals or "")
+        if item.strip()
+    ]
+    if not goals:
+        goals = [
+            "अवधारणात्मक समझ, अनुप्रयोग, वैज्ञानिक अभिव्यक्ति और परीक्षा तैयारी"
+            if payload.medium.strip().lower() != "english"
+            else "Conceptual understanding, application, clear subject expression, and exam readiness"
+        ]
+    return chapters, list(dict.fromkeys(goals))
+
+
+def _curriculum_week_topics(chapters: list[str], duration_weeks: int) -> list[str]:
+    """Distribute every requested chapter across the available weeks without dropping scope."""
+    topics: list[str] = []
+    for week in range(duration_weeks):
+        start = (week * len(chapters)) // duration_weeks
+        end = ((week + 1) * len(chapters)) // duration_weeks
+        if start == end:
+            selected = [chapters[min(start, len(chapters) - 1)]]
+        else:
+            selected = chapters[start:end]
+        topics.append("; ".join(selected))
+    return topics
+
+
+def _period_plan(periods: int, *, english: bool = False) -> str:
+    if english:
+        if periods == 1:
+            return "P1: prior-knowledge check, core concept, and exit check"
+        if periods == 2:
+            return "P1: concept building; P2: guided practice and exit check"
+        if periods == 3:
+            return "P1: prior knowledge and concept; P2: activity/application; P3: practice and assessment"
+        if periods == 4:
+            return "P1: diagnostic and concept; P2: explanation; P3: activity/application; P4: assessment and support"
+        return f"P1: diagnostic and goals; P2–{periods - 2}: concept, examples, and guided practice; P{periods - 1}: application/activity; P{periods}: assessment and support"
+    if periods == 1:
+        return "पी1: पूर्वज्ञान जाँच, मुख्य अवधारणा और निकास-पर्ची"
+    if periods == 2:
+        return "पी1: अवधारणा निर्माण; पी2: निर्देशित अभ्यास और निकास-पर्ची"
+    if periods == 3:
+        return "पी1: पूर्वज्ञान व अवधारणा; पी2: गतिविधि/अनुप्रयोग; पी3: अभ्यास व आकलन"
+    if periods == 4:
+        return "पी1: निदान व अवधारणा; पी2: व्याख्या; पी3: गतिविधि/अनुप्रयोग; पी4: आकलन व सहायता"
+    return f"पी1: निदान व लक्ष्य; पी2–{periods - 2}: अवधारणा, उदाहरण व निर्देशित अभ्यास; पी{periods - 1}: अनुप्रयोग/गतिविधि; पी{periods}: आकलन व पुनःसहायता"
+
+
+def _structured_curriculum_fallback(payload: CurriculumRequest) -> str:
+    """Produce a complete, safe plan using exact teacher/official scope when an LLM is unavailable."""
+    chapters, goals = _curriculum_items(payload)
+    week_topics = _curriculum_week_topics(chapters, payload.duration_weeks)
+    english = payload.medium.strip().lower() == "english"
+    period_plan = _period_plan(payload.periods_per_week, english=english)
+
+    if english:
+        lines = [
+            f"# Class {payload.class_level} {payload.subject} Curriculum Plan",
+            "",
+            "## Plan overview",
+            "",
+            f"| Class | Subject | Duration | Weekly periods | Medium | Total planned periods |",
+            "|---|---|---:|---:|---|---:|",
+            f"| {payload.class_level} | {payload.subject} | {payload.duration_weeks} weeks | {payload.periods_per_week} | {payload.medium} | {payload.duration_weeks * payload.periods_per_week} |",
+            "",
+            "This plan sequences the exact scope supplied by the teacher (or the mapped official Class 10 scope when left blank). Each week includes instruction, application, evidence of learning, and a recovery step.",
+            "",
+            "## Measurable learning outcomes",
+            "",
+            *[f"- Students will demonstrate progress toward: {goal}." for goal in goals],
+            "- Students will explain key ideas in their own words, apply them to unfamiliar questions, and improve work using feedback.",
+            "- The teacher will record weekly evidence and reteach any outcome not yet demonstrated.",
+            "",
+            "## Week-wise scope and sequence",
+            "",
+            "| Week | Chapter / focus | Period allocation | Expected learning evidence | Learning activity | Assessment and follow-up |",
+            "|---:|---|---|---|---|---|",
+        ]
+        for week, topic in enumerate(week_topics, 1):
+            phase = "orientation and diagnostic" if week == 1 else "revision and consolidation" if week == payload.duration_weeks else "concept building and application"
+            assessment = "short diagnostic plus exit ticket" if week == 1 else "mixed retrieval check, correction, and targeted support" if week == payload.duration_weeks else "exit ticket or five-question check; regroup next lesson from results"
+            lines.append(
+                f"| {week} | {topic} — {phase} | {period_plan} | Explain the central ideas of **{topic}** and use them in a guided task. | Think–pair–share, worked example, and one independent application. | {assessment} |"
+            )
+        lines.extend([
+            "", "## Teaching approach and resources", "",
+            "- Begin with a short prior-knowledge prompt; model one example; move from guided to independent work.",
+            "- Use the prescribed textbook, board work, locally available materials, and one concise practice sheet; verify diagrams and terminology against the official text.",
+            "- Keep a weekly misconception log and use the first part of the next lesson for corrective teaching.",
+            "", "## Assessment plan", "",
+            "- **Weekly:** exit ticket, notebook check, oral explanation, or five-question quiz.",
+            "- **Mid-plan:** cumulative application task covering all scope taught so far, followed by correction time.",
+            "- **End-plan:** mixed-format assessment, feedback, targeted reteaching, and one re-check of weak outcomes.",
+            "", "## Differentiation, revision, and buffer", "",
+            "- Foundation support: vocabulary bank, chunked examples, peer rehearsal, and one scaffolded question before independent work.",
+            "- Extension: justification, error analysis, comparison, or an unfamiliar application from the same taught scope.",
+            "- Reserve the final assessment period each week for feedback; if pacing slips, protect core outcomes and move enrichment—not essential teaching—to the buffer.",
+            "", "## Teacher checklist", "",
+            "- [ ] Confirm chapter order, holidays, and school assessment dates.",
+            "- [ ] Prepare the textbook pages, examples, activity materials, and assessment evidence for each week.",
+            "- [ ] Record students needing support or extension and schedule the follow-up.",
+            "- [ ] Review progress at the end of each week and update the next week's first period.",
+        ])
+        return "\n".join(lines)
+
+    lines = [
+        f"# कक्षा {payload.class_level} {payload.subject} — पाठ्यक्रम योजना",
+        "",
+        "## योजना का संक्षिप्त परिचय",
+        "",
+        "| कक्षा | विषय | अवधि | साप्ताहिक पीरियड | माध्यम | कुल नियोजित पीरियड |",
+        "|---|---|---:|---:|---|---:|",
+        f"| {payload.class_level} | {payload.subject} | {payload.duration_weeks} सप्ताह | {payload.periods_per_week} | {payload.medium} | {payload.duration_weeks * payload.periods_per_week} |",
+        "",
+        "यह योजना शिक्षक द्वारा दी गई पाठ्यक्रम-सीमा को उसी रूप में क्रमबद्ध करती है। सीमा खाली होने पर कक्षा 10 के उपलब्ध आधिकारिक अध्याय-मानचित्र का उपयोग किया गया है। हर सप्ताह शिक्षण, अनुप्रयोग, सीखने का प्रमाण और पुनःसहायता शामिल है।",
+        "",
+        "## मापनीय अधिगम परिणाम",
+        "",
+        *[f"- विद्यार्थी इस लक्ष्य की दिशा में प्रगति दिखाएँगे: {goal}।" for goal in goals],
+        "- विद्यार्थी प्रमुख विचारों को अपने शब्दों में समझाएँगे, नए प्रश्न में लागू करेंगे और प्रतिक्रिया के आधार पर उत्तर सुधारेंगे।",
+        "- शिक्षक हर सप्ताह सीखने का प्रमाण दर्ज करेंगे और अधूरा परिणाम मिलने पर पुनःशिक्षण करेंगे।",
+        "",
+        "## सप्ताहवार कार्ययोजना",
+        "",
+        "| सप्ताह | अध्याय / केंद्रबिंदु | पीरियड-विन्यास | अपेक्षित सीखने का प्रमाण | गतिविधि | आकलन एवं अगला कदम |",
+        "|---:|---|---|---|---|---|",
+    ]
+    for week, topic in enumerate(week_topics, 1):
+        phase = "परिचय और निदान" if week == 1 else "पुनरावृत्ति और समेकन" if week == payload.duration_weeks else "अवधारणा निर्माण और अनुप्रयोग"
+        assessment = "लघु निदान तथा निकास-पर्ची" if week == 1 else "मिश्रित पुनःस्मरण जाँच, त्रुटि-सुधार और लक्षित सहायता" if week == payload.duration_weeks else "निकास-पर्ची अथवा पाँच-प्रश्न जाँच; परिणाम से अगला समूह तय करें"
+        lines.append(
+            f"| {week} | {topic} — {phase} | {period_plan} | **{topic}** के प्रमुख विचार समझाकर निर्देशित कार्य में उनका उपयोग। | सोचो–जोड़ी बनाओ–साझा करो, उदाहरण और एक स्वतंत्र अनुप्रयोग। | {assessment} |"
+        )
+    lines.extend([
+        "", "## शिक्षण-पद्धति और संसाधन", "",
+        "- छोटे पूर्वज्ञान प्रश्न से शुरुआत करें; एक उदाहरण का आदर्श समाधान दिखाएँ; फिर निर्देशित से स्वतंत्र अभ्यास की ओर बढ़ें।",
+        "- निर्धारित पाठ्यपुस्तक, श्यामपट्ट, स्थानीय सामग्री और एक संक्षिप्त अभ्यास-पत्र उपयोग करें; आरेख व शब्दावली आधिकारिक पाठ से मिलाएँ।",
+        "- साप्ताहिक भ्रांति-पंजी बनाएँ और अगले पीरियड के प्रारंभ में आवश्यक सुधारात्मक शिक्षण करें।",
+        "", "## मूल्यांकन योजना", "",
+        "- **साप्ताहिक:** निकास-पर्ची, कॉपी-जाँच, मौखिक व्याख्या या पाँच-प्रश्न क्विज़।",
+        "- **मध्यावधि:** अब तक पढ़ाए गए सभी केंद्रबिंदुओं पर संचयी अनुप्रयोग कार्य और उसके बाद त्रुटि-सुधार।",
+        "- **समापन:** मिश्रित प्रश्न-विन्यास वाला आकलन, प्रतिक्रिया, लक्षित पुनःशिक्षण और कमजोर परिणामों की दोबारा जाँच।",
+        "", "## विभेदीकरण, पुनरावृत्ति और बफर", "",
+        "- आधार-सहायता: शब्द-सूची, छोटे चरणों वाले उदाहरण, साथी के साथ मौखिक अभ्यास और स्वतंत्र कार्य से पहले एक संकेतयुक्त प्रश्न।",
+        "- उन्नत कार्य: कारण देना, त्रुटि-विश्लेषण, तुलना या पढ़ी हुई सीमा से नया अनुप्रयोग।",
+        "- हर सप्ताह अंतिम आकलन-पीरियड में प्रतिक्रिया दें; गति पीछे होने पर मुख्य परिणाम सुरक्षित रखें और केवल समृद्धि-कार्य को बफर में ले जाएँ।",
+        "", "## शिक्षक चेकलिस्ट", "",
+        "- [ ] अध्याय क्रम, अवकाश और विद्यालयी मूल्यांकन तिथियाँ जाँच ली हैं।",
+        "- [ ] हर सप्ताह के पाठ्यपुस्तक पृष्ठ, उदाहरण, गतिविधि-सामग्री और आकलन प्रमाण तैयार हैं।",
+        "- [ ] अतिरिक्त सहायता और उन्नत कार्य वाले विद्यार्थियों की सूची तथा अगला कदम दर्ज है।",
+        "- [ ] सप्ताहांत प्रगति देखकर अगले सप्ताह के पहले पीरियड को आवश्यकतानुसार बदला है।",
+    ])
+    return "\n".join(lines)
+
+
+def _curriculum_validation_errors(content: str, payload: CurriculumRequest) -> list[str]:
+    errors: list[str] = []
+    minimum_length = min(1400, 600 + (payload.duration_weeks * 80))
+    if len(content.strip()) < minimum_length:
+        errors.append("curriculum is too short")
+    lowered = content.casefold()
+    if "add textbook-aligned details" in lowered or "ai generation is temporarily unavailable" in lowered:
+        errors.append("curriculum contains placeholder text")
+    week_heading = re.search(
+        r"^#{1,6}[^\n]*(?:सप्ताह|साप्ताहिक|week)[^\n]*$",
+        content,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    week_section = ""
+    if week_heading:
+        section_start = week_heading.end()
+        next_heading = re.search(r"^#{1,6}\s", content[section_start:], flags=re.MULTILINE)
+        section_end = section_start + next_heading.start() if next_heading else len(content)
+        week_section = content[section_start:section_end]
+    else:
+        week_header = re.search(
+            r"^\|[^\n]*(?:सप्ताह|week)[^\n]*\|\s*$",
+            content,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+        if week_header:
+            section_start = week_header.start()
+            next_heading = re.search(r"^#{1,6}\s", content[section_start:], flags=re.MULTILINE)
+            section_end = section_start + next_heading.start() if next_heading else len(content)
+            week_section = content[section_start:section_end]
+    week_numbers = [
+        int(match)
+        for match in re.findall(
+            r"^\|\s*(?:\*\*)?(?:सप्ताह\s*)?(\d{1,2})(?:\*\*)?\s*\|",
+            week_section,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+    ]
+    expected_weeks = list(range(1, payload.duration_weeks + 1))
+    if week_numbers != expected_weeks:
+        errors.append(f"week table must contain exactly weeks 1 through {payload.duration_weeks}")
+    if payload.medium.strip().lower() != "english":
+        if len(re.findall(r"[\u0900-\u097f]", content)) < 180:
+            errors.append("curriculum is not predominantly Hindi")
+        required_groups = {
+            "outcomes": ("अधिगम", "सीखने", "उद्देश्य"),
+            "assessment": ("मूल्यांकन", "आकलन"),
+            "support": ("विभेदीकरण", "पुनःसहायता", "उपचारात्मक", "सहायता"),
+            "revision": ("पुनरावृत्ति", "बफर", "दोहराव", "समेकन"),
+            "checklist": ("चेकलिस्ट", "जाँच-सूची", "जाँच सूची", "शिक्षक जाँच", "कार्य-सूची"),
+        }
+        missing = [
+            label for label, terms in required_groups.items()
+            if not any(term in content for term in terms)
+        ]
+        if "सप्ताह" not in content or missing:
+            errors.append("curriculum is missing required Hindi sections" + (f": {', '.join(missing)}" if missing else ""))
+    else:
+        required_groups = {
+            "outcomes": ("learning outcome", "learning goal", "objective"),
+            "assessment": ("assessment", "check for understanding"),
+            "support": ("differentiation", "remediation", "support"),
+            "revision": ("revision", "buffer", "consolidation"),
+            "checklist": ("checklist", "teacher check"),
+        }
+        missing = [
+            label for label, terms in required_groups.items()
+            if not any(term in lowered for term in terms)
+        ]
+        if "week" not in lowered or missing:
+            errors.append("curriculum is missing required sections" + (f": {', '.join(missing)}" if missing else ""))
+    return errors
+
+
+def _generate_curriculum_plan(*, payload: CurriculumRequest, context: str) -> tuple[str, str]:
+    fallback = _structured_curriculum_fallback(payload)
+    if not settings.groq_api_key:
+        return fallback, "structured_fallback"
+
+    chapters, goals = _curriculum_items(payload)
+    language = "English" if payload.medium.strip().lower() == "english" else "natural Hindi"
+    topic_lines = "\n".join(f"- {chapter}" for chapter in chapters)
+    goal_lines = "\n".join(f"- {goal}" for goal in goals)
+    prompt = f"""Create a classroom-ready curriculum plan in {language}.
+
+IMMUTABLE INPUTS
+Class: {payload.class_level}
+Subject: {payload.subject}
+Duration: exactly {payload.duration_weeks} weeks
+Periods per week: exactly {payload.periods_per_week}
+Medium: {payload.medium}
+
+CHAPTERS / SCOPE (preserve these labels; cover every item)
+{topic_lines}
+
+LEARNING GOALS
+{goal_lines}
+
+REQUIRED OUTPUT
+1. Markdown only, with a clear title and a compact metadata table.
+2. Measurable learning outcomes tied to the supplied goals.
+3. One week-wise Markdown table containing exactly {payload.duration_weeks} data rows. The first cell of each row must be the Arabic week number alone: 1 through {payload.duration_weeks}.
+4. Each week row must include chapter/focus, an exact {payload.periods_per_week}-period allocation, expected evidence of learning, an activity, assessment, and the next support step.
+5. Add separate sections for teaching methods/resources, weekly and cumulative assessment, differentiation/remediation, revision/buffer, and a teacher checklist.
+6. Stay within the supplied labels and evidence. Do not invent chapter facts, board rules, holidays, or dates. Do not use placeholder or verification-warning text.
+
+COMPACT OFFICIAL EVIDENCE
+{_compact_paper_context(context, max_chars=2400) or 'No excerpt available; use only the exact scope labels and goals above.'}
+"""
+    token_budget = min(5000, max(2200, 1200 + (payload.duration_weeks * 95)))
+    models = list(dict.fromkeys(filter(None, [
+        settings.groq_paper_model,
+        settings.groq_paper_fallback_model,
+        settings.groq_model,
+    ])))[:2]
+    last_errors: list[str] = []
+    for model in models:
+        request = prompt if not last_errors else f"Regenerate from scratch and fix: {'; '.join(last_errors)}.\n\n{prompt}"
+        try:
+            content = _request_paper_completion(request, max_tokens=token_budget, model=model)
+            last_errors = _curriculum_validation_errors(content, payload)
+            if not last_errors:
+                return content, "ai"
+            logger.warning("Curriculum model %s failed validation: %s", model, "; ".join(last_errors))
+        except (requests.RequestException, ValueError, KeyError) as exc:
+            logger.warning("Curriculum model %s failed: %s", model, exc)
+            last_errors = ["provider request failed"]
+    logger.warning("Curriculum generation used structured fallback: %s", "; ".join(last_errors))
+    return fallback, "structured_fallback"
+
+
 @router.post("/curriculum")
 async def create_curriculum(payload: CurriculumRequest, teacher=Depends(require_teacher)):
     query = f"Class {payload.class_level} {payload.subject} curriculum {payload.chapters} {payload.learning_goals}"
@@ -995,23 +1345,35 @@ async def create_curriculum(payload: CurriculumRequest, teacher=Depends(require_
             "previous_year_question": 0.5,
         },
     )
-    details = (
-        f"Class: {payload.class_level}\nSubject: {payload.subject}\nMedium: {payload.medium}\n"
-        f"Duration: {payload.duration_weeks} weeks\nPeriods per week: {payload.periods_per_week}\n"
-        f"Chapters/syllabus: {payload.chapters or 'Teacher will map chapters later'}\n"
-        f"Learning goals: {payload.learning_goals or 'Build conceptual understanding and exam readiness'}"
+    curriculum_chapters, _ = _curriculum_items(payload)
+    local_context, local_sources = await asyncio.to_thread(
+        _local_teacher_context,
+        payload.class_level,
+        payload.subject,
+        8000,
+        curriculum_chapters,
     )
-    task = (
-        "Build a curriculum plan with: overview and assumptions; measurable learning outcomes; week-wise scope and sequence; "
-        "period allocation; pedagogy and activities; resources; formative and summative assessment checkpoints; "
-        "differentiation/remediation; revision and buffer plan; and a final teacher checklist."
+    if local_context:
+        context = "\n\n".join(item for item in (context, local_context) if item)
+    sources = list(dict.fromkeys([*sources, *local_sources]))
+    content, generation_mode = await asyncio.to_thread(
+        _generate_curriculum_plan,
+        payload=payload,
+        context=context,
     )
-    fallback = _fallback_content(
-        f"Class {payload.class_level} {payload.subject} Curriculum Plan",
-        ["Learning outcomes", "Week-wise plan", "Teaching strategies", "Assessment plan", "Differentiation", "Teacher checklist"],
-    )
-    content = await asyncio.to_thread(_generate_content, task=task, details=details, context=context, fallback=fallback)
-    return {"content": content, "sources": sources, "type": "curriculum"}
+    return {
+        "content": content,
+        "sources": sources,
+        "type": "curriculum",
+        "generation_mode": generation_mode,
+        "curriculum_meta": {
+            "class_level": payload.class_level,
+            "subject": payload.subject,
+            "duration_weeks": payload.duration_weeks,
+            "periods_per_week": payload.periods_per_week,
+            "medium": payload.medium,
+        },
+    }
 
 
 @router.post("/test-paper")

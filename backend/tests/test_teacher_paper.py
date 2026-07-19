@@ -6,6 +6,7 @@ from backend.routers.teacher import (
     TestPaperRequest,
     _chapter_hint,
     _chapter_options,
+    _default_paper_rules,
     _generate_structured_test_paper,
     _local_teacher_context,
     _normalize_paper_data,
@@ -76,14 +77,8 @@ class TeacherPaperTests(unittest.TestCase):
         self.assertIn("valid JSON object", system_prompt)
         self.assertNotIn("Markdown only", system_prompt)
 
-    def test_structured_completion_uses_paper_model_and_strict_schema(self):
+    def test_structured_completion_supports_model_override_and_json_object_mode(self):
         captured = {}
-        response_schema = {
-            "type": "object",
-            "properties": {"instructions": {"type": "array", "items": {"type": "string"}}},
-            "required": ["instructions"],
-            "additionalProperties": False,
-        }
 
         class FakeResponse:
             def raise_for_status(self):
@@ -106,20 +101,16 @@ class TeacherPaperTests(unittest.TestCase):
                 "JSON बनाइए",
                 json_mode=True,
                 max_tokens=3900,
-                response_schema=response_schema,
+                model="openai/gpt-oss-120b",
             )
         finally:
             teacher_module.requests.post = original_post
             teacher_module.settings.groq_paper_model = original_paper_model
 
         self.assertEqual(content, '{"instructions":[]}')
-        self.assertEqual(captured["model"], "openai/gpt-oss-20b")
+        self.assertEqual(captured["model"], "openai/gpt-oss-120b")
         self.assertEqual(captured["reasoning_effort"], "low")
-        self.assertEqual(captured["response_format"]["type"], "json_schema")
-        strict_schema = captured["response_format"]["json_schema"]
-        self.assertEqual(strict_schema["name"], "cgbse_question_paper")
-        self.assertTrue(strict_schema["strict"])
-        self.assertEqual(strict_schema["schema"], response_schema)
+        self.assertEqual(captured["response_format"], {"type": "json_object"})
 
     def test_normalizer_applies_teacher_blueprint_and_consecutive_numbering(self):
         payload = TestPaperRequest(
@@ -284,12 +275,13 @@ class TeacherPaperTests(unittest.TestCase):
         original_completion = teacher_module._request_paper_completion
         original_api_key = teacher_module.settings.groq_api_key
 
-        def fake_completion(prompt, *, json_mode=False, max_tokens=7000, response_schema=None):
+        def fake_completion(prompt, *, json_mode=False, max_tokens=7000, response_schema=None, model=None):
             calls.append({
                 "prompt": prompt,
                 "json_mode": json_mode,
                 "max_tokens": max_tokens,
                 "response_schema": response_schema,
+                "model": model,
             })
             if len(calls) == 1:
                 response = teacher_module.requests.Response()
@@ -308,9 +300,74 @@ class TeacherPaperTests(unittest.TestCase):
         self.assertEqual(result, valid_data)
         self.assertEqual(len(calls), 2)
         self.assertTrue(all(call["json_mode"] for call in calls))
-        self.assertTrue(all(call["response_schema"] for call in calls))
+        self.assertTrue(all(call["response_schema"] is None for call in calls))
+        self.assertEqual(calls[0]["model"], "openai/gpt-oss-20b")
+        self.assertEqual(calls[1]["model"], "openai/gpt-oss-120b")
         self.assertLess(calls[1]["max_tokens"], calls[0]["max_tokens"])
         self.assertLess(len(calls[1]["prompt"]), len(calls[0]["prompt"]))
+
+    def test_three_question_paper_uses_fallback_model_after_malformed_primary_json(self):
+        payload = TestPaperRequest(
+            class_level="10",
+            subject="Science",
+            selected_chapters=["science-2"],
+            total_marks=5,
+            question_count=3,
+            duration_minutes=30,
+            medium="Hindi",
+            sections=[
+                {"name": "A", "label_hi": "बहुविकल्पीय प्रश्न", "type": "mcq", "count": 1, "marks_each": 1, "word_limit": ""},
+                {"name": "B", "label_hi": "अति लघु उत्तरीय प्रश्न", "type": "very_short", "count": 2, "marks_each": 2, "word_limit": "30"},
+            ],
+        )
+        valid_data = {
+            "instructions": ["सभी प्रश्न हल कीजिए।", "उत्तर क्रम से और स्पष्ट लिखिए।"],
+            "sections": [
+                {
+                    "name": "A", "label_hi": "बहुविकल्पीय प्रश्न", "type": "mcq", "marks_each": 1, "word_limit": "",
+                    "questions": [{
+                        "number": 1, "text_hi": "अम्लीय विलयन में नीला लिटमस किस रंग का हो जाता है?",
+                        "options_hi": ["लाल", "नीला", "हरा", "पीला"], "or_text_hi": "", "answer_hi": "लाल",
+                        "marking_points_hi": ["सही विकल्प के लिए एक अंक"],
+                    }],
+                },
+                {
+                    "name": "B", "label_hi": "अति लघु उत्तरीय प्रश्न", "type": "very_short", "marks_each": 2, "word_limit": "30",
+                    "questions": [
+                        {"number": 2, "text_hi": "उदासीनीकरण अभिक्रिया से बनने वाले दो उत्पाद लिखिए।", "options_hi": [], "or_text_hi": "", "answer_hi": "लवण और जल।", "marking_points_hi": ["लवण", "जल"]},
+                        {"number": 3, "text_hi": "दैनिक जीवन में क्षारक का एक उपयोग उदाहरण सहित लिखिए।", "options_hi": [], "or_text_hi": "", "answer_hi": "उचित उदाहरण सहित क्षारक का उपयोग।", "marking_points_hi": ["सही उपयोग", "उदाहरण"]},
+                    ],
+                },
+            ],
+        }
+        calls = []
+        original_completion = teacher_module._request_paper_completion
+        original_api_key = teacher_module.settings.groq_api_key
+
+        def fake_completion(prompt, *, json_mode=False, max_tokens=7000, response_schema=None, model=None):
+            calls.append(model)
+            if len(calls) == 1:
+                return '{"instructions":["अधूरा"]}'
+            return teacher_module.json.dumps(valid_data, ensure_ascii=False)
+
+        teacher_module._request_paper_completion = fake_completion
+        teacher_module.settings.groq_api_key = "test-key"
+        try:
+            result = _generate_structured_test_paper(payload=payload, context="अम्ल, क्षारक एवं लवण")
+        finally:
+            teacher_module._request_paper_completion = original_completion
+            teacher_module.settings.groq_api_key = original_api_key
+
+        self.assertEqual(result, valid_data)
+        self.assertEqual(calls, ["openai/gpt-oss-20b", "openai/gpt-oss-120b"])
+
+    def test_structured_validator_reports_string_section_without_crashing(self):
+        errors = _validate_paper_data(
+            {"instructions": ["सभी प्रश्न हल करें।", "उत्तर स्पष्ट लिखें।"], "sections": ["not-an-object"]},
+            self.payload,
+        )
+
+        self.assertTrue(any("section" in error for error in errors))
 
     def test_unsplit_legacy_content_remains_printable(self):
         parts = _split_paper_content("# पुराना प्रश्नपत्र")
@@ -434,6 +491,27 @@ class TeacherPaperTests(unittest.TestCase):
         )
 
         self.assertTrue(any("शिक्षक प्रश्न कुल प्रश्नों से अधिक" in error for error in _paper_request_errors(payload)))
+
+    def test_sectionless_three_question_blueprint_distributes_five_marks_exactly(self):
+        payload = TestPaperRequest(
+            class_level="10", subject="Science", syllabus="प्रकाश", total_marks=5,
+            question_count=3, medium="Hindi", sections=[],
+        )
+
+        rules = _default_paper_rules(payload)
+
+        self.assertEqual(sum(rule["count"] for rule in rules), 3)
+        self.assertEqual(sum(rule["count"] * rule["marks_each"] for rule in rules), 5)
+        self.assertEqual([(rule["count"], rule["marks_each"]) for rule in rules], [(1, 1), (2, 2)])
+        self.assertEqual(_paper_request_errors(payload), [])
+
+    def test_sectionless_blueprint_rejects_fewer_marks_than_questions(self):
+        payload = TestPaperRequest(
+            class_level="10", subject="Science", syllabus="प्रकाश", total_marks=5,
+            question_count=6, medium="Hindi", sections=[],
+        )
+
+        self.assertTrue(any("कुल अंक" in error for error in _paper_request_errors(payload)))
 
     def test_structured_validator_preserves_entire_teacher_question(self):
         question_text = "प्रकाश के परावर्तन के दोनों नियम स्पष्ट भाषा में उदाहरण सहित लिखिए और उनका उपयोग समझाइए।"
