@@ -206,6 +206,39 @@ class TeacherPaperTests(unittest.TestCase):
         self.assertEqual(locked_question["marking_points_hi"], ["सही विकल्प — एक अंक"])
         self.assertTrue(all(question["options_hi"] == [] for question in normalized["sections"][1]["questions"]))
 
+    def test_normalizer_supplies_instructions_when_provider_omits_them(self):
+        payload = TestPaperRequest(
+            class_level="10",
+            subject="Science",
+            syllabus="प्रकाश",
+            total_marks=5,
+            question_count=1,
+            medium="Hindi",
+            instructions="चित्र साफ बनाइए।",
+            sections=[{
+                "name": "A", "label_hi": "दीर्घ उत्तरीय प्रश्न", "type": "long",
+                "count": 1, "marks_each": 5, "word_limit": "100",
+            }],
+        )
+        data = {"sections": [{
+            "name": "A", "label_hi": "दीर्घ उत्तरीय प्रश्न", "type": "long",
+            "marks_each": 5, "word_limit": "100", "questions": [{
+                "number": 1,
+                "text_hi": "प्रकाश के परावर्तन के दोनों नियम उचित उदाहरण सहित विस्तार से समझाइए।",
+                "options_hi": [],
+                "or_text_hi": "",
+                "answer_hi": "आपतन कोण परावर्तन कोण के बराबर होता है और तीनों किरणें एक तल में होती हैं।",
+                "marking_points_hi": ["दोनों नियम", "उचित उदाहरण"],
+            }],
+        }]}
+
+        normalized = _normalize_paper_data(data, payload)
+
+        self.assertEqual(normalized["instructions"][0], "चित्र साफ बनाइए।")
+        self.assertGreaterEqual(len(normalized["instructions"]), 2)
+        self.assertIn("सभी प्रश्न हल करना अनिवार्य है।", normalized["instructions"])
+        self.assertEqual(_validate_paper_data(normalized, payload), [])
+
     def test_structured_token_budget_scales_for_full_papers(self):
         self.assertGreater(_structured_paper_token_budget(23), 0)
         self.assertLessEqual(_structured_paper_token_budget(23), 5000)
@@ -306,7 +339,7 @@ class TeacherPaperTests(unittest.TestCase):
         self.assertLess(calls[1]["max_tokens"], calls[0]["max_tokens"])
         self.assertLess(len(calls[1]["prompt"]), len(calls[0]["prompt"]))
 
-    def test_three_question_paper_uses_fallback_model_after_malformed_primary_json(self):
+    def test_three_question_paper_uses_independent_models_after_malformed_json(self):
         payload = TestPaperRequest(
             class_level="10",
             subject="Science",
@@ -343,23 +376,34 @@ class TeacherPaperTests(unittest.TestCase):
         calls = []
         original_completion = teacher_module._request_paper_completion
         original_api_key = teacher_module.settings.groq_api_key
+        original_primary = teacher_module.settings.groq_paper_model
+        original_fallback = teacher_module.settings.groq_paper_fallback_model
+        original_general = teacher_module.settings.groq_model
 
         def fake_completion(prompt, *, json_mode=False, max_tokens=7000, response_schema=None, model=None):
             calls.append(model)
             if len(calls) == 1:
                 return '{"instructions":["अधूरा"]}'
+            if len(calls) == 2:
+                return "[]"
             return teacher_module.json.dumps(valid_data, ensure_ascii=False)
 
         teacher_module._request_paper_completion = fake_completion
         teacher_module.settings.groq_api_key = "test-key"
+        teacher_module.settings.groq_paper_model = "openai/gpt-oss-20b"
+        teacher_module.settings.groq_paper_fallback_model = "openai/gpt-oss-120b"
+        teacher_module.settings.groq_model = "llama-3.1-8b-instant"
         try:
             result = _generate_structured_test_paper(payload=payload, context="अम्ल, क्षारक एवं लवण")
         finally:
             teacher_module._request_paper_completion = original_completion
             teacher_module.settings.groq_api_key = original_api_key
+            teacher_module.settings.groq_paper_model = original_primary
+            teacher_module.settings.groq_paper_fallback_model = original_fallback
+            teacher_module.settings.groq_model = original_general
 
         self.assertEqual(result, valid_data)
-        self.assertEqual(calls, ["openai/gpt-oss-20b", "openai/gpt-oss-120b"])
+        self.assertEqual(calls, ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "llama-3.1-8b-instant"])
 
     def test_structured_validator_reports_string_section_without_crashing(self):
         errors = _validate_paper_data(

@@ -748,12 +748,36 @@ def _normalize_paper_data(data: dict, payload: TestPaperRequest) -> dict:
     """Apply teacher-owned blueprint metadata and consecutive numbering server-side."""
     if not isinstance(data, dict) or not isinstance(data.get("sections"), list):
         return data
-    if isinstance(data.get("instructions"), str):
-        data["instructions"] = [
-            item.strip(" -\t")
-            for item in re.split(r"\n+", data["instructions"])
-            if item.strip(" -\t")
-        ]
+    raw_instructions = data.get("instructions", [])
+    if isinstance(raw_instructions, str):
+        raw_instructions = re.split(r"\n+", raw_instructions)
+    if not isinstance(raw_instructions, list):
+        raw_instructions = []
+    instructions = [
+        str(item).strip(" -\t")
+        for item in raw_instructions
+        if str(item).strip(" -\t")
+    ]
+    teacher_instructions = [
+        item.strip(" -\t")
+        for item in re.split(r"\n+", payload.instructions or "")
+        if item.strip(" -\t")
+    ]
+    defaults = (
+        ["Attempt all questions.", "Write every answer clearly and in question-number order."]
+        if payload.medium.strip().lower() == "english"
+        else ["सभी प्रश्न हल करना अनिवार्य है।", "उत्तर प्रश्न क्रमांक के अनुसार स्पष्ट और क्रमबद्ध लिखिए।"]
+    )
+    # Instructions are presentation metadata, not factual question content.
+    # Keep teacher wording first and deterministically fill omissions instead
+    # of rejecting an otherwise complete paper because the provider skipped it.
+    normalized_instructions = list(dict.fromkeys([*teacher_instructions, *instructions]))
+    for default in defaults:
+        if len(normalized_instructions) >= 2:
+            break
+        if default not in normalized_instructions:
+            normalized_instructions.append(default)
+    data["instructions"] = normalized_instructions[:8]
     sections = data["sections"]
     rules = payload.sections
     if rules and len(sections) == len(rules):
@@ -846,7 +870,7 @@ EVIDENCE:
         settings.groq_paper_model,
         settings.groq_paper_fallback_model,
         settings.groq_model,
-    ])))[:2]
+    ])))[:3]
     for attempt, model in enumerate(models):
         prompt = build_prompt(_compact_paper_context(context, max_chars=context_limit))
         request = prompt if not last_errors else f"Fix these validation failures: {last_errors}. Regenerate from scratch.\n\n{prompt}"
