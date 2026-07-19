@@ -14,6 +14,7 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 - [Environment Variables](#environment-variables)
 - [Running the Application](#running-the-application)
 - [Public Company and Legal Pages](#public-company-and-legal-pages)
+- [Search and AI Discoverability](#search-and-ai-discoverability)
 - [PDF Ingestion](#pdf-ingestion)
 - [Teacher Dashboard](#teacher-dashboard)
 - [Admin Dashboard](#admin-dashboard)
@@ -74,6 +75,17 @@ An AI-powered study assistant built for CGBSE (Chhattisgarh Board of Secondary E
 - **Versioned legal pages** — Terms & Conditions, Privacy Policy, and Responsible AI Use Policy are published as version `1.0.0`, effective 18 July 2026
 - **Responsible disclosure** — The policies describe current Groq processing, stored learning activity, browser local storage, administrator review, improvement candidates, AI limitations, and the absence of advertising trackers
 - **Accessible public shell** — Shared company navigation and footer include keyboard focus handling, a skip link, active-route state, 44px touch targets, responsive navigation, declared image dimensions, and reduced-motion support
+
+### Search and AI Discoverability
+
+- **Crawlable product homepage** — `/` is a public CGBSE Class 10 product page with a single descriptive H1, student and teacher use cases, internal links, accuracy limitations, and sign-in calls to action; authenticated workspaces remain on their existing protected routes
+- **Useful public resource pages** — `/cgbse-class-10-model-papers` exposes the existing subject-wise model-paper and PYQ library with direct PDF downloads, while `/cgbse-teacher-tools` explains the curriculum, lesson, and question-paper workflows
+- **Per-page metadata** — Public routes set unique titles, descriptions, canonical URLs, robots directives, Open Graph fields, Twitter cards, and truthful JSON-LD where applicable
+- **Crawler endpoints** — Nginx proxies `/robots.txt`, `/sitemap.xml`, and `/llms.txt` to FastAPI so each response uses the configured production origin; private app routes emit an `X-Robots-Tag: noindex, nofollow` header
+- **Technical safeguards** — Nginx adds baseline security headers, compresses text assets, and applies long-lived caching to fingerprinted/static assets
+- **No invented authority signals** — Public copy describes current product behavior without unsupported rankings, user counts, endorsements, or official-board affiliation; generated educational output is clearly identified as requiring human review
+
+Set `PUBLIC_SITE_URL` in the VPS `.env` to the final HTTPS origin without a trailing slash, for example `https://example.org`. This value is used for absolute sitemap and crawler-document links. When it is unset, FastAPI derives the origin from Nginx's forwarded scheme and host. After deployment, submit `/sitemap.xml` in Google Search Console and Bing Webmaster Tools and verify the canonical domain there.
 
 ---
 

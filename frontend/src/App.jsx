@@ -11,19 +11,15 @@ const Contact = lazy(() => import("./pages/Contact"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const AIUse = lazy(() => import("./pages/AIUse"));
-
-function RoleHome() {
-  const hasToken = Boolean(localStorage.getItem("vidyaai_token"));
-  const role = localStorage.getItem("vidyaai_role");
-  if (!hasToken) return <Navigate to="/login" replace />;
-  return <Navigate to={role === "teacher" ? "/teacher" : "/dashboard"} replace />;
-}
+const Home = lazy(() => import("./pages/Home"));
+const ModelPapers = lazy(() => import("./pages/ModelPapers"));
+const TeacherTools = lazy(() => import("./pages/TeacherTools"));
 
 function App() {
   return (
     <Suspense fallback={<div className="route-loader" role="status"><span /><strong>VidyaAI</strong><small>Loading your workspace…</small></div>}>
       <Routes>
-        <Route path="/" element={<RoleHome />} />
+        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/chat" element={<Dashboard />} />
@@ -37,6 +33,8 @@ function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
         <Route path="/ai-use" element={<AIUse />} />
+        <Route path="/cgbse-class-10-model-papers" element={<ModelPapers />} />
+        <Route path="/cgbse-teacher-tools" element={<TeacherTools />} />
         <Route path="/ai-policy" element={<Navigate to="/ai-use" replace />} />
       </Routes>
     </Suspense>

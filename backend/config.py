@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     allow_embedding_download: str = "false"
     admin_emails: str = ""
+    public_site_url: str = ""
 
     @field_validator("database_url")
     def normalize_database_url(cls, value: str) -> str:
