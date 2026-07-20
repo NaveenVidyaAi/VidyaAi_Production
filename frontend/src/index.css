@@ -5997,6 +5997,12 @@ button:active:not(:disabled) { transform: scale(0.98); }
 
 .teacher-app-header .mobile-profile-wrap { display: block; min-width: 0; }
 
+@media (min-width: 821px) {
+  .teacher-app-header .mobile-profile-wrap,
+  .teacher-app-header .mobile-profile-backdrop,
+  .teacher-app-header .mobile-profile-menu { display: none; }
+}
+
 .teacher-app-header .mobile-profile-chip {
   display: grid;
   grid-template-columns: 34px minmax(110px, 1fr) 14px;
@@ -6382,6 +6388,8 @@ button:active:not(:disabled) { transform: scale(0.98); }
 }
 
 @media (max-width: 820px), (max-width: 1040px) and (max-height: 650px) {
+  .teacher-sidebar .teacher-account { display: none; }
+
   .teacher-app-header {
     z-index: 70;
     grid-template-columns: minmax(0, 1fr);
@@ -6577,12 +6585,8 @@ button:active:not(:disabled) { transform: scale(0.98); }
   outline-offset: 2px;
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1100px) {
   .teacher-shell { grid-template-columns: 270px minmax(0, 1fr) 296px; }
-
-  .teacher-shell.teacher-tool-paper { grid-template-columns: 270px minmax(0, 1fr); }
-
-  .teacher-tool-paper .teacher-insights-rail { display: none; }
 
   .teacher-main {
     width: 100%;

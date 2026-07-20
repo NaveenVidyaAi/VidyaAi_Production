@@ -10,7 +10,7 @@ const copy = {
     eyebrow: "CGBSE CLASS 10 · STUDENTS & TEACHERS",
     heading: "CGBSE learning support that understands your curriculum.",
     lead: "VidyaAI brings curriculum-aware explanations, Hindi and English learning support, authentic practice resources and teacher planning tools into one focused workspace.",
-    open: "Open VidyaAI", papers: "Sign in to access papers",
+    open: "Open VidyaAI",
     trust: "AI output is designed for learning support and should be checked against official CGBSE material and teacher guidance.",
     ask: "Ask in your language", points: ["Curriculum-grounded support", "Class 10 model papers and PYQs", "Editable resources for teachers"],
     capEye: "ONE EDUCATION WORKSPACE", capTitle: "How VidyaAI supports CGBSE preparation", capLead: "Every feature is organised around practical study and classroom workflows—not generic chat alone.",
@@ -36,7 +36,7 @@ const copy = {
     eyebrow: "CGBSE कक्षा 10 · विद्यार्थी और शिक्षक",
     heading: "आपके पाठ्यक्रम को समझने वाली CGBSE शिक्षण सहायता।",
     lead: "VidyaAI पाठ्यक्रम-संगत व्याख्या, हिंदी और अंग्रेज़ी में सीखने की सहायता, अभ्यास सामग्री और शिक्षक योजना टूल्स को एक केंद्रित कार्यक्षेत्र में लाता है।",
-    open: "VidyaAI खोलें", papers: "प्रश्नपत्रों के लिए साइन इन करें",
+    open: "VidyaAI खोलें",
     trust: "AI से मिले उत्तर केवल सीखने में सहायता के लिए हैं। उन्हें आधिकारिक CGBSE सामग्री और शिक्षक मार्गदर्शन से जाँचें।",
     ask: "अपनी भाषा में पूछें", points: ["पाठ्यक्रम-संगत सहायता", "कक्षा 10 मॉडल और पिछले प्रश्नपत्र", "शिक्षकों के लिए संपादन योग्य संसाधन"],
     capEye: "एक संपूर्ण शिक्षा कार्यक्षेत्र", capTitle: "VidyaAI CGBSE की तैयारी में कैसे मदद करता है", capLead: "हर सुविधा व्यावहारिक पढ़ाई और कक्षा की जरूरतों के अनुसार बनाई गई है—केवल सामान्य चैट के लिए नहीं।",
@@ -65,7 +65,7 @@ export default function Home() {
   const schema = [{ "@context": "https://schema.org", "@type": "Organization", name: "Gyanix AI Solutions", url: `${origin}/about`, logo: `${origin}/brand/gyanix-ai-solutions-logo.png`, founder: { "@type": "Person", name: "Naveen Chandrawanshi" }, email: "GyanixAiSolutions@gmail.com" }, { "@context": "https://schema.org", "@type": "SoftwareApplication", name: "VidyaAI", applicationCategory: "EducationalApplication", operatingSystem: "Web", url: `${origin}/`, description: t.description, creator: { "@type": "Organization", name: "Gyanix AI Solutions" } }];
 
   return <PublicLayout title={t.title} description={t.description} path="/" schema={schema}>
-    <section className="seo-home-hero public-section" aria-labelledby="home-title"><div><p className="public-eyebrow">{t.eyebrow}</p><h1 id="home-title">{t.heading}</h1><p className="seo-home-lead">{t.lead}</p><div className="public-hero-actions"><Link className="public-primary-button" to="/login">{t.open} <Icon name="arrowRight" size={18} /></Link><Link className="public-secondary-button" to="/login">{t.papers}</Link></div><p className="seo-trust-note"><Icon name="shield" size={18} /> {t.trust}</p></div><div className="seo-hero-card"><span className="seo-hero-mark" aria-hidden="true">वि</span><p>{t.ask}</p><strong>समझें · अभ्यास करें · पढ़ाएँ</strong><ul>{t.points.map((point) => <li key={point}>{point}</li>)}</ul></div></section>
+    <section className="seo-home-hero public-section" aria-labelledby="home-title"><div><p className="public-eyebrow">{t.eyebrow}</p><h1 id="home-title">{t.heading}</h1><p className="seo-home-lead">{t.lead}</p><div className="public-hero-actions"><Link className="public-primary-button" to="/login">{t.open} <Icon name="arrowRight" size={18} /></Link></div><p className="seo-trust-note"><Icon name="shield" size={18} /> {t.trust}</p></div><div className="seo-hero-card"><span className="seo-hero-mark" aria-hidden="true">वि</span><p>{t.ask}</p><strong>समझें · अभ्यास करें · पढ़ाएँ</strong><ul>{t.points.map((point) => <li key={point}>{point}</li>)}</ul></div></section>
     <section className="seo-capabilities public-section"><div className="public-section-heading"><p className="public-eyebrow">{t.capEye}</p><h2>{t.capTitle}</h2><p>{t.capLead}</p></div><div className="seo-card-grid">{t.capabilities.map(([icon, title, text]) => <article key={title}><span aria-hidden="true"><Icon name={icon} size={23} /></span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
     <section className="seo-split public-section"><div><p className="public-eyebrow">{t.studentEye}</p><h2>{t.studentTitle}</h2><p>{t.studentOne}</p><p>{t.studentTwo}</p><Link className="public-text-link" to="/login">{t.studentLink} <Icon name="arrowRight" size={16} /></Link></div><div><p className="public-eyebrow">{t.teacherEye}</p><h2>{t.teacherTitle}</h2><p>{t.teacherOne}</p><p>{t.teacherTwo}</p><Link className="public-text-link" to="/cgbse-teacher-tools">{t.teacherLink} <Icon name="arrowRight" size={16} /></Link></div></section>
     <section className="seo-grounding public-section"><div><p className="public-eyebrow">{t.responsibleEye}</p><h2>{t.responsibleTitle}</h2></div><div><p>{t.responsibleOne}</p><p>{t.responsibleTwo} <Link to="/ai-use">{t.policy}</Link></p></div></section>

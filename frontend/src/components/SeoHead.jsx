@@ -25,7 +25,7 @@ export default function SeoHead({
   title,
   description,
   path,
-  image = "/brand/gyanix-ai-solutions-logo.png",
+  image = "/vidyaai-icon-512.png",
   robots = "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
   type = "website",
   schema = [],

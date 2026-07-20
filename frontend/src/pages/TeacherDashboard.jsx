@@ -786,6 +786,14 @@ export default function TeacherDashboard() {
           <button type="button" className={activeTool === "chat" ? "active" : ""} aria-current={activeTool === "chat" ? "page" : undefined} onClick={() => openTool("chat")}><span className="teacher-shared-icon"><Icon name="chat" size={17} /></span>{t.nav.chat}<Icon name="arrowRight" size={16} /></button>
           <button type="button" className={activeTool === "pyq" ? "active" : ""} aria-current={activeTool === "pyq" ? "page" : undefined} onClick={() => openTool("pyq")}><span className="teacher-shared-icon"><Icon name="library" size={17} /></span>{t.nav.pyq}<Icon name="arrowRight" size={16} /></button>
         </div>
+        <div className="teacher-account" aria-label={lang === "hi" ? "शिक्षक प्रोफाइल" : "Teacher profile"}>
+          <span aria-hidden="true">{profile.name?.trim()?.charAt(0)?.toUpperCase() || "T"}</span>
+          <div>
+            <strong>{profile.name?.trim() || "Teacher"}</strong>
+            <small>{t.classLabel} {profile.class_level || "10"} · {profile.medium || "Hindi"}</small>
+          </div>
+          <button type="button" onClick={logout} title={t.logout} aria-label={t.logout}><Icon name="logout" size={18} /></button>
+        </div>
       </aside>
 
       <main className="teacher-main" id="teacher-main" tabIndex="-1">

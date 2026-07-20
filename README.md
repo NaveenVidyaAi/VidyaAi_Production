@@ -307,6 +307,40 @@ docker compose up -d
 
 This starts: **PostgreSQL** (port 5432), **Qdrant** (port 6333), **FastAPI backend** (port 8000).
 
+#### macOS with Colima
+
+On the local Apple Silicon development machine, Docker runs through Colima and
+Compose may be installed as the legacy `docker-compose` command. The normal fast
+startup is:
+
+```bash
+cd /Users/naveenchandrawanshi/Applications/AI_Assistant_cgbse
+colima start
+docker-compose up -d
+curl -I http://127.0.0.1:8000/docs
+```
+
+If the host Docker socket returns `EOF` or `permission denied` but the Colima VM
+is running, start Docker and Compose inside the VM instead:
+
+```bash
+colima ssh -- sudo systemctl start docker
+colima ssh -- sh -lc 'cd /Users/naveenchandrawanshi/Applications/AI_Assistant_cgbse && sudo docker compose up -d'
+curl -I http://127.0.0.1:8000/docs
+```
+
+To inspect the services through the same fallback path:
+
+```bash
+colima ssh -- sh -lc 'cd /Users/naveenchandrawanshi/Applications/AI_Assistant_cgbse && sudo docker compose ps'
+colima ssh -- sh -lc 'cd /Users/naveenchandrawanshi/Applications/AI_Assistant_cgbse && sudo docker compose logs --tail=100 backend'
+```
+
+The first clean build can take several minutes because the backend image installs
+the embedding and OCR dependencies. Later starts reuse the built image and are
+much faster. PostgreSQL and Qdrant data are bind-mounted in `pg_data/` and
+`qdrant_storage/`.
+
 ### 3. Start frontend
 
 ```bash
