@@ -29,6 +29,7 @@ export default function SeoHead({
   robots = "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
   type = "website",
   schema = [],
+  language = "en",
 }) {
   useEffect(() => {
     const canonical = new URL(path || window.location.pathname, window.location.origin).href;
@@ -36,7 +37,9 @@ export default function SeoHead({
     const fullTitle = title.includes(BRAND) ? title : `${title} | ${BRAND}`;
 
     document.title = fullTitle;
-    document.documentElement.lang = "en-IN";
+    const htmlLanguage = language === "hi" ? "hi-IN" : "en-IN";
+    const openGraphLocale = language === "hi" ? "hi_IN" : "en_IN";
+    document.documentElement.lang = htmlLanguage;
     upsertMeta('meta[name="description"]', { name: "description", content: description });
     upsertMeta('meta[name="robots"]', { name: "robots", content: robots });
     upsertMeta('meta[property="og:title"]', { property: "og:title", content: fullTitle });
@@ -45,7 +48,7 @@ export default function SeoHead({
     upsertMeta('meta[property="og:url"]', { property: "og:url", content: canonical });
     upsertMeta('meta[property="og:image"]', { property: "og:image", content: imageUrl });
     upsertMeta('meta[property="og:site_name"]', { property: "og:site_name", content: BRAND });
-    upsertMeta('meta[property="og:locale"]', { property: "og:locale", content: "en_IN" });
+    upsertMeta('meta[property="og:locale"]', { property: "og:locale", content: openGraphLocale });
     upsertMeta('meta[name="twitter:card"]', { name: "twitter:card", content: "summary_large_image" });
     upsertMeta('meta[name="twitter:title"]', { name: "twitter:title", content: fullTitle });
     upsertMeta('meta[name="twitter:description"]', { name: "twitter:description", content: description });
@@ -61,7 +64,7 @@ export default function SeoHead({
       script.textContent = JSON.stringify(entry);
       document.head.appendChild(script);
     });
-  }, [description, image, path, robots, schema, title, type]);
+  }, [description, image, language, path, robots, schema, title, type]);
 
   return null;
 }
