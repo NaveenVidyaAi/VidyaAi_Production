@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { PublicLanguageProvider } from "./contexts/PublicLanguageContext";
 
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
@@ -12,13 +13,13 @@ const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const AIUse = lazy(() => import("./pages/AIUse"));
 const Home = lazy(() => import("./pages/Home"));
-const ModelPapers = lazy(() => import("./pages/ModelPapers"));
 const TeacherTools = lazy(() => import("./pages/TeacherTools"));
 
 function App() {
   return (
-    <Suspense fallback={<div className="route-loader" role="status"><span /><strong>VidyaAI</strong><small>Loading your workspace…</small></div>}>
-      <Routes>
+    <PublicLanguageProvider>
+      <Suspense fallback={<div className="route-loader" role="status"><span /><strong>VidyaAI</strong><small>Loading your workspace…</small></div>}>
+        <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -33,11 +34,12 @@ function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
         <Route path="/ai-use" element={<AIUse />} />
-        <Route path="/cgbse-class-10-model-papers" element={<ModelPapers />} />
+        <Route path="/cgbse-class-10-model-papers" element={<Navigate to="/login" replace />} />
         <Route path="/cgbse-teacher-tools" element={<TeacherTools />} />
         <Route path="/ai-policy" element={<Navigate to="/ai-use" replace />} />
-      </Routes>
-    </Suspense>
+        </Routes>
+      </Suspense>
+    </PublicLanguageProvider>
   );
 }
 
