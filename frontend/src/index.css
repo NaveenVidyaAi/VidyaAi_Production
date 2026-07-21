@@ -5347,6 +5347,141 @@ button:active:not(:disabled) { transform: scale(0.98); }
   animation: register-enter 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+.login-motion-story,
+.register-motion-story { animation: none; }
+
+/* VidyaAI motion system: transform/opacity only for smooth, accessible feedback */
+.route-motion-frame { min-height: 100vh; animation: motion-route-enter 220ms ease-out both; }
+
+.public-scroll-reveal {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0);
+  transition:
+    opacity 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--motion-order, 0) * 55ms);
+  will-change: opacity, transform;
+}
+
+.public-scroll-reveal.motion-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.public-nav-link { position: relative; isolation: isolate; }
+.public-nav-indicator {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border: 1px solid rgba(124, 58, 237, 0.14);
+  border-radius: inherit;
+  background: rgba(124, 58, 237, 0.08);
+  box-shadow: 0 8px 20px rgba(76, 29, 149, 0.08);
+}
+
+.seo-card-grid article,
+.teacher-tool-card,
+.overview-card,
+.study-tool-panel,
+.right-section,
+.teacher-insight-card,
+.adm-stat-card,
+.adm-chart-card {
+  transition: transform 220ms ease-out, box-shadow 220ms ease-out, border-color 220ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .seo-card-grid article:hover,
+  .teacher-tool-card:hover,
+  .overview-card:hover,
+  .study-tool-panel:hover,
+  .teacher-insight-card:hover,
+  .adm-stat-card:hover,
+  .adm-chart-card:hover {
+    transform: translate3d(0, -4px, 0);
+  }
+
+  .seo-card-grid article:hover,
+  .teacher-tool-card:hover,
+  .teacher-insight-card:hover { box-shadow: 0 20px 44px rgba(76, 29, 149, 0.12); }
+
+  .seo-card-grid article:hover svg,
+  .teacher-tool-card:hover .teacher-tool-icon svg,
+  .public-app-link:hover svg,
+  .public-text-link:hover svg { transform: translate3d(3px, 0, 0) rotate(2deg); }
+}
+
+.seo-card-grid article svg,
+.teacher-tool-card .teacher-tool-icon svg,
+.public-app-link svg,
+.public-text-link svg { transition: transform 200ms ease-out; }
+
+.dashboard-left-nav nav button,
+.teacher-sidebar nav button,
+.teacher-shared-tools button,
+.right-subject-list button { position: relative; overflow: hidden; }
+
+.dashboard-left-nav nav button::after,
+.teacher-sidebar nav button::after,
+.right-subject-list button::after {
+  content: "";
+  position: absolute;
+  inset-block: 7px;
+  left: 3px;
+  width: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0;
+  transform: scaleY(0.25);
+  transition: opacity 180ms ease-out, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dashboard-left-nav nav button.active::after,
+.teacher-sidebar nav button.active::after,
+.right-subject-list button.active::after { opacity: 0.8; transform: scaleY(1); }
+
+.dashboard-message-row,
+.teacher-chat-message { animation: motion-message-enter 260ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+.mobile-profile-menu { animation: motion-menu-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: top right; }
+.mobile-profile-backdrop { animation: motion-fade-in 180ms ease-out both; }
+.paper-section-rule { animation: motion-card-enter 260ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.paper-section-rule[open] .paper-section-content { animation: motion-content-open 220ms ease-out both; transform-origin: top center; }
+.paper-custom-question { animation: motion-card-enter 240ms ease-out both; }
+
+.learning-score-grid strong,
+.teacher-pulse-grid strong,
+.teacher-hero-stat strong,
+.adm-stat-card strong { animation: motion-metric-pop 420ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.learning-progress-track > span { transform-origin: left center; animation: motion-progress 620ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes motion-message-enter { from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes motion-route-enter { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
+@keyframes motion-menu-enter { from { opacity: 0; transform: translate3d(0, -8px, 0) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes motion-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes motion-card-enter { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
+@keyframes motion-content-open { from { opacity: 0; transform: scaleY(0.97) translate3d(0, -5px, 0); } to { opacity: 1; transform: none; } }
+@keyframes motion-metric-pop { from { opacity: 0; transform: translate3d(0, 5px, 0) scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes motion-progress { from { opacity: 0.55; transform: scaleX(0.05); } to { opacity: 1; transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within { scroll-behavior: auto; }
+  .public-scroll-reveal,
+  .public-scroll-reveal.motion-visible { opacity: 1; transform: none; transition: none; }
+  .route-motion-frame,
+  .dashboard-message-row,
+  .teacher-chat-message,
+  .mobile-profile-menu,
+  .mobile-profile-backdrop,
+  .paper-section-rule,
+  .paper-section-rule[open] .paper-section-content,
+  .paper-custom-question,
+  .learning-score-grid strong,
+  .teacher-pulse-grid strong,
+  .teacher-hero-stat strong,
+  .adm-stat-card strong,
+  .learning-progress-track > span { animation: none !important; }
+}
+
 .register-kicker,
 .register-step {
   color: var(--register-accent-strong);

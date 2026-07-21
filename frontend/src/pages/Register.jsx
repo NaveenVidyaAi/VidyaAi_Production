@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import api from "../api/client";
 import BrandMark from "../components/BrandMark";
 import CompanyLegalFooter from "../components/CompanyLegalFooter";
@@ -11,6 +12,14 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const reduceMotion = useReducedMotion();
+  const enter = reduceMotion
+    ? { initial: false, animate: { opacity: 1 } }
+    : { initial: { opacity: 0, y: 22 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] } };
+  const stagger = { animate: { transition: { staggerChildren: reduceMotion ? 0 : 0.09, delayChildren: reduceMotion ? 0 : 0.12 } } };
+  const staggerItem = reduceMotion
+    ? { initial: false, animate: { opacity: 1 } }
+    : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.42, ease: "easeOut" } };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -39,45 +48,47 @@ export default function Register() {
   return (
     <div className={`register-experience register-role-${form.role}`}>
       <div className="register-ambient" aria-hidden="true">
-        <span className="register-orb register-orb-one" />
-        <span className="register-orb register-orb-two" />
-        <span className="register-orb register-orb-three" />
+        <motion.span className="register-orb register-orb-one" animate={reduceMotion ? undefined : { x: [0, 18, 0], y: [0, -14, 0], scale: [1, 1.05, 1] }} transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }} />
+        <motion.span className="register-orb register-orb-two" animate={reduceMotion ? undefined : { x: [0, -16, 0], y: [0, 20, 0], scale: [1, 0.96, 1] }} transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }} />
+        <motion.span className="register-orb register-orb-three" animate={reduceMotion ? undefined : { y: [0, -12, 0], opacity: [0.55, 0.8, 0.55] }} transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }} />
         <span className="register-grid" />
       </div>
 
-      <header className="register-topbar">
+      <motion.header className="register-topbar" {...enter}>
         <div className="register-brand"><BrandMark compact tagline="आपका स्मार्ट पढ़ाई साथी" /></div>
         <p>
           पहले से अकाउंट है?
           <Link to="/login">लॉगिन करें <Icon name="arrowRight" size={16} /></Link>
         </p>
-      </header>
+      </motion.header>
 
       <main className="register-layout">
-        <section className="register-story" aria-labelledby="register-story-title">
+        <motion.section className="register-story register-motion-story" aria-labelledby="register-story-title" {...enter} variants={stagger}>
           <div className="register-kicker"><Icon name="sparkle" size={17} /><span>AI-POWERED LEARNING SPACE</span></div>
           <h1 id="register-story-title">सीखने और सिखाने की <span>बेहतर शुरुआत।</span></h1>
           <p className="register-story-copy">
             अपनी कक्षा, माध्यम और भूमिका चुनें। VidyaAI आपके लिए उसी पल एक व्यक्तिगत workspace तैयार कर देगा।
           </p>
 
-          <div className="register-role-preview" aria-live="polite">
-            <div className="register-preview-icon" aria-hidden="true"><Icon name={form.role === "teacher" ? "teacher" : "student"} size={25} /></div>
-            <div>
-              <small>{form.role === "teacher" ? "TEACHER WORKSPACE" : "STUDENT WORKSPACE"}</small>
-              <strong>{form.role === "teacher" ? "योजना बनाएँ, पढ़ाएँ और प्रगति समझें" : "समझें, अभ्यास करें और आत्मविश्वास बढ़ाएँ"}</strong>
-              <span>{form.role === "teacher" ? "AI lesson tools, curriculum planning और PYQ library एक जगह।" : "आपकी कक्षा और माध्यम के अनुसार उत्तर, revision और PYQ support।"}</span>
-            </div>
-          </div>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div key={form.role} className="register-role-preview" aria-live="polite" initial={reduceMotion ? false : { opacity: 0, x: form.role === "teacher" ? 18 : -18 }} animate={{ opacity: 1, x: 0 }} exit={reduceMotion ? undefined : { opacity: 0, x: form.role === "teacher" ? -12 : 12 }} transition={{ duration: 0.24, ease: "easeOut" }}>
+              <motion.div className="register-preview-icon" aria-hidden="true" initial={reduceMotion ? false : { rotate: -8, scale: 0.86 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: "spring", stiffness: 380, damping: 24 }}><Icon name={form.role === "teacher" ? "teacher" : "student"} size={25} /></motion.div>
+              <div>
+                <small>{form.role === "teacher" ? "TEACHER WORKSPACE" : "STUDENT WORKSPACE"}</small>
+                <strong>{form.role === "teacher" ? "योजना बनाएँ, पढ़ाएँ और प्रगति समझें" : "समझें, अभ्यास करें और आत्मविश्वास बढ़ाएँ"}</strong>
+                <span>{form.role === "teacher" ? "AI lesson tools, curriculum planning और PYQ library एक जगह।" : "आपकी कक्षा और माध्यम के अनुसार उत्तर, revision और PYQ support।"}</span>
+              </div>
+            </motion.div>
+          </AnimatePresence>
 
-          <div className="register-benefits" aria-label="VidyaAI benefits">
-            <div><span><Icon name="check" size={17} /></span><p><strong>Personalised</strong><small>आपकी प्रोफाइल के अनुसार</small></p></div>
-            <div><span><Icon name="shield" size={17} /></span><p><strong>Simple & secure</strong><small>तेज और सुरक्षित शुरुआत</small></p></div>
-            <div><span><Icon name="sparkle" size={17} /></span><p><strong>Ready instantly</strong><small>कोई जटिल setup नहीं</small></p></div>
-          </div>
-        </section>
+          <motion.div className="register-benefits" aria-label="VidyaAI benefits" variants={stagger} initial="initial" animate="animate">
+            <motion.div variants={staggerItem}><span><Icon name="check" size={17} /></span><p><strong>Personalised</strong><small>आपकी प्रोफाइल के अनुसार</small></p></motion.div>
+            <motion.div variants={staggerItem}><span><Icon name="shield" size={17} /></span><p><strong>Simple & secure</strong><small>तेज और सुरक्षित शुरुआत</small></p></motion.div>
+            <motion.div variants={staggerItem}><span><Icon name="sparkle" size={17} /></span><p><strong>Ready instantly</strong><small>कोई जटिल setup नहीं</small></p></motion.div>
+          </motion.div>
+        </motion.section>
 
-        <section className="register-glass-card" aria-labelledby="register-form-title">
+        <motion.section className="register-glass-card" aria-labelledby="register-form-title" {...enter} transition={{ ...enter.transition, delay: reduceMotion ? 0 : 0.12 }}>
           <div className="register-card-head">
             <span className="register-step">ONE SIMPLE STEP</span>
             <h2 id="register-form-title">अपना VidyaAI अकाउंट बनाएँ</h2>
@@ -88,12 +99,12 @@ export default function Register() {
             <fieldset className="register-role-fieldset">
               <legend id="register-role-label">मैं VidyaAI का उपयोग करूँगा/करूँगी</legend>
               <div className="register-role-selector" role="radiogroup" aria-labelledby="register-role-label">
-                <button type="button" role="radio" aria-checked={form.role === "student"} className={form.role === "student" ? "active" : ""} onClick={() => selectRole("student")}>
+                <motion.button type="button" role="radio" aria-checked={form.role === "student"} className={form.role === "student" ? "active" : ""} onClick={() => selectRole("student")} whileHover={reduceMotion ? undefined : { y: -2 }} whileTap={reduceMotion ? undefined : { scale: 0.98 }}>
                   <span aria-hidden="true"><Icon name="student" size={21} /></span><strong>Student</strong><small>Learn & practise</small><i aria-hidden="true"><Icon name="check" size={14} /></i>
-                </button>
-                <button type="button" role="radio" aria-checked={form.role === "teacher"} className={form.role === "teacher" ? "active" : ""} onClick={() => selectRole("teacher")}>
+                </motion.button>
+                <motion.button type="button" role="radio" aria-checked={form.role === "teacher"} className={form.role === "teacher" ? "active" : ""} onClick={() => selectRole("teacher")} whileHover={reduceMotion ? undefined : { y: -2 }} whileTap={reduceMotion ? undefined : { scale: 0.98 }}>
                   <span aria-hidden="true"><Icon name="teacher" size={21} /></span><strong>Teacher</strong><small>Plan & teach</small><i aria-hidden="true"><Icon name="check" size={14} /></i>
-                </button>
+                </motion.button>
               </div>
             </fieldset>
 
@@ -131,17 +142,17 @@ export default function Register() {
               </div>
             </div>
 
-            {error && <p className="register-error" role="alert">{error}</p>}
-            <button type="submit" className="register-submit" disabled={loading}>
+            <AnimatePresence>{error && <motion.p className="register-error" role="alert" initial={reduceMotion ? false : { opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{error}</motion.p>}</AnimatePresence>
+            <motion.button type="submit" className="register-submit" disabled={loading} whileHover={loading || reduceMotion ? undefined : { y: -2, scale: 1.01 }} whileTap={loading || reduceMotion ? undefined : { scale: 0.985 }}>
               {loading && <span className="register-submit-loader" aria-hidden="true" />}
               <span>{loading ? "अकाउंट बन रहा है…" : "मेरा अकाउंट बनाएँ"}</span>
               {!loading && <Icon name="arrowRight" size={18} />}
-            </button>
+            </motion.button>
             <p className="register-consent"><Icon name="shield" size={15} /> जारी रखकर आप हमारी <Link to="/terms">शर्तों</Link>, <Link to="/privacy">Privacy Policy</Link> और <Link to="/ai-use">AI Use Policy</Link> से सहमत होते हैं।</p>
           </form>
 
           <p className="register-mobile-login">पहले से अकाउंट है? <Link to="/login">लॉगिन करें</Link></p>
-        </section>
+        </motion.section>
       </main>
 
       <CompanyLegalFooter className="auth-public-footer" />
