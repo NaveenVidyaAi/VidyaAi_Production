@@ -508,7 +508,7 @@ function TeacherInsightsRail({ recent, streak, t, lang, onOpenTool, onOpenRecent
   );
 }
 
-function TeacherStreamingResponse({ content, animate }) {
+function TeacherStreamingResponse({ content, animate, onProgress }) {
   const tokens = useMemo(() => (content || "").match(/\S+\s*/g) || [], [content]);
   const [visibleCount, setVisibleCount] = useState(animate ? 0 : tokens.length);
   useEffect(() => {
@@ -521,6 +521,7 @@ function TeacherStreamingResponse({ content, animate }) {
     const timer = window.setInterval(() => setVisibleCount((current) => {
       const next = Math.min(current + wordsPerTick, tokens.length);
       if (next >= tokens.length) window.clearInterval(timer);
+      onProgress?.();
       return next;
     }), 28);
     return () => window.clearInterval(timer);
@@ -530,17 +531,24 @@ function TeacherStreamingResponse({ content, animate }) {
 }
 
 function TeacherChat({ compact = false, t, lang, question, setQuestion, subject, setSubject, answerStyle, setAnswerStyle, loading, messages, onSubmit, onClear, onOpenFull, onCopy, onRetry, onFeedback, onChapterOption }) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const chatWindowRef = useRef(null);
+  useEffect(() => {
+    const windowElement = chatWindowRef.current;
+    if (!windowElement) return;
+    requestAnimationFrame(() => windowElement.scrollTo({ top: windowElement.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
+  }, [messages, loading]);
   const prompts = lang === "hi"
     ? ["कक्षा 10 में प्रकाश का परावर्तन कैसे पढ़ाएँ?", "अम्ल और क्षार के लिए कक्षा गतिविधि बनाएँ।", "कमजोर विद्यार्थियों के लिए भिन्न समझाएँ।"]
     : ["How should I teach reflection of light in Class 10?", "Create a classroom activity for acids and bases.", "Explain fractions for struggling learners."];
   return (
     <section className={`teacher-chat-panel${compact ? " compact" : ""}`}>
       <div className="teacher-chat-toolbar">
-        <div><strong>{compact ? t.homeChat.title : t.nav.chat}</strong><span>{compact ? t.homeChat.note : t.chatWelcome}</span></div>
-        {!compact && <div className="teacher-chat-settings"><label><span>{t.subject}</span><select value={subject} onChange={(event) => setSubject(event.target.value)}><option value="General">{t.options.general}</option>{subjects.map((item) => <option key={item} value={item}>{t.subjectNames[item]}</option>)}</select></label><label><span>{lang === "hi" ? "उत्तर शैली" : "Answer style"}</span><select value={answerStyle} onChange={(event) => setAnswerStyle(event.target.value)}>{teacherAnswerStyles.map((style) => <option key={style.id} value={style.id}>{style[lang]}</option>)}</select></label></div>}
+        <div className="teacher-chat-heading"><strong>{compact ? t.homeChat.title : t.nav.chat}</strong><span>{compact ? t.homeChat.note : t.chatWelcome}</span></div>
+        {!compact && <><button type="button" className="teacher-chat-settings-toggle" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}><Icon name="settings" size={16} />{lang === "hi" ? "विषय" : "Subject"}</button><div className={`teacher-chat-settings${settingsOpen ? " open" : ""}`}><label><span>{t.subject}</span><select value={subject} onChange={(event) => setSubject(event.target.value)}><option value="General">{t.options.general}</option>{subjects.map((item) => <option key={item} value={item}>{t.subjectNames[item]}</option>)}</select></label><label><span>{lang === "hi" ? "उत्तर शैली" : "Answer style"}</span><select value={answerStyle} onChange={(event) => setAnswerStyle(event.target.value)}>{teacherAnswerStyles.map((style) => <option key={style.id} value={style.id}>{style[lang]}</option>)}</select></label></div></>}
         {compact ? <button type="button" onClick={onOpenFull}>{t.homeChat.open} <Icon name="arrowRight" size={17} /></button> : <button type="button" onClick={onClear}>{t.newChat}</button>}
       </div>
-      <div className="teacher-chat-window" role="log" aria-label={compact ? t.homeChat.title : t.nav.chat} aria-live="polite" tabIndex="0">
+      <div ref={chatWindowRef} className="teacher-chat-window" role="log" aria-label={compact ? t.homeChat.title : t.nav.chat} aria-live="polite" tabIndex="0">
         {!messages.length && !loading && (
           <div className="teacher-chat-welcome"><span><Icon name="sparkle" size={30} /></span>{!compact && <h2>{t.ask}</h2>}<p>{t.chatWelcome}</p><div>{prompts.slice(0, compact ? 2 : 3).map((prompt) => <button key={prompt} type="button" onClick={() => setQuestion(prompt)}>{prompt}</button>)}</div></div>
         )}
@@ -548,7 +556,7 @@ function TeacherChat({ compact = false, t, lang, question, setQuestion, subject,
           <article key={`${message.role}-${index}`} className={`teacher-chat-message ${message.role}`}>
             <span>{message.role === "teacher" ? t.you : t.assistant}</span>
             <div>
-              {message.role === "assistant" ? <TeacherStreamingResponse content={message.content} animate={message.animateResponse} /> : <RichMarkdown>{message.content}</RichMarkdown>}
+              {message.role === "assistant" ? <TeacherStreamingResponse content={message.content} animate={message.animateResponse} onProgress={() => { const windowElement = chatWindowRef.current; if (windowElement) windowElement.scrollTop = windowElement.scrollHeight; }} /> : <RichMarkdown>{message.content}</RichMarkdown>}
               {message.chapterOptions?.length > 0 && <div className="chapter-option-list">{message.chapterOptions.map((option) => <button key={option.section} type="button" disabled={loading} onClick={() => onChapterOption(option)}><span>{option.section}</span>{option.title}</button>)}</div>}
               {message.sources?.length > 0 && <footer>{message.sources.map((source) => <small key={source}>{source}</small>)}</footer>}
             </div>
@@ -572,7 +580,7 @@ function TeacherChat({ compact = false, t, lang, question, setQuestion, subject,
 export default function TeacherDashboard() {
   const navigate = useNavigate();
   const [activeTool, setActiveTool] = useState("home");
-  const [lang, setLang] = useState(() => localStorage.getItem("vidyaai_teacher_lang") || "en");
+  const [lang, setLang] = useState(() => localStorage.getItem("vidyaai_teacher_lang") || "hi");
   const [profile, setProfile] = useState({ name: "Teacher", email: "", class_level: "10", medium: "Hindi", role: "teacher" });
   const [curriculum, setCurriculum] = useState(initialCurriculum);
   const [paper, setPaper] = useState(initialPaper);
@@ -920,6 +928,10 @@ export default function TeacherDashboard() {
           <BrandMark compact tone="teacher" tagline={t.brandTagline} />
         </div>
         <div className="teacher-role-badge">{t.roleBadge}</div>
+        <details className="teacher-mobile-tool-menu">
+          <summary><span><Icon name={activeTool === "home" ? "home" : activeTool === "curriculum" ? "curriculum" : activeTool === "paper" ? "paper" : activeTool === "lesson" ? "lesson" : activeTool === "chat" ? "chat" : "library"} size={18} /></span><strong>{t.nav[activeTool]}</strong><small>{lang === "hi" ? "टूल बदलें" : "Change tool"}</small><Icon name="arrowRight" size={17} /></summary>
+          <div>{[["home", "home"], ["curriculum", "curriculum"], ["paper", "paper"], ["lesson", "lesson"], ["chat", "chat"], ["pyq", "library"]].map(([id, icon]) => <button key={id} type="button" className={activeTool === id ? "active" : ""} onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); openTool(id); }}><Icon name={icon} size={18} /><span>{t.nav[id]}</span></button>)}</div>
+        </details>
         <nav>
           {[
             ["home", "home"],
