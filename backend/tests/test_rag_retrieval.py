@@ -703,6 +703,20 @@ class RAGRetrievalTests(unittest.TestCase):
         self.assertIn("class 10 hindi chapter 3.2 कन्यादान", question)
         self.assertIn("Follow-up request", question)
 
+    def test_reported_hinglish_prompts_resolve_or_request_clarification(self):
+        english_history = [{"question": "Lesson 1 ko bataiye English ka", "answer": "Choose a reading.", "subject": "English"}]
+
+        self.assertIn(
+            "नाम या chapter/reading number",
+            chat._clarification_for_prompt("Class 10 English poem का summary और theme बताइए", "English", []),
+        )
+        self.assertEqual(rag._extract_chapter_number("Lesson 1 ko bataiye English ka"), "1")
+        self.assertEqual(rag._extract_chapter_number("Adhyay pahla ko bataiye"), "1")
+        self.assertEqual(chat._subject_for_contextual_followup("Adhyay pahla ko bataiye", "General", english_history), "English")
+        self.assertEqual(len(rag.get_unit_options("English", "Adhyay pahla ko bataiye", "10")), 3)
+        self.assertIn("कौन-सा विषय", chat._clarification_for_prompt("Maths ka", "Math", english_history))
+        self.assertEqual(rag._infer_subject("General", "Bahupad"), "Math")
+
     def test_hinglish_application_request_uses_hindi_school_format(self):
         requested = rag._requested_format_for_question("application likho principle ko", "General")
 

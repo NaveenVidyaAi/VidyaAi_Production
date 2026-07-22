@@ -143,6 +143,35 @@ def _contextualize_followup_question(question: str, recent_history: list[dict[st
     )
 
 
+def _subject_for_contextual_followup(question: str, selected_subject: str, recent_history: list[dict[str, str]]) -> str:
+    """Carry subject context only for clearly incomplete follow-up prompts."""
+    if (selected_subject or "").strip().lower() not in {"", "general"} or not recent_history:
+        return selected_subject
+    normalized = re.sub(r"\s+", " ", (question or "").strip().lower())
+    contextual = bool(
+        _is_followup_reference(question)
+        or re.search(r"\b(?:adhyay|chapter|lesson|unit|path)\s+(?:pahla|pehla|pahila|first|one|dusra|doosra|second|two|tisra|teesra|third|three)\b", normalized)
+        or re.search(r"(?:अध्याय|पाठ)\s*(?:पहला|प्रथम|दूसरा|द्वितीय|तीसरा|तृतीय)", normalized)
+    )
+    previous_subject = str(recent_history[-1].get("subject", "")).strip()
+    return previous_subject if contextual and previous_subject else selected_subject
+
+
+def _clarification_for_prompt(question: str, subject: str, recent_history: list[dict[str, str]]) -> str | None:
+    """Refuse to guess when LLM/retrieval cannot safely resolve a short prompt."""
+    normalized = re.sub(r"\s+", " ", (question or "").strip().lower())
+    if re.fullmatch(r"(?:maths?|mathematics|ganit|गणित)\s*(?:ka|ki|ke|का|की|के)?[?.!]*", normalized):
+        return "गणित में कौन-सा विषय समझना है? उदाहरण: **बहुपद**, **द्विघात समीकरण**, या अपना पूरा प्रश्न लिखें।"
+    if re.search(r"\benglish\b", normalized) and re.search(r"\bpoem\b", normalized) and re.search(r"\b(?:summary|theme)\b", normalized):
+        has_identity = bool(re.search(r"\b(?:chapter|lesson|reading)\s*[\d-]|\b(?:title|named|called)\b", normalized))
+        if not has_identity:
+            return "कृपया English poem का **नाम या chapter/reading number** लिखें। मैं बिना कविता पहचाने गलत summary या theme नहीं दूँगा।"
+    vague_chapter = bool(re.fullmatch(r"(?:adhyay|chapter|lesson|unit|path|अध्याय|पाठ)(?:\s+\w+){0,2}[?.!]*", normalized))
+    if vague_chapter and (subject or "").strip().lower() in {"", "general"} and not recent_history:
+        return "कृपया विषय और अध्याय स्पष्ट करें—जैसे **Class 10 English Chapter 1** या **कक्षा 10 हिंदी अध्याय 1**।"
+    return None
+
+
 def _feedback_log_path(student_id: str, session_id: int) -> str:
     safe_student_id = re.sub(r"[^a-zA-Z0-9_.-]", "_", str(student_id or "guest"))
     feedback_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "feedback_logs"))
@@ -416,6 +445,11 @@ async def ask(
             effective_subject = selected_option.get("subject") or request.subject
             in_memory_store["pending_chapter_options"].pop(current_student.id, None)
 
+    recent_history = await _recent_student_history_from_db(db, current_student, effective_question)
+    if not recent_history:
+        recent_history = _history_for_question(current_student.id, effective_question)
+    effective_subject = _subject_for_contextual_followup(effective_question, effective_subject, recent_history)
+
     chapter_options = get_unit_options(effective_subject, effective_question, current_student.class_level)
     if chapter_options:
         created_at = datetime.utcnow().isoformat()
@@ -448,9 +482,28 @@ async def ask(
             chapter_options=chapter_options,
         )
 
-    recent_history = await _recent_student_history_from_db(db, current_student, effective_question)
-    if not recent_history:
-        recent_history = _history_for_question(current_student.id, effective_question)
+    clarification = _clarification_for_prompt(effective_question, effective_subject, recent_history)
+    if clarification:
+        created_at = datetime.utcnow().isoformat()
+        session_id = in_memory_store["next_session_id"]
+        in_memory_store["next_session_id"] += 1
+        session = {
+            "id": session_id,
+            "student_id": current_student.id,
+            "question": request.question,
+            "answer": clarification,
+            "subject": effective_subject,
+            "topic": "",
+            "class_level": current_student.class_level,
+            "source_type": "clarification",
+            "sources": [],
+            "confidence": 1.0,
+            "answer_style": request.answer_style,
+            "created_at": created_at,
+        }
+        session_id = await _store_session(db, current_student, session)
+        return AskResponse(answer=clarification, sources=[], confidence=1.0, session_id=session_id)
+
     effective_question = _contextualize_followup_question(effective_question, recent_history)
     normalized_question = _normalize_question(effective_question)
     history_signature = tuple(

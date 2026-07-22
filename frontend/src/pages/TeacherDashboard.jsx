@@ -533,10 +533,25 @@ function TeacherStreamingResponse({ content, animate, onProgress }) {
 function TeacherChat({ compact = false, t, lang, question, setQuestion, subject, setSubject, answerStyle, setAnswerStyle, loading, messages, onSubmit, onClear, onOpenFull, onCopy, onRetry, onFeedback, onChapterOption }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const chatWindowRef = useRef(null);
+  const followOutputRef = useRef(true);
+  const scrollFrameRef = useRef(null);
+  const followLatestOutput = () => {
+    if (!followOutputRef.current || scrollFrameRef.current) return;
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      const windowElement = chatWindowRef.current;
+      if (windowElement) windowElement.scrollTop = windowElement.scrollHeight;
+      scrollFrameRef.current = null;
+    });
+  };
   useEffect(() => {
     const windowElement = chatWindowRef.current;
     if (!windowElement) return;
-    requestAnimationFrame(() => windowElement.scrollTo({ top: windowElement.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
+    followOutputRef.current = true;
+    followLatestOutput();
+    return () => {
+      if (scrollFrameRef.current) cancelAnimationFrame(scrollFrameRef.current);
+      scrollFrameRef.current = null;
+    };
   }, [messages, loading]);
   const prompts = lang === "hi"
     ? ["कक्षा 10 में प्रकाश का परावर्तन कैसे पढ़ाएँ?", "अम्ल और क्षार के लिए कक्षा गतिविधि बनाएँ।", "कमजोर विद्यार्थियों के लिए भिन्न समझाएँ।"]
@@ -548,7 +563,7 @@ function TeacherChat({ compact = false, t, lang, question, setQuestion, subject,
         {!compact && <><button type="button" className="teacher-chat-settings-toggle" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}><Icon name="settings" size={16} />{lang === "hi" ? "विषय" : "Subject"}</button><div className={`teacher-chat-settings${settingsOpen ? " open" : ""}`}><label><span>{t.subject}</span><select value={subject} onChange={(event) => setSubject(event.target.value)}><option value="General">{t.options.general}</option>{subjects.map((item) => <option key={item} value={item}>{t.subjectNames[item]}</option>)}</select></label><label><span>{lang === "hi" ? "उत्तर शैली" : "Answer style"}</span><select value={answerStyle} onChange={(event) => setAnswerStyle(event.target.value)}>{teacherAnswerStyles.map((style) => <option key={style.id} value={style.id}>{style[lang]}</option>)}</select></label></div></>}
         {compact ? <button type="button" onClick={onOpenFull}>{t.homeChat.open} <Icon name="arrowRight" size={17} /></button> : <button type="button" onClick={onClear}>{t.newChat}</button>}
       </div>
-      <div ref={chatWindowRef} className="teacher-chat-window" role="log" aria-label={compact ? t.homeChat.title : t.nav.chat} aria-live="polite" tabIndex="0">
+      <div ref={chatWindowRef} className="teacher-chat-window" role="log" aria-label={compact ? t.homeChat.title : t.nav.chat} aria-live="polite" tabIndex="0" onScroll={(event) => { const element = event.currentTarget; followOutputRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120; }}>
         {!messages.length && !loading && (
           <div className="teacher-chat-welcome"><span><Icon name="sparkle" size={30} /></span>{!compact && <h2>{t.ask}</h2>}<p>{t.chatWelcome}</p><div>{prompts.slice(0, compact ? 2 : 3).map((prompt) => <button key={prompt} type="button" onClick={() => setQuestion(prompt)}>{prompt}</button>)}</div></div>
         )}
@@ -556,7 +571,7 @@ function TeacherChat({ compact = false, t, lang, question, setQuestion, subject,
           <article key={`${message.role}-${index}`} className={`teacher-chat-message ${message.role}`}>
             <span>{message.role === "teacher" ? t.you : t.assistant}</span>
             <div>
-              {message.role === "assistant" ? <TeacherStreamingResponse content={message.content} animate={message.animateResponse} onProgress={() => { const windowElement = chatWindowRef.current; if (windowElement) windowElement.scrollTop = windowElement.scrollHeight; }} /> : <RichMarkdown>{message.content}</RichMarkdown>}
+              {message.role === "assistant" ? <TeacherStreamingResponse content={message.content} animate={message.animateResponse} onProgress={followLatestOutput} /> : <RichMarkdown>{message.content}</RichMarkdown>}
               {message.chapterOptions?.length > 0 && <div className="chapter-option-list">{message.chapterOptions.map((option) => <button key={option.section} type="button" disabled={loading} onClick={() => onChapterOption(option)}><span>{option.section}</span>{option.title}</button>)}</div>}
               {message.sources?.length > 0 && <footer>{message.sources.map((source) => <small key={source}>{source}</small>)}</footer>}
             </div>

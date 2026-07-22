@@ -350,6 +350,18 @@ def _extract_chapter_number(text: str) -> str | None:
 
     lower_text = text.lower()
 
+    ordinal_words = {
+        "first": "1", "one": "1", "pahla": "1", "pehla": "1", "pahila": "1", "पहला": "1", "प्रथम": "1",
+        "second": "2", "two": "2", "dusra": "2", "doosra": "2", "दूसरा": "2", "द्वितीय": "2",
+        "third": "3", "three": "3", "tisra": "3", "teesra": "3", "तीसरा": "3", "तृतीय": "3",
+    }
+    ordinal_match = re.search(
+        r"(?:chapter|अध्याय|adhyay|पाठ|path|lesson|unit)\s*[-:]?\s*(first|one|pahla|pehla|pahila|पहला|प्रथम|second|two|dusra|doosra|दूसरा|द्वितीय|third|three|tisra|teesra|तीसरा|तृतीय)\b",
+        lower_text,
+    )
+    if ordinal_match:
+        return ordinal_words[ordinal_match.group(1)]
+
     patterns = [
         r"(?:chapter|अध्याय|पाठ)\s*[-:]?\s*(\d{1,2})",
         r"class\s*\d{1,2}\s*.*?\s*(\d{1,2})\s*(?:chapter|अध्याय|पाठ)",
@@ -1171,7 +1183,7 @@ def _infer_subject(subject: str, question: str) -> str:
             return "Sanskrit"
         if re.search(r"\b(social science|sst|history|geography|civics|economics|itihas|bhugol|nagrik)\b", raw) or "इतिहास" in raw or "भूगोल" in raw or "नागरिक" in raw:
             return "Social Science"
-        if re.search(r"\b(math|maths|ganit|algebra|geometry|trigonometry|quadratic|equation|probability|mensuration)\b", raw) or "गणित" in raw:
+        if re.search(r"\b(math|maths|ganit|algebra|geometry|trigonometry|quadratic|equation|probability|mensuration|polynomials?|bahupad)\b", raw) or "गणित" in raw or "बहुपद" in raw:
             return "Math"
         if re.search(
             r"\b(science|vigyan|physics|chemistry|biology|chemical|acid|base|electricity|light|"
