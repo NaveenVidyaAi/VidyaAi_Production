@@ -543,6 +543,8 @@ def _squash_repetition(text: str) -> str:
 def _normalize_answer_style(answer_style: str | None) -> str:
     style = (answer_style or "exam").strip().lower().replace("-", "_")
     aliases = {
+        "default": "default",
+        "prompt_first": "default",
         "exam_ready": "exam",
         "exam": "exam",
         "summary": "summary",
@@ -769,6 +771,11 @@ def _answer_format_for_style(subject: str, answer_style: str, answer_language: s
 
     if is_english:
         formats = {
+            "default": (
+                "Prioritize the user's prompt exactly as written. Follow its requested language, format, depth, "
+                "length, audience, and visual requirements before applying any generic answer structure. "
+                "Do not add a fixed summary, exam template, Q&A, or practice section unless the prompt asks for it."
+            ),
             "summary": (
                 "Use this exact layout without numbering headings or paragraphs:\n"
                 "**Relevant Title**\n"
@@ -813,6 +820,11 @@ def _answer_format_for_style(subject: str, answer_style: str, answer_language: s
         }
     else:
         formats = {
+            "default": (
+                "उपयोगकर्ता के prompt को सर्वोच्च प्राथमिकता दें। उसमें मांगी गई भाषा, प्रारूप, विस्तार, लंबाई, "
+                "श्रोता और visual requirements का ठीक पालन करें। जब तक prompt में न मांगा गया हो, कोई तय सारांश, "
+                "परीक्षा template, प्रश्नोत्तर या अभ्यास खंड न जोड़ें।"
+            ),
             "summary": (
                 "बिना headings या अनुच्छेदों को क्रमांक दिए इसी layout में उत्तर दें:\n"
                 "**प्रासंगिक शीर्षक**\n"
@@ -856,7 +868,7 @@ def _answer_format_for_style(subject: str, answer_style: str, answer_language: s
             ),
         }
 
-    return formats.get(style, formats["exam"])
+    return formats.get(style, formats["default"])
 
 
 def _requested_format_for_question(question: str, subject: str) -> str | None:

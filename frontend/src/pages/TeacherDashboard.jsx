@@ -11,6 +11,14 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 
 const subjects = ["Hindi", "English", "Math", "Science", "Social Science", "Sanskrit"];
+const teacherAnswerStyles = [
+  { id: "default", en: "Default · Follow prompt", hi: "डिफ़ॉल्ट · Prompt के अनुसार" },
+  { id: "summary", en: "Summary", hi: "सारांश" },
+  { id: "two", en: "2 marks", hi: "2 अंक" },
+  { id: "five", en: "5 marks", hi: "5 अंक" },
+  { id: "qa", en: "Q&A", hi: "प्रश्नोत्तर" },
+  { id: "exam", en: "Exam-ready", hi: "परीक्षा शैली" },
+];
 let paperUiSequence = 0;
 const createPaperUiId = (prefix) => `${prefix}-${Date.now()}-${paperUiSequence += 1}`;
 const paperTypePresets = {
@@ -500,7 +508,28 @@ function TeacherInsightsRail({ recent, streak, t, lang, onOpenTool, onOpenRecent
   );
 }
 
-function TeacherChat({ compact = false, t, lang, question, setQuestion, subject, setSubject, loading, messages, onSubmit, onClear, onOpenFull }) {
+function TeacherStreamingResponse({ content, animate }) {
+  const tokens = useMemo(() => (content || "").match(/\S+\s*/g) || [], [content]);
+  const [visibleCount, setVisibleCount] = useState(animate ? 0 : tokens.length);
+  useEffect(() => {
+    if (!animate || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setVisibleCount(tokens.length);
+      return undefined;
+    }
+    setVisibleCount(0);
+    const wordsPerTick = Math.max(1, Math.ceil(tokens.length / 320));
+    const timer = window.setInterval(() => setVisibleCount((current) => {
+      const next = Math.min(current + wordsPerTick, tokens.length);
+      if (next >= tokens.length) window.clearInterval(timer);
+      return next;
+    }), 28);
+    return () => window.clearInterval(timer);
+  }, [animate, content, tokens.length]);
+  const streaming = visibleCount < tokens.length;
+  return <div className={`streaming-markdown${streaming ? " is-streaming" : ""}`}><RichMarkdown streaming={streaming}>{tokens.slice(0, visibleCount).join("")}</RichMarkdown></div>;
+}
+
+function TeacherChat({ compact = false, t, lang, question, setQuestion, subject, setSubject, answerStyle, setAnswerStyle, loading, messages, onSubmit, onClear, onOpenFull, onCopy, onRetry, onFeedback, onChapterOption }) {
   const prompts = lang === "hi"
     ? ["कक्षा 10 में प्रकाश का परावर्तन कैसे पढ़ाएँ?", "अम्ल और क्षार के लिए कक्षा गतिविधि बनाएँ।", "कमजोर विद्यार्थियों के लिए भिन्न समझाएँ।"]
     : ["How should I teach reflection of light in Class 10?", "Create a classroom activity for acids and bases.", "Explain fractions for struggling learners."];
@@ -508,7 +537,7 @@ function TeacherChat({ compact = false, t, lang, question, setQuestion, subject,
     <section className={`teacher-chat-panel${compact ? " compact" : ""}`}>
       <div className="teacher-chat-toolbar">
         <div><strong>{compact ? t.homeChat.title : t.nav.chat}</strong><span>{compact ? t.homeChat.note : t.chatWelcome}</span></div>
-        {!compact && <label><span>{t.subject}</span><select value={subject} onChange={(event) => setSubject(event.target.value)}><option value="General">{t.options.general}</option>{subjects.map((item) => <option key={item} value={item}>{t.subjectNames[item]}</option>)}</select></label>}
+        {!compact && <div className="teacher-chat-settings"><label><span>{t.subject}</span><select value={subject} onChange={(event) => setSubject(event.target.value)}><option value="General">{t.options.general}</option>{subjects.map((item) => <option key={item} value={item}>{t.subjectNames[item]}</option>)}</select></label><label><span>{lang === "hi" ? "उत्तर शैली" : "Answer style"}</span><select value={answerStyle} onChange={(event) => setAnswerStyle(event.target.value)}>{teacherAnswerStyles.map((style) => <option key={style.id} value={style.id}>{style[lang]}</option>)}</select></label></div>}
         {compact ? <button type="button" onClick={onOpenFull}>{t.homeChat.open} <Icon name="arrowRight" size={17} /></button> : <button type="button" onClick={onClear}>{t.newChat}</button>}
       </div>
       <div className="teacher-chat-window" role="log" aria-label={compact ? t.homeChat.title : t.nav.chat} aria-live="polite" tabIndex="0">
@@ -518,7 +547,16 @@ function TeacherChat({ compact = false, t, lang, question, setQuestion, subject,
         {messages.map((message, index) => (
           <article key={`${message.role}-${index}`} className={`teacher-chat-message ${message.role}`}>
             <span>{message.role === "teacher" ? t.you : t.assistant}</span>
-            <div><RichMarkdown>{message.content}</RichMarkdown>{message.sources?.length > 0 && <footer>{message.sources.map((source) => <small key={source}>{source}</small>)}</footer>}</div>
+            <div>
+              {message.role === "assistant" ? <TeacherStreamingResponse content={message.content} animate={message.animateResponse} /> : <RichMarkdown>{message.content}</RichMarkdown>}
+              {message.chapterOptions?.length > 0 && <div className="chapter-option-list">{message.chapterOptions.map((option) => <button key={option.section} type="button" disabled={loading} onClick={() => onChapterOption(option)}><span>{option.section}</span>{option.title}</button>)}</div>}
+              {message.sources?.length > 0 && <footer>{message.sources.map((source) => <small key={source}>{source}</small>)}</footer>}
+            </div>
+            {message.role !== "error" && <div className="teacher-message-actions">
+              <button type="button" className="icon-btn copy-action" onClick={() => onCopy(message.content)} title={lang === "hi" ? "कॉपी करें" : "Copy"} aria-label={lang === "hi" ? "कॉपी करें" : "Copy"}><Icon name="copy" size={16} /></button>
+              <button type="button" className="icon-btn retry-action" onClick={() => onRetry(message)} disabled={loading} title={lang === "hi" ? "फिर से बनाएँ" : "Regenerate"} aria-label={lang === "hi" ? "फिर से बनाएँ" : "Regenerate"}><Icon name="refresh" size={16} /></button>
+              {message.role === "assistant" && !message.chapterOptions?.length && <><button type="button" className={`icon-btn feedback-icon positive${message.feedback === "up" ? " active" : ""}`} onClick={() => onFeedback(index, message.sessionId, true)} disabled={!message.sessionId} title={lang === "hi" ? "अच्छा उत्तर" : "Good answer"} aria-label={lang === "hi" ? "अच्छा उत्तर" : "Good answer"}><Icon name="thumbUp" size={16} /></button><button type="button" className={`icon-btn feedback-icon negative${message.feedback === "down" ? " active" : ""}`} onClick={() => onFeedback(index, message.sessionId, false)} disabled={!message.sessionId} title={lang === "hi" ? "सुधार चाहिए" : "Needs improvement"} aria-label={lang === "hi" ? "सुधार चाहिए" : "Needs improvement"}><Icon name="thumbDown" size={16} /></button></>}
+            </div>}
           </article>
         ))}
         {loading && <div className="teacher-chat-loading"><div className="teacher-loader" /><span>{t.thinking}</span></div>}
@@ -554,6 +592,7 @@ export default function TeacherDashboard() {
   const [error, setError] = useState("");
   const [chatQuestion, setChatQuestion] = useState("");
   const [chatSubject, setChatSubject] = useState("General");
+  const [chatAnswerStyle, setChatAnswerStyle] = useState("default");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [pyqSubject, setPyqSubject] = useState("All");
@@ -695,22 +734,49 @@ export default function TeacherDashboard() {
     localStorage.setItem("vidyaai_streak", JSON.stringify(next));
   };
 
-  const askChat = async (event) => {
-    event.preventDefault();
-    const question = chatQuestion.trim();
+  const askTeacherQuestion = async (rawQuestion, subjectOverride = chatSubject, styleOverride = chatAnswerStyle) => {
+    const question = rawQuestion.trim();
     if (!question || chatLoading) return;
     setChatQuestion("");
-    setChatMessages((items) => [...items, { role: "teacher", content: question }]);
+    setChatMessages((items) => [...items, { role: "teacher", content: question, question, subject: subjectOverride, answerStyle: styleOverride }]);
     setChatLoading(true);
     recordActivity();
     try {
-      const response = await api.post("/chat/ask", { question, subject: chatSubject, answer_style: "detailed" });
-      setChatMessages((items) => [...items, { role: "assistant", content: response.data.answer, sources: response.data.sources || [] }]);
+      const response = await api.post("/chat/ask", { question, subject: subjectOverride, answer_style: styleOverride });
+      setChatMessages((items) => [...items, { role: "assistant", content: response.data.answer, sources: response.data.sources || [], sessionId: response.data.session_id, chapterOptions: response.data.chapter_options || [], question, subject: subjectOverride, answerStyle: styleOverride, feedback: null, animateResponse: true }]);
     } catch (err) {
       setChatMessages((items) => [...items, { role: "error", content: err?.response?.data?.detail || "VidyaAI could not answer right now. Please try again." }]);
     } finally {
       setChatLoading(false);
     }
+  };
+  const askChat = async (event) => {
+    event.preventDefault();
+    await askTeacherQuestion(chatQuestion);
+  };
+  const copyChatMessage = async (content) => {
+    try { await navigator.clipboard.writeText(content); } catch {}
+  };
+  const retryChatMessage = async (message) => {
+    const retryQuestion = message.question || message.content;
+    if (!retryQuestion) return;
+    setChatSubject(message.subject || chatSubject);
+    setChatAnswerStyle(message.answerStyle || chatAnswerStyle);
+    await askTeacherQuestion(retryQuestion, message.subject || chatSubject, message.answerStyle || chatAnswerStyle);
+  };
+  const rateChatMessage = async (messageIndex, sessionId, understood) => {
+    if (!sessionId) return;
+    setChatMessages((items) => items.map((message, index) => index === messageIndex ? { ...message, feedback: understood ? "up" : "down" } : message));
+    try {
+      await api.post("/chat/feedback", { session_id: sessionId, understood });
+    } catch {
+      setChatMessages((items) => items.map((message, index) => index === messageIndex ? { ...message, feedback: null } : message));
+    }
+  };
+  const chooseChatChapter = async (option) => {
+    const optionSubject = option.subject || chatSubject;
+    setChatSubject(optionSubject);
+    await askTeacherQuestion(option.prompt || `class 10 ${optionSubject} chapter ${option.section}`, optionSubject, chatAnswerStyle);
   };
 
   const runTool = async (endpoint, payload, title, type) => {
@@ -887,7 +953,7 @@ export default function TeacherDashboard() {
               <div className="teacher-hero-stat"><strong>5</strong><span>{t.hero.stat}</span><small>{t.hero.statNote}</small></div>
             </section>
             <div className="teacher-home-chat-heading"><span>{t.homeChat.kicker}</span></div>
-            <TeacherChat compact t={t} lang={lang} question={chatQuestion} setQuestion={setChatQuestion} subject={chatSubject} setSubject={setChatSubject} loading={chatLoading} messages={chatMessages} onSubmit={askChat} onClear={() => setChatMessages([])} onOpenFull={() => openTool("chat")} />
+            <TeacherChat compact t={t} lang={lang} question={chatQuestion} setQuestion={setChatQuestion} subject={chatSubject} setSubject={setChatSubject} answerStyle={chatAnswerStyle} setAnswerStyle={setChatAnswerStyle} loading={chatLoading} messages={chatMessages} onSubmit={askChat} onClear={() => setChatMessages([])} onOpenFull={() => openTool("chat")} onCopy={copyChatMessage} onRetry={retryChatMessage} onFeedback={rateChatMessage} onChapterOption={chooseChatChapter} />
             <section className="teacher-tool-grid">
               {[["curriculum", "curriculum-card"], ["paper", "paper-card"], ["lesson", "lesson-card"]].map(([id, className]) => (
                 <article key={id} className={`teacher-tool-card ${className}`}><div className="teacher-tool-icon"><Icon name={id === "curriculum" ? "curriculum" : id === "paper" ? "paper" : "lesson"} size={22} /></div><h3>{t.cards[id].title}</h3><p>{t.cards[id].text}</p><button type="button" onClick={() => openTool(id)}>{t.cards[id].action}<Icon name="arrowRight" size={17} /></button></article>
@@ -985,7 +1051,7 @@ export default function TeacherDashboard() {
         )}
 
         {activeTool === "chat" && (
-          <TeacherChat t={t} lang={lang} question={chatQuestion} setQuestion={setChatQuestion} subject={chatSubject} setSubject={setChatSubject} loading={chatLoading} messages={chatMessages} onSubmit={askChat} onClear={() => setChatMessages([])} onOpenFull={() => openTool("chat")} />
+          <TeacherChat t={t} lang={lang} question={chatQuestion} setQuestion={setChatQuestion} subject={chatSubject} setSubject={setChatSubject} answerStyle={chatAnswerStyle} setAnswerStyle={setChatAnswerStyle} loading={chatLoading} messages={chatMessages} onSubmit={askChat} onClear={() => setChatMessages([])} onOpenFull={() => openTool("chat")} onCopy={copyChatMessage} onRetry={retryChatMessage} onFeedback={rateChatMessage} onChapterOption={chooseChatChapter} />
         )}
 
         {activeTool === "pyq" && (
