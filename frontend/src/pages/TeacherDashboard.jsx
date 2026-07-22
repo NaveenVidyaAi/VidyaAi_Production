@@ -5,7 +5,8 @@ import BrandMark from "../components/BrandMark";
 import CompanyLegalFooter from "../components/CompanyLegalFooter";
 import Icon from "../components/Icon";
 import RichMarkdown from "../components/RichMarkdown";
-import { assessmentPapers } from "../data/assessmentPapers";
+import GuidedTour from "../components/GuidedTour";
+import ConnectionStatus from "../components/ConnectionStatus";
 
 const subjects = ["Hindi", "English", "Math", "Science", "Social Science", "Sanskrit"];
 let paperUiSequence = 0;
@@ -157,6 +158,16 @@ const initialPaperSections = [
   { ui_id: "paper-section-d", name: "D", type: "long", label_hi: "दीर्घ उत्तरीय प्रश्न", count: 3, marks_each: 5, word_limit: "100", custom_questions: [] },
 ];
 const initialPaper = { class_level: "10", subject: "Science", syllabus: "", selected_chapters: [], total_marks: 50, question_count: 23, duration_minutes: 90, difficulty: "balanced", paper_type: "unit_test", medium: "Hindi", instructions: "", enabled_fields: ["duration", "difficulty", "paper_type", "medium", "instructions", "syllabus"], sections: initialPaperSections };
+const paperTemplates = {
+  unit: { total_marks: 20, question_count: 15, duration_minutes: 45, paper_type: "unit_test", sections: [{ name: "A", type: "mcq", count: 10, marks_each: 1 }, { name: "B", type: "very_short", count: 5, marks_each: 2 }] },
+  term: { total_marks: 50, question_count: 23, duration_minutes: 90, paper_type: "term_exam", sections: [{ name: "A", type: "mcq", count: 10, marks_each: 1 }, { name: "B", type: "very_short", count: 5, marks_each: 2 }, { name: "C", type: "short", count: 5, marks_each: 3 }, { name: "D", type: "long", count: 3, marks_each: 5 }] },
+  practice: { total_marks: 40, question_count: 30, duration_minutes: 60, paper_type: "practice", sections: [{ name: "A", type: "mcq", count: 20, marks_each: 1 }, { name: "B", type: "very_short", count: 10, marks_each: 2 }] },
+};
+
+const buildTemplateSections = (template) => template.sections.map((section, index) => ({
+  ui_id: createPaperUiId("paper-template"), ui_open: index === 0, custom_questions: [], word_limit: paperTypePresets[section.type].word_limit,
+  label_hi: paperTypePresets[section.type].label_hi, ...section,
+}));
 const initialLesson = { class_level: "10", subject: "Science", chapter_or_topic: "", lesson_minutes: 45, medium: "Hindi", student_level: "mixed", teacher_notes: "" };
 const paperOptionalFields = [
   ["duration", "duration"],
@@ -175,7 +186,7 @@ function Field({ label, children, wide = false, removable = false, onRemove, rem
   </div>;
 }
 
-function ChapterPicker({ options, selected, onChange, loading, error, t }) {
+function ChapterPicker({ options, selected, onChange, loading, error, onRetry, t }) {
   const [search, setSearch] = useState("");
   const headingId = useId();
   const searchId = useId();
@@ -213,7 +224,7 @@ function ChapterPicker({ options, selected, onChange, loading, error, t }) {
         <button type="button" disabled={!selected.length} onClick={() => onChange([])}>{t.paperForm.clear}</button>
       </div>
       {loading ? <div className="paper-chapter-state" role="status"><span className="paper-chapter-spinner" aria-hidden="true" />{t.paperForm.chapterLoading}</div>
-        : error ? <div className="paper-chapter-state error" role="alert">{t.paperForm.chapterError}</div>
+        : error ? <div className="paper-chapter-state error" role="alert"><span>{t.paperForm.chapterError}</span><button type="button" onClick={onRetry}>{t.paperForm.section === "खंड" ? "फिर कोशिश करें" : "Retry"}</button></div>
           : !visibleOptions.length ? <div className="paper-chapter-state">{normalizedSearch ? t.paperForm.chapterNoMatch : t.paperForm.chapterEmpty}</div>
             : <div className="paper-chapter-options" role="group" aria-label={t.paperForm.chapters}>
               {visibleGroups.map(([group, groupOptions]) => <section className="paper-chapter-group" key={group || "chapters"} aria-label={group || t.paperForm.chapters}>
@@ -259,6 +270,13 @@ function PaperSectionBuilder({ sections, onChange, t, units }) {
     if ((section.custom_questions || []).length && !window.confirm(t.paperForm.removeSectionConfirm)) return;
     onChange(sections.filter((_, itemIndex) => itemIndex !== index));
   };
+  const move = (index, offset) => {
+    const destination = index + offset;
+    if (destination < 0 || destination >= sections.length) return;
+    const next = [...sections];
+    [next[index], next[destination]] = [next[destination], next[index]];
+    onChange(next.map((section, itemIndex) => ({ ...section, name: String.fromCharCode(65 + itemIndex) })));
+  };
   const add = () => {
     if (sections.length >= 12) return;
     const name = nextPaperSectionName(sections);
@@ -280,7 +298,7 @@ function PaperSectionBuilder({ sections, onChange, t, units }) {
         <details className="paper-section-rule" key={section.ui_id} open={openSectionIds.has(section.ui_id)} onToggle={(event) => setSectionOpen(section.ui_id, event.currentTarget.open)}>
           <summary><span><strong>{t.paperForm.section} {section.name || index + 1}</strong><small>{Number(section.count) || 0} {units.questions} × {Number(section.marks_each) || 0} {(Number(section.marks_each) || 0) === 1 ? units.mark : units.marks} = {(Number(section.count) || 0) * (Number(section.marks_each) || 0)} {units.marks}</small></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></summary>
           <div className="paper-section-content">
-          {sections.length > 1 && <div className="paper-section-actions"><button type="button" onClick={() => remove(index)} aria-label={`${t.paperForm.remove}: ${t.paperForm.section} ${section.name || index + 1}`}>{t.paperForm.remove}</button></div>}
+          {sections.length > 1 && <div className="paper-section-actions"><button type="button" disabled={index === 0} onClick={() => move(index, -1)} aria-label={`${section.name}: ${t.paperForm.section === "खंड" ? "ऊपर ले जाएँ" : "Move up"}`}>↑</button><button type="button" disabled={index === sections.length - 1} onClick={() => move(index, 1)} aria-label={`${section.name}: ${t.paperForm.section === "खंड" ? "नीचे ले जाएँ" : "Move down"}`}>↓</button><button type="button" onClick={() => remove(index)} aria-label={`${t.paperForm.remove}: ${t.paperForm.section} ${section.name || index + 1}`}>{t.paperForm.remove}</button></div>}
           <div className="paper-section-fields">
             <Field label={t.paperForm.section}><input value={section.name} onChange={(event) => update(index, "name", event.target.value)} /></Field>
             <Field label={t.paperForm.questionType}><select value={section.type} onChange={(event) => updateType(index, event.target.value)}><option value="mcq">MCQ / बहुविकल्पीय</option><option value="very_short">Very short / अति लघु</option><option value="short">Short answer / लघु</option><option value="long">Long answer / दीर्घ</option></select></Field>
@@ -321,7 +339,7 @@ function FireIcon() {
   );
 }
 
-function TeacherAppHeader({ profile, logout, t, lang, streak, recent, meta, menuOpen, setMenuOpen, menuRef, onToggleLanguage, onOpenRecent }) {
+function TeacherAppHeader({ profile, logout, t, lang, streak, recent, meta, menuOpen, setMenuOpen, menuRef, onToggleLanguage, onOpenRecent, onReplayTour }) {
   const profileTriggerRef = useRef(null);
   const profileDialogRef = useRef(null);
   const menuWasOpenRef = useRef(false);
@@ -429,6 +447,7 @@ function TeacherAppHeader({ profile, logout, t, lang, streak, recent, meta, menu
                 <div className="teacher-profile-activity-note"><span>{t.insights.activeDays}: <strong>{streak.count || 0}</strong></span><span>{lastActive ? `${t.insights.lastActive}: ${new Date(lastActive).toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN")}` : t.insights.noRecent}</span></div>
                 {recent.length > 0 && <div className="mobile-learning-subjects">{recent.slice(0, 3).map((item) => <button key={item.createdAt} type="button" onClick={() => { setMenuOpen(false); onOpenRecent(item); }}><span>{item.title}</span><small>{t.recent[item.type] || t.recent.curriculum}</small></button>)}</div>}
               </div>
+              <button type="button" className="profile-menu-action" onClick={() => { setMenuOpen(false); onReplayTour(); }}><Icon name="sparkle" size={17} />{lang === "hi" ? "गाइड फिर देखें" : "Replay walkthrough"}</button>
               <button type="button" className="profile-menu-action teacher-profile-logout" onClick={logout}><Icon name="logout" size={17} />{t.logout}</button>
             </div>
           </>
@@ -523,10 +542,13 @@ export default function TeacherDashboard() {
   const [chapterOptions, setChapterOptions] = useState([]);
   const [chapterLoading, setChapterLoading] = useState(false);
   const [chapterError, setChapterError] = useState("");
+  const [chapterRetry, setChapterRetry] = useState(0);
   const [paperScopeError, setPaperScopeError] = useState("");
   const [paperBlueprintTouched, setPaperBlueprintTouched] = useState(false);
   const paperBlueprintStatusRef = useRef(null);
   const previousPaperRef = useRef(paper);
+  const paperDraftLoadedRef = useRef(false);
+  const [paperDraftStatus, setPaperDraftStatus] = useState("");
   const [lesson, setLesson] = useState(initialLesson);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -536,6 +558,8 @@ export default function TeacherDashboard() {
   const [chatLoading, setChatLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [pyqSubject, setPyqSubject] = useState("All");
+  const [assessmentPapers, setAssessmentPapers] = useState([]);
+  const [paperCatalogLoaded, setPaperCatalogLoaded] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef(null);
   const [streak, setStreak] = useState(() => {
@@ -577,7 +601,12 @@ export default function TeacherDashboard() {
       })
       .finally(() => { if (active) setChapterLoading(false); });
     return () => { active = false; };
-  }, [paper.class_level, paper.subject]);
+  }, [paper.class_level, paper.subject, chapterRetry]);
+
+  useEffect(() => {
+    if (activeTool !== "pyq" || assessmentPapers.length) return;
+    import("../data/assessmentPapers").then(({ assessmentPapers: papers }) => setAssessmentPapers(papers)).finally(() => setPaperCatalogLoaded(true));
+  }, [activeTool, assessmentPapers.length]);
 
   useEffect(() => {
     if (previousPaperRef.current !== paper && result?.type === "paper") setResult(null);
@@ -601,11 +630,56 @@ export default function TeacherDashboard() {
   }, [showProfileMenu]);
 
   const recentKey = useMemo(() => `vidyaai_teacher_recent_${profile.email || "local"}`, [profile.email]);
+  const paperDraftKey = useMemo(() => profile.email ? `vidyaai_paper_draft_v1_${profile.email.toLowerCase()}` : "", [profile.email]);
   const [recent, setRecent] = useState([]);
+  const tourSteps = lang === "hi" ? [
+    { target: ".teacher-sidebar", icon: "teacher", kicker: "शिक्षक कार्यक्षेत्र", title: "सभी शिक्षण टूल्स एक जगह", body: "होम, पाठ्यक्रम, प्रश्नपत्र, पाठ योजना, AI चैट और PYQ लाइब्रेरी के बीच यहाँ से जाएँ।", skipLabel: "टूर छोड़ें", backLabel: "पीछे", nextLabel: "आगे", finishLabel: "शुरू करें" },
+    { target: ".teacher-hero", icon: "home", kicker: "आज की तैयारी", title: "अपना दैनिक कार्यक्षेत्र देखें", body: "होम स्क्रीन आपको उपलब्ध टूल्स, त्वरित AI सहायता और हाल में बनाए गए संसाधनों का स्पष्ट सार देती है।", skipLabel: "टूर छोड़ें", backLabel: "पीछे", nextLabel: "आगे", finishLabel: "शुरू करें" },
+    { target: ".teacher-tool-grid", icon: "curriculum", kicker: "सामग्री निर्माण", title: "योजना, प्रश्नपत्र और पाठ बनाएँ", body: "हर टूल चुनी हुई कक्षा, विषय और अध्याय के आधार पर संपादन योग्य प्रारूप तैयार करता है। उपयोग से पहले सामग्री की जाँच करें।", skipLabel: "टूर छोड़ें", backLabel: "पीछे", nextLabel: "आगे", finishLabel: "शुरू करें" },
+    { target: ".teacher-insights-rail", icon: "chart", kicker: "तैयारी मेट्रिक्स", title: "अपनी गतिविधि पर नज़र रखें", body: "दाईं ओर बनाए गए संसाधन, सक्रिय दिन, हाल की गतिविधि और त्वरित कार्रवाइयाँ दिखाई देती हैं।", skipLabel: "टूर छोड़ें", backLabel: "पीछे", nextLabel: "आगे", finishLabel: "शुरू करें" },
+  ] : [
+    { target: ".teacher-sidebar", icon: "teacher", kicker: "TEACHER WORKSPACE", title: "Every teaching tool in one place", body: "Move between Home, Curriculum, Question Paper, Lesson Guide, AI Chat, and the PYQ library from here.", skipLabel: "Skip tour", backLabel: "Back", nextLabel: "Next", finishLabel: "Get started" },
+    { target: ".teacher-hero", icon: "home", kicker: "TODAY'S PREPARATION", title: "See your daily workspace", body: "Home gives you a clear overview of available tools, quick AI support, and your recently created resources.", skipLabel: "Skip tour", backLabel: "Back", nextLabel: "Next", finishLabel: "Get started" },
+    { target: ".teacher-tool-grid", icon: "curriculum", kicker: "RESOURCE CREATION", title: "Build plans, papers, and lessons", body: "Each tool creates an editable draft from your chosen class, subject, and chapters. Review every resource before classroom use.", skipLabel: "Skip tour", backLabel: "Back", nextLabel: "Next", finishLabel: "Get started" },
+    { target: ".teacher-insights-rail", icon: "chart", kicker: "PREPARATION METRICS", title: "Keep track of your activity", body: "The right rail shows created resources, active days, recent work, and shortcuts for your next action.", skipLabel: "Skip tour", backLabel: "Back", nextLabel: "Next", finishLabel: "Get started" },
+  ];
+  const paperTourSteps = lang === "hi" ? [
+    { target: ".paper-template-bar", icon: "paper", kicker: "त्वरित शुरुआत", title: "तैयार प्रारूप चुनें", body: "यूनिट टेस्ट, टर्म परीक्षा या अभ्यास पेपर से शुरुआत करें और फिर हर सेटिंग बदलें।", skipLabel: "गाइड छोड़ें", backLabel: "पीछे", nextLabel: "आगे", finishLabel: "पेपर बनाएँ" },
+    { target: ".paper-blueprint-status", icon: "check", kicker: "सटीक अंक", title: "लक्ष्य और खंड मिलाएँ", body: "यह स्थिति बताती है कि कुल अंक और प्रश्न संख्या आपके खंडों के विन्यास से मेल खाते हैं या नहीं।", skipLabel: "गाइड छोड़ें", backLabel: "पीछे", nextLabel: "आगे", finishLabel: "पेपर बनाएँ" },
+    { target: "#paper-section-builder", icon: "curriculum", kicker: "खंड नियंत्रण", title: "खंड जोड़ें और क्रम बदलें", body: "प्रश्न प्रकार, संख्या, अंक और अपने प्रश्न संपादित करें। तीर बटन से खंडों को कीबोर्ड-सुलभ तरीके से ऊपर या नीचे करें।", skipLabel: "गाइड छोड़ें", backLabel: "पीछे", nextLabel: "आगे", finishLabel: "पेपर बनाएँ" },
+    { target: ".paper-builder-form .teacher-generate", icon: "sparkle", kicker: "AI ड्राफ्ट", title: "जाँच के बाद पेपर बनाएँ", body: "VidyaAI ड्राफ्ट तैयार करेगा। कक्षा में उपयोग से पहले हर प्रश्न, उत्तर और अंक-वितरण अवश्य जाँचें।", skipLabel: "गाइड छोड़ें", backLabel: "पीछे", nextLabel: "आगे", finishLabel: "पेपर बनाएँ" },
+  ] : [
+    { target: ".paper-template-bar", icon: "paper", kicker: "QUICK START", title: "Choose a ready blueprint", body: "Begin with a Unit Test, Term Exam, or Practice Paper, then customise every setting.", skipLabel: "Skip guide", backLabel: "Back", nextLabel: "Next", finishLabel: "Build my paper" },
+    { target: ".paper-blueprint-status", icon: "check", kicker: "EXACT MARKS", title: "Match targets and sections", body: "This status tells you whether total marks and question count match the section blueprint.", skipLabel: "Skip guide", backLabel: "Back", nextLabel: "Next", finishLabel: "Build my paper" },
+    { target: "#paper-section-builder", icon: "curriculum", kicker: "SECTION CONTROL", title: "Add and reorder sections", body: "Edit question type, count, marks, and teacher-written questions. Arrow controls provide accessible reordering.", skipLabel: "Skip guide", backLabel: "Back", nextLabel: "Next", finishLabel: "Build my paper" },
+    { target: ".paper-builder-form .teacher-generate", icon: "sparkle", kicker: "AI DRAFT", title: "Generate after validation", body: "VidyaAI creates a draft. Review every question, answer, and mark allocation before classroom use.", skipLabel: "Skip guide", backLabel: "Back", nextLabel: "Next", finishLabel: "Build my paper" },
+  ];
 
   useEffect(() => {
     try { setRecent(JSON.parse(localStorage.getItem(recentKey) || "[]")); } catch { setRecent([]); }
   }, [recentKey]);
+
+  useEffect(() => {
+    if (!paperDraftKey) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(paperDraftKey) || "null");
+      if (saved?.paper?.sections?.length) {
+        setPaper({ ...initialPaper, ...saved.paper });
+        setPaperDraftStatus(lang === "hi" ? "पिछला ड्राफ्ट वापस लाया गया" : "Previous draft restored");
+      }
+    } catch {}
+    paperDraftLoadedRef.current = true;
+  }, [paperDraftKey]);
+
+  useEffect(() => {
+    if (!paperDraftKey || !paperDraftLoadedRef.current) return undefined;
+    setPaperDraftStatus(lang === "hi" ? "सेव हो रहा है…" : "Saving…");
+    const timer = window.setTimeout(() => {
+      localStorage.setItem(paperDraftKey, JSON.stringify({ paper, savedAt: new Date().toISOString() }));
+      setPaperDraftStatus(lang === "hi" ? "ड्राफ्ट अपने आप सेव हो गया" : "Draft autosaved");
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [paper, paperDraftKey, lang]);
 
   const saveRecent = (entry) => {
     const next = [entry, ...recent.filter((item) => item.createdAt !== entry.createdAt)].slice(0, 8);
@@ -701,6 +775,7 @@ export default function TeacherDashboard() {
     localStorage.setItem("vidyaai_teacher_lang", next);
     return next;
   });
+  const replayTour = () => window.dispatchEvent(new CustomEvent("vidyaai:replay-tour", { detail: { role: "teacher" } }));
 
   const t = copy[lang];
   const meta = toolMeta[lang][activeTool] || toolMeta[lang].home;
@@ -727,6 +802,19 @@ export default function TeacherDashboard() {
   const useCurrentSectionTotals = () => {
     setPaperBlueprintTouched(false);
     setPaper((current) => ({ ...current, total_marks: blueprintTotals.marks, question_count: blueprintTotals.questions }));
+  };
+  const applyPaperTemplate = (templateId) => {
+    const template = paperTemplates[templateId];
+    if (!template) return;
+    setPaperBlueprintTouched(false);
+    setResult(null);
+    setPaper((current) => ({ ...current, ...template, sections: buildTemplateSections(template) }));
+  };
+  const clearPaperDraft = () => {
+    if (!window.confirm(lang === "hi" ? "सहेजा हुआ ड्राफ्ट हटाकर नया पेपर शुरू करें?" : "Clear the saved draft and start a new paper?")) return;
+    localStorage.removeItem(paperDraftKey);
+    setPaper({ ...initialPaper, sections: initialPaperSections.map((section) => ({ ...section, custom_questions: [] })) });
+    setPaperDraftStatus(lang === "hi" ? "नया ड्राफ्ट शुरू हुआ" : "New draft started");
   };
   const focusPaperBlueprint = () => requestAnimationFrame(() => paperBlueprintStatusRef.current?.focus());
   const submitPaper = (event) => {
@@ -765,6 +853,7 @@ export default function TeacherDashboard() {
         menuRef={profileMenuRef}
         onToggleLanguage={toggleLanguage}
         onOpenRecent={(item) => { setResult(item); setError(""); setActiveTool(item.type); }}
+        onReplayTour={replayTour}
       />
       <aside className="teacher-sidebar">
         <div className="teacher-sidebar-head">
@@ -786,6 +875,7 @@ export default function TeacherDashboard() {
           <button type="button" className={activeTool === "chat" ? "active" : ""} aria-current={activeTool === "chat" ? "page" : undefined} onClick={() => openTool("chat")}><span className="teacher-shared-icon"><Icon name="chat" size={17} /></span>{t.nav.chat}<Icon name="arrowRight" size={16} /></button>
           <button type="button" className={activeTool === "pyq" ? "active" : ""} aria-current={activeTool === "pyq" ? "page" : undefined} onClick={() => openTool("pyq")}><span className="teacher-shared-icon"><Icon name="library" size={17} /></span>{t.nav.pyq}<Icon name="arrowRight" size={16} /></button>
         </div>
+        <button type="button" className="teacher-replay-tour" onClick={replayTour}><Icon name="sparkle" size={17} />{lang === "hi" ? "गाइड फिर देखें" : "Replay guide"}</button>
         <div className="teacher-account" aria-label={lang === "hi" ? "शिक्षक प्रोफाइल" : "Teacher profile"}>
           <span aria-hidden="true">{profile.name?.trim()?.charAt(0)?.toUpperCase() || "T"}</span>
           <div>
@@ -840,6 +930,10 @@ export default function TeacherDashboard() {
           <section className="teacher-workspace">
             <form onSubmit={submitPaper} className="teacher-generator-form paper-builder-form">
               <div className="teacher-form-title"><span>02</span><div><h2>{t.paperForm.title}</h2><p>{t.paperForm.note}</p></div></div>
+              <div className="paper-template-bar">
+                <div><strong>{lang === "hi" ? "प्रारूप से शुरू करें" : "Start from a blueprint"}</strong><small aria-live="polite">{paperDraftStatus}</small></div>
+                <div><button type="button" onClick={() => applyPaperTemplate("unit")}>{lang === "hi" ? "यूनिट टेस्ट · 20" : "Unit test · 20"}</button><button type="button" onClick={() => applyPaperTemplate("term")}>{lang === "hi" ? "टर्म परीक्षा · 50" : "Term exam · 50"}</button><button type="button" onClick={() => applyPaperTemplate("practice")}>{lang === "hi" ? "अभ्यास · 40" : "Practice · 40"}</button><button type="button" className="paper-clear-draft" onClick={clearPaperDraft}>{lang === "hi" ? "नया" : "New"}</button></div>
+              </div>
               <div className="teacher-form-grid">
                 <Field label={t.classLabel}><select value={paper.class_level} onChange={(e) => setPaperScope("class_level", e.target.value)}>{Array.from({ length: 12 }, (_, i) => <option key={i + 1}>{i + 1}</option>)}</select></Field>
                 <Field label={t.subject}><select value={paper.subject} onChange={(e) => setPaperScope("subject", e.target.value)}>{subjects.map((item) => <option key={item} value={item}>{t.subjectNames[item]}</option>)}</select></Field>
@@ -865,7 +959,7 @@ export default function TeacherDashboard() {
                 {enabledPaperFields.includes("difficulty") && <Field label={t.paperForm.difficulty} removable onRemove={() => removePaperField("difficulty")} removeLabel={t.paperForm.removeField}><select value={paper.difficulty} onChange={(e) => setPaper({ ...paper, difficulty: e.target.value })}><option value="easy">{t.options.easy}</option><option value="balanced">{t.options.balanced}</option><option value="challenging">{t.options.challenging}</option></select></Field>}
                 {enabledPaperFields.includes("paper_type") && <Field label={t.paperForm.type} removable onRemove={() => removePaperField("paper_type")} removeLabel={t.paperForm.removeField}><select value={paper.paper_type} onChange={(e) => setPaper({ ...paper, paper_type: e.target.value })}><option value="unit_test">{t.options.unit}</option><option value="term_exam">{t.options.term}</option><option value="practice">{t.options.practice}</option><option value="worksheet">{t.options.worksheet}</option></select></Field>}
                 {enabledPaperFields.includes("medium") && <Field label={t.medium} removable onRemove={() => removePaperField("medium")} removeLabel={t.paperForm.removeField}><select value={paper.medium} onChange={(e) => setPaper({ ...paper, medium: e.target.value })}><option value="Hindi">{t.options.hindi}</option><option value="English">{t.options.english}</option><option value="Bilingual">{t.options.bilingual}</option></select></Field>}
-                <ChapterPicker options={chapterOptions} selected={paper.selected_chapters} onChange={(selected_chapters) => { setPaperScopeError(""); setPaper((current) => ({ ...current, selected_chapters })); }} loading={chapterLoading} error={chapterError} t={t} />
+                <ChapterPicker options={chapterOptions} selected={paper.selected_chapters} onChange={(selected_chapters) => { setPaperScopeError(""); setPaper((current) => ({ ...current, selected_chapters })); }} loading={chapterLoading} error={chapterError} onRetry={() => setChapterRetry((value) => value + 1)} t={t} />
                 {paperScopeError && <p className="paper-scope-error" role="alert">{paperScopeError}</p>}
                 {enabledPaperFields.includes("syllabus") && <Field label={t.paperForm.syllabus} wide removable onRemove={() => removePaperField("syllabus")} removeLabel={t.paperForm.removeField}><textarea rows="4" value={paper.syllabus} onChange={(e) => { setPaperScopeError(""); setPaper({ ...paper, syllabus: e.target.value }); }} placeholder={t.paperForm.syllabusPlaceholder} /></Field>}
                 {enabledPaperFields.includes("instructions") && <Field label={t.paperForm.instructions} wide removable onRemove={() => removePaperField("instructions")} removeLabel={t.paperForm.removeField}><textarea rows="3" value={paper.instructions} onChange={(e) => setPaper({ ...paper, instructions: e.target.value })} placeholder={t.paperForm.instructionsPlaceholder} /></Field>}
@@ -876,6 +970,7 @@ export default function TeacherDashboard() {
               <button className="teacher-generate" type="submit" disabled={loading}>{loading ? t.paperForm.loading : t.paperForm.action}</button>
             </form>
             {renderResult(result, error, loading, copyResult, t, paper)}
+            <GuidedTour accountId={profile.email} role="teacher-paper" steps={paperTourSteps} />
           </section>
         )}
 
@@ -905,7 +1000,7 @@ export default function TeacherDashboard() {
         {activeTool === "pyq" && (
           <section className="teacher-pyq-panel">
             <div className="teacher-pyq-head"><div><h2>{t.papersTitle}</h2><p>{t.papersNote}</p></div><span>{t.papersCount(visiblePapers.length)}</span></div>
-            <div className="teacher-pyq-filters" role="tablist" aria-label="PYQ subject">
+            {!paperCatalogLoaded ? <div className="resource-skeleton" role="status" aria-label={lang === "hi" ? "प्रश्नपत्र लोड हो रहे हैं" : "Loading papers"}><span /><span /><span /></div> : <><div className="teacher-pyq-filters" role="tablist" aria-label="PYQ subject">
               <button type="button" className={pyqSubject === "All" ? "active" : ""} onClick={() => setPyqSubject("All")}>{t.allSubjects}</button>
               {pyqSubjects.map((subject) => <button key={subject} type="button" className={pyqSubject === subject ? "active" : ""} onClick={() => setPyqSubject(subject)}>{t.subjectNames[subject]}</button>)}
             </div>
@@ -918,6 +1013,7 @@ export default function TeacherDashboard() {
                 </article>
               ))}
             </div>
+            </>}
           </section>
         )}
 
@@ -932,6 +1028,8 @@ export default function TeacherDashboard() {
         onOpenTool={openTool}
         onOpenRecent={(item) => { setResult(item); setActiveTool(item.type); }}
       />
+      <GuidedTour accountId={profile.email} role="teacher" steps={tourSteps} onStepChange={() => setActiveTool("home")} />
+      <ConnectionStatus language={lang} />
     </div>
   );
 }

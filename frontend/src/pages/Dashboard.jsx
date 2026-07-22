@@ -4,7 +4,8 @@ import RichMarkdown from "../components/RichMarkdown";
 import api from "../api/client";
 import CompanyLegalFooter from "../components/CompanyLegalFooter";
 import Icon from "../components/Icon";
-import { assessmentPapers } from "../data/assessmentPapers";
+import GuidedTour from "../components/GuidedTour";
+import ConnectionStatus from "../components/ConnectionStatus";
 
 const translations = {
   hi: {
@@ -267,7 +268,6 @@ const pyqStyleQuestionsBySubject = {
   ],
 };
 
-const pyqPapers = assessmentPapers;
 const dateKey = (date = new Date()) => date.toISOString().slice(0, 10);
 
 const addDays = (date, days) => {
@@ -337,7 +337,7 @@ export default function Dashboard() {
   const [lang, setLang] = useState(() => localStorage.getItem("vidyaai_student_lang") || "hi");
   const [studentName, setStudentName] = useState("विद्यार्थी");
   const [studentProfile, setStudentProfile] = useState(null);
-  const [question, setQuestion] = useState("");
+  const [question, setQuestion] = useState(() => localStorage.getItem("vidyaai_student_question_draft") || "");
   const [messages, setMessages] = useState(() => [
     { role: "assistant", text: translations.hi.welcomeMsg },
   ]);
@@ -357,6 +357,8 @@ export default function Dashboard() {
   const [standaloneQuiz, setStandaloneQuiz] = useState(null);
   const [pyqQuiz, setPyqQuiz] = useState(null);
   const [pyqLoadingFile, setPyqLoadingFile] = useState("");
+  const [pyqPapers, setPyqPapers] = useState([]);
+  const [pyqCatalogLoaded, setPyqCatalogLoaded] = useState(false);
   const [quizSubject, setQuizSubject] = useState("Hindi");
   const [pyqSubject, setPyqSubject] = useState("Hindi");
   const [studyHours, setStudyHours] = useState(3);
@@ -376,6 +378,7 @@ export default function Dashboard() {
     localStorage.setItem("vidyaai_student_lang", nextLang);
     return nextLang;
   });
+  const replayTour = () => window.dispatchEvent(new CustomEvent("vidyaai:replay-tour", { detail: { role: "student" } }));
   const todayIndex = Math.floor(new Date().getTime() / 86400000) % dailyTargets.length;
   const todaysTargets = dailyTargets[todayIndex];
   const completedCount = todaysTargets.filter((item) => completedTargets.includes(item.id)).length;
@@ -398,6 +401,17 @@ export default function Dashboard() {
     .filter((group) => group.count > 0);
   const selectedPyqSubjectMeta = subjects.find((subject) => subject.id === pyqSubject) || subjects[0];
   const selectedPyqPapers = pyqPapers.filter((paper) => paper.subject === pyqSubject);
+  const tourSteps = lang === "hi" ? [
+    { target: ".dashboard-left-nav", icon: "home", kicker: "VIDYAAI का परिचय", title: "आपका अध्ययन नियंत्रण केंद्र", body: "नई चैट शुरू करें, पुराने प्रश्न खोलें और चैट, PYQ, योजना तथा क्विज़ टूल्स के बीच जाएँ।", skipLabel: "टूर छोड़ें", backLabel: "पीछे", nextLabel: "आगे", finishLabel: "पढ़ाई शुरू करें" },
+    { target: ".dashboard-chat-panel", icon: "chat", kicker: "AI STUDY ASSISTANT", title: "किसी भी विषय पर प्रश्न पूछें", body: "विषय और उत्तर शैली चुनें, फिर हिंदी या English में सवाल लिखें। VidyaAI पाठ्यक्रम के अनुसार समझाने और अभ्यास कराने में मदद करेगा।", skipLabel: "टूर छोड़ें", backLabel: "पीछे", nextLabel: "आगे", finishLabel: "पढ़ाई शुरू करें" },
+    { target: ".dashboard-main-top", icon: "sparkle", kicker: "आपकी पसंद", title: "भाषा और प्रोफाइल हमेशा पास हैं", body: "ऊपर से भाषा बदलें, स्ट्रीक देखें और अपने प्रोफाइल तथा प्रगति की जानकारी खोलें।", skipLabel: "टूर छोड़ें", backLabel: "पीछे", nextLabel: "आगे", finishLabel: "पढ़ाई शुरू करें" },
+    { target: ".dashboard-right-rail", icon: "chart", kicker: "LEARNING TRACKER", title: "अपनी प्रगति समझें", body: "विषय बदलें, क्विज़ औसत देखें और उन कमजोर टॉपिक्स पर वापस जाएँ जिन्हें अधिक अभ्यास चाहिए।", skipLabel: "टूर छोड़ें", backLabel: "पीछे", nextLabel: "आगे", finishLabel: "पढ़ाई शुरू करें" },
+  ] : [
+    { target: ".dashboard-left-nav", icon: "home", kicker: "MEET VIDYAAI", title: "Your study control centre", body: "Start a new chat, revisit questions, and move between Chat, PYQs, Study Plan, and Quiz tools.", skipLabel: "Skip tour", backLabel: "Back", nextLabel: "Next", finishLabel: "Start studying" },
+    { target: ".dashboard-chat-panel", icon: "chat", kicker: "AI STUDY ASSISTANT", title: "Ask about any subject", body: "Choose a subject and answer style, then ask in Hindi or English. VidyaAI helps explain, revise, and practise within your curriculum.", skipLabel: "Skip tour", backLabel: "Back", nextLabel: "Next", finishLabel: "Start studying" },
+    { target: ".dashboard-main-top", icon: "sparkle", kicker: "YOUR PREFERENCES", title: "Language and profile stay close", body: "Use the header to switch language, check your streak, and open your profile and learning summary.", skipLabel: "Skip tour", backLabel: "Back", nextLabel: "Next", finishLabel: "Start studying" },
+    { target: ".dashboard-right-rail", icon: "chart", kicker: "LEARNING TRACKER", title: "Understand your progress", body: "Change subjects, review quiz averages, and return to weak topics that need more practice.", skipLabel: "Skip tour", backLabel: "Back", nextLabel: "Next", finishLabel: "Start studying" },
+  ];
 
   useEffect(() => {
     const requestedSection = new URLSearchParams(location.search).get("section");
@@ -405,6 +419,13 @@ export default function Dashboard() {
       setActiveSection(requestedSection);
     }
   }, [location.search]);
+
+  useEffect(() => { localStorage.setItem("vidyaai_student_question_draft", question); }, [question]);
+
+  useEffect(() => {
+    if (activeSection !== "pyq" || pyqPapers.length) return;
+    import("../data/assessmentPapers").then(({ assessmentPapers }) => setPyqPapers(assessmentPapers)).finally(() => setPyqCatalogLoaded(true));
+  }, [activeSection, pyqPapers.length]);
 
   const inferSubject = (text) => {
     const q = (text || "").toLowerCase();
@@ -1068,10 +1089,11 @@ export default function Dashboard() {
           {isGuest ? (
             <button type="button" className="nav-action" onClick={() => navigate("/login")}>Login</button>
           ) : (
+            <><button type="button" className="nav-action desktop-tour-action" onClick={replayTour}><Icon name="sparkle" size={17} /><span>{lang === "hi" ? "गाइड फिर देखें" : "Replay guide"}</span></button>
             <button type="button" className="nav-action desktop-logout-action" onClick={handleLogout}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/></svg>
               <span>{lang === "hi" ? "लॉग आउट" : "Logout"}</span>
-            </button>
+            </button></>
           )}
         </div>
 
@@ -1239,6 +1261,7 @@ export default function Dashboard() {
                     Admin Panel
                   </button>
                 )}
+                <button type="button" className="profile-menu-action" onClick={() => { setShowProfileMenu(false); replayTour(); }}><Icon name="sparkle" size={17} />{lang === "hi" ? "गाइड फिर देखें" : "Replay walkthrough"}</button>
                 <button
                   type="button"
                   className="profile-menu-action"
@@ -1373,6 +1396,18 @@ export default function Dashboard() {
                         ? "अध्याय समझें, उत्तर लिखवाएं, PYQ practice करें और कमजोर टॉपिक पर तुरंत revision शुरू करें."
                         : "Understand chapters, draft exam answers, practice PYQs, and revise weak topics from one focused workspace."}
                     </p>
+                    <div className="student-learning-path" aria-label={lang === "hi" ? "सीखने के चार चरण" : "Four-step learning path"}>
+                      {[
+                        { id: "chat", icon: "chat", label: lang === "hi" ? "पूछें" : "Ask", note: lang === "hi" ? "अपना सवाल लिखें" : "Start with a question" },
+                        { id: "understand", icon: "brain", label: lang === "hi" ? "समझें" : "Understand", note: lang === "hi" ? "सरल व्याख्या पाएँ" : "Get a clear explanation" },
+                        { id: "quiz", icon: "lesson", label: lang === "hi" ? "अभ्यास" : "Practise", note: lang === "hi" ? "क्विज़ से जाँचें" : "Check with a quiz" },
+                        { id: "progress", icon: "sparkle", label: lang === "hi" ? "सुधारें" : "Improve", note: lang === "hi" ? "कमज़ोर टॉपिक देखें" : "Review weak topics" },
+                      ].map((item, index) => <button key={item.id} type="button" onClick={() => {
+                        if (item.id === "quiz") setActiveSection("quiz");
+                        else if (item.id === "progress") document.querySelector(".dashboard-right-rail")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+                        else { setActiveSection("chat"); if (item.id === "understand") setQuestion(chatSuggestions[0] || ""); }
+                      }}><span>{index + 1}</span><Icon name={item.icon} size={18} /><strong>{item.label}</strong><small>{item.note}</small></button>)}
+                    </div>
                     <div className="study-welcome-actions">
                       {chatSuggestions.slice(0, 3).map((suggestion) => (
                         <button key={suggestion} type="button" onClick={() => setQuestion(suggestion)}>
@@ -1578,7 +1613,7 @@ export default function Dashboard() {
                 <span>{lang === "hi" ? "कक्षा" : "Class"} {classLevel}</span>
               </div>
 
-              {pyqSubjects.length > 0 ? (
+              {!pyqCatalogLoaded ? <div className="resource-skeleton" role="status" aria-label={lang === "hi" ? "प्रश्नपत्र लोड हो रहे हैं" : "Loading papers"}><span /><span /><span /></div> : pyqSubjects.length > 0 ? (
                 <div className="pyq-subject-browser">
                   <div className="pyq-subject-picker" role="tablist" aria-label="PYQ subject">
                     {pyqSubjects.map((group) => (
@@ -1846,6 +1881,8 @@ export default function Dashboard() {
           </div>
         </section>
       </aside>
+      {!isGuest && <GuidedTour accountId={studentProfile?.email} role="student" steps={tourSteps} onStepChange={(tourStep) => { if (tourStep.target === ".dashboard-chat-panel") setActiveSection("chat"); }} />}
+      <ConnectionStatus language={lang} />
     </div>
   );
 }
