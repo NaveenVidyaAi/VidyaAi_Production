@@ -378,7 +378,6 @@ export default function Dashboard() {
     localStorage.setItem("vidyaai_student_lang", nextLang);
     return nextLang;
   });
-  const replayTour = () => window.dispatchEvent(new CustomEvent("vidyaai:replay-tour", { detail: { role: "student" } }));
   const todayIndex = Math.floor(new Date().getTime() / 86400000) % dailyTargets.length;
   const todaysTargets = dailyTargets[todayIndex];
   const completedCount = todaysTargets.filter((item) => completedTargets.includes(item.id)).length;
@@ -1089,11 +1088,10 @@ export default function Dashboard() {
           {isGuest ? (
             <button type="button" className="nav-action" onClick={() => navigate("/login")}>Login</button>
           ) : (
-            <><button type="button" className="nav-action desktop-tour-action" onClick={replayTour}><Icon name="sparkle" size={17} /><span>{lang === "hi" ? "गाइड फिर देखें" : "Replay guide"}</span></button>
             <button type="button" className="nav-action desktop-logout-action" onClick={handleLogout}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/></svg>
               <span>{lang === "hi" ? "लॉग आउट" : "Logout"}</span>
-            </button></>
+            </button>
           )}
         </div>
 
@@ -1261,7 +1259,6 @@ export default function Dashboard() {
                     Admin Panel
                   </button>
                 )}
-                <button type="button" className="profile-menu-action" onClick={() => { setShowProfileMenu(false); replayTour(); }}><Icon name="sparkle" size={17} />{lang === "hi" ? "गाइड फिर देखें" : "Replay walkthrough"}</button>
                 <button
                   type="button"
                   className="profile-menu-action"

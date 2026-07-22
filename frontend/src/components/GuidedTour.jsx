@@ -27,18 +27,6 @@ export default function GuidedTour({ accountId, role, steps, onStepChange }) {
   }, [storageKey, progressKey, steps.length]);
 
   useEffect(() => {
-    const replay = (event) => {
-      if (event.detail?.role !== role || !storageKey) return;
-      localStorage.removeItem(storageKey);
-      localStorage.removeItem(progressKey);
-      setStepIndex(0);
-      setOpen(true);
-    };
-    window.addEventListener("vidyaai:replay-tour", replay);
-    return () => window.removeEventListener("vidyaai:replay-tour", replay);
-  }, [role, storageKey, progressKey]);
-
-  useEffect(() => {
     if (open && progressKey) localStorage.setItem(progressKey, String(stepIndex));
   }, [open, stepIndex, progressKey]);
 
