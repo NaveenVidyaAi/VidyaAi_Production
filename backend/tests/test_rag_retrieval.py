@@ -1,5 +1,6 @@
 import unittest
 import asyncio
+import json
 
 from backend.services import rag
 from backend.routers import chat
@@ -716,6 +717,64 @@ class RAGRetrievalTests(unittest.TestCase):
         self.assertEqual(len(rag.get_unit_options("English", "Adhyay pahla ko bataiye", "10")), 3)
         self.assertIn("कौन-सा विषय", chat._clarification_for_prompt("Maths ka", "Math", english_history))
         self.assertEqual(rag._infer_subject("General", "Bahupad"), "Math")
+
+    def test_prompt_interpreter_handles_short_hinglish_without_llm(self):
+        original_key = rag.settings.groq_api_key
+        rag.settings.groq_api_key = ""
+        try:
+            polynomial = rag.interpret_student_prompt("Bahupad", "General", "10")
+            followup = rag.interpret_student_prompt(
+                "Adhyay pahla ko bataiye",
+                "General",
+                "10",
+                [{"question": "English lesson", "answer": "...", "subject": "English"}],
+            )
+            vague = rag.interpret_student_prompt("Maths ka", "General", "10")
+        finally:
+            rag.settings.groq_api_key = original_key
+
+        self.assertEqual(polynomial["subject"], "Math")
+        self.assertFalse(polynomial["needs_clarification"])
+        self.assertEqual(followup["subject"], "English")
+        self.assertTrue(followup["uses_previous_context"])
+        self.assertTrue(vague["needs_clarification"])
+
+    def test_llm_interpreter_cannot_invent_chapter_numbers(self):
+        original_key = rag.settings.groq_api_key
+        original_post = rag.requests.post
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"choices": [{"message": {"content": json.dumps({
+                    "language": "hindi",
+                    "subject": "English",
+                    "intent": "curriculum",
+                    "topic": "poem",
+                    "chapter": "7",
+                    "uses_previous_context": False,
+                    "needs_clarification": False,
+                    "clarification_question": "",
+                    "confidence": 0.99,
+                    "normalized_prompt": "Class 10 English chapter 7 poem summary",
+                })}}]}
+
+        rag.settings.groq_api_key = "test-key"
+        rag.requests.post = lambda *args, **kwargs: FakeResponse()
+        try:
+            result = rag.interpret_student_prompt("English poem summary", "General", "10")
+        finally:
+            rag.settings.groq_api_key = original_key
+            rag.requests.post = original_post
+
+        self.assertTrue(result["needs_clarification"])
+        self.assertNotIn("chapter 7", result["normalized_prompt"])
+
+    def test_interpretation_confidence_controls_answer_confidence(self):
+        self.assertEqual(chat._answer_confidence("safe-mode", [], 0.9), 0.35)
+        self.assertEqual(chat._answer_confidence("groq", [], 0.95), 0.72)
+        self.assertEqual(chat._answer_confidence("rag-groq", ["textbook"], 0.88), 0.88)
 
     def test_hinglish_application_request_uses_hindi_school_format(self):
         requested = rag._requested_format_for_question("application likho principle ko", "General")

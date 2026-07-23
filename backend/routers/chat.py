@@ -18,7 +18,13 @@ from backend.models.session import ChatSession
 from backend.models.student import Student as StudentModel
 from backend.models.weak_topic import WeakTopic
 from backend.routers.auth import get_db
-from backend.services.rag import _is_chapter_style_question, format_unit_selection_answer, get_unit_options, run_rag
+from backend.services.rag import (
+    _is_chapter_style_question,
+    format_unit_selection_answer,
+    get_unit_options,
+    interpret_student_prompt,
+    run_rag,
+)
 from backend.services.learning_loop import apply_feedback, capture_interaction
 
 router = APIRouter()
@@ -84,6 +90,21 @@ def _extract_bare_section(question: str) -> str | None:
 
 def _is_cacheable_answer_source(answer_source: str) -> bool:
     return answer_source in {"groq", "fallback-topic-guard"} or answer_source.startswith("rag")
+
+
+def _answer_confidence(answer_source: str, sources: list[str], prompt_confidence: float) -> float:
+    """Report evidence-aware confidence instead of treating every fluent answer as certain."""
+    if answer_source == "safe-mode":
+        return 0.35
+    if sources and (answer_source.startswith("rag") or answer_source == "fallback-topic-guard"):
+        evidence_confidence = 0.94
+    elif answer_source in {"math-direct", "fallback-topic-guard"}:
+        evidence_confidence = 0.9
+    elif answer_source == "groq":
+        evidence_confidence = 0.72
+    else:
+        evidence_confidence = 0.58
+    return round(min(evidence_confidence, max(0.0, prompt_confidence)), 2)
 
 
 def _recent_student_history(student_id: str, limit: int = 2) -> list[dict[str, str]]:
@@ -170,6 +191,18 @@ def _clarification_for_prompt(question: str, subject: str, recent_history: list[
     if vague_chapter and (subject or "").strip().lower() in {"", "general"} and not recent_history:
         return "कृपया विषय और अध्याय स्पष्ट करें—जैसे **Class 10 English Chapter 1** या **कक्षा 10 हिंदी अध्याय 1**।"
     return None
+
+
+def _clarification_from_interpretation(interpretation: dict) -> str | None:
+    if not interpretation.get("needs_clarification"):
+        return None
+    model_question = str(interpretation.get("clarification_question", "")).strip()
+    if model_question:
+        return model_question
+    subject = str(interpretation.get("subject", "General"))
+    if subject != "General":
+        return f"आप **{subject}** में क्या समझना चाहते हैं? कृपया topic, chapter number/name, या पूरा प्रश्न लिखें।"
+    return "मैं आपका प्रश्न ठीक से समझ नहीं पाया। कृपया **विषय और पूरा सवाल** दोबारा लिखें—जैसे: ‘Class 10 Maths में बहुपद समझाइए’।"
 
 
 def _feedback_log_path(student_id: str, session_id: int) -> str:
@@ -450,6 +483,24 @@ async def ask(
         recent_history = _history_for_question(current_student.id, effective_question)
     effective_subject = _subject_for_contextual_followup(effective_question, effective_subject, recent_history)
 
+    interpretation = interpret_student_prompt(
+        effective_question,
+        effective_subject,
+        current_student.class_level,
+        recent_history,
+    )
+    logger.info(
+        "Prompt interpreted source=%s subject=%s intent=%s confidence=%.2f clarify=%s",
+        interpretation.get("source"),
+        interpretation.get("subject"),
+        interpretation.get("intent"),
+        float(interpretation.get("confidence", 0.0)),
+        interpretation.get("needs_clarification"),
+    )
+    effective_subject = str(interpretation.get("subject") or effective_subject)
+    if not interpretation.get("needs_clarification"):
+        effective_question = str(interpretation.get("normalized_prompt") or effective_question)
+
     chapter_options = get_unit_options(effective_subject, effective_question, current_student.class_level)
     if chapter_options:
         created_at = datetime.utcnow().isoformat()
@@ -471,6 +522,7 @@ async def ask(
             "sources": [],
             "confidence": 1.0,
             "answer_style": request.answer_style,
+            "prompt_interpretation": interpretation,
             "created_at": created_at,
         }
         session_id = await _store_session(db, current_student, session)
@@ -482,7 +534,9 @@ async def ask(
             chapter_options=chapter_options,
         )
 
-    clarification = _clarification_for_prompt(effective_question, effective_subject, recent_history)
+    clarification = _clarification_from_interpretation(interpretation) or _clarification_for_prompt(
+        effective_question, effective_subject, recent_history
+    )
     if clarification:
         created_at = datetime.utcnow().isoformat()
         session_id = in_memory_store["next_session_id"]
@@ -499,6 +553,7 @@ async def ask(
             "sources": [],
             "confidence": 1.0,
             "answer_style": request.answer_style,
+            "prompt_interpretation": interpretation,
             "created_at": created_at,
         }
         session_id = await _store_session(db, current_student, session)
@@ -559,6 +614,7 @@ async def ask(
         weak_topics,
         answer_style=request.answer_style,
         recent_history=recent_history,
+        prompt_confidence=float(interpretation.get("confidence", 0.0)),
     )
 
     if not chapter_request and _is_cacheable_answer_source(answer_source) and sources:
@@ -580,7 +636,11 @@ async def ask(
 
     session_id = in_memory_store["next_session_id"]
     in_memory_store["next_session_id"] += 1
-    confidence = 0.95 if answer_source == "groq" else 0.9
+    confidence = _answer_confidence(
+        answer_source,
+        sources,
+        float(interpretation.get("confidence", 0.0)),
+    )
     created_at = datetime.utcnow().isoformat()
     session = {
         "id": session_id,
@@ -595,6 +655,7 @@ async def ask(
         "sources": sources,
         "confidence": confidence,
         "answer_style": request.answer_style,
+        "prompt_interpretation": interpretation,
         "created_at": created_at,
     }
     session_id = await _store_session(db, current_student, session)

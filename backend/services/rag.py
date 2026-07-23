@@ -5,7 +5,7 @@ import logging
 import ast
 import json
 import operator
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 import requests
 from qdrant_client import QdrantClient
@@ -1206,6 +1206,136 @@ def _infer_subject(subject: str, question: str) -> str:
     return subject or "General"
 
 
+def interpret_student_prompt(
+    question: str,
+    selected_subject: str,
+    class_level: str,
+    recent_history: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    """Resolve noisy student input without allowing the interpreter to invent facts."""
+    original = re.sub(r"\s+", " ", question or "").strip()
+    history = recent_history or []
+    explicit_subject = _infer_subject("", original)
+    inferred_subject = _infer_subject(selected_subject, original)
+    chapter = _extract_chapter_number(original)
+    intent = _classify_prompt_intent(selected_subject, original)
+    word_count = len(re.findall(r"[\w\u0900-\u097f]+", original))
+    result: dict[str, Any] = {
+        "language": _detect_prompt_language(original),
+        "subject": inferred_subject,
+        "class_level": str(class_level),
+        "intent": intent,
+        "topic": original,
+        "chapter": chapter,
+        "uses_previous_context": False,
+        "needs_clarification": False,
+        "clarification_question": "",
+        "confidence": 0.9 if explicit_subject != "General" or inferred_subject != "General" else 0.68,
+        "normalized_prompt": original,
+        "source": "deterministic",
+    }
+
+    previous_subject = str(history[-1].get("subject", "")).strip() if history else ""
+    contextual_marker = bool(
+        re.search(r"\b(?:this|same|that|is|iss|us|usi)\b", original.lower())
+        or re.search(r"\b(?:adhyay|chapter|lesson|unit|path)\s+(?:pahla|pehla|pahila|first|one|dusra|doosra|second|two|tisra|teesra|third|three)\b", original.lower())
+        or re.search(r"(?:इस|इसी)\s*(?:अध्याय|पाठ|कविता|कहानी)", original)
+    )
+    if explicit_subject == "General" and previous_subject and contextual_marker:
+        result["subject"] = previous_subject
+        result["uses_previous_context"] = True
+        result["confidence"] = 0.88
+
+    normalized = original.lower().strip(" ?.!।")
+    subject_only = bool(re.fullmatch(r"(?:maths?|mathematics|ganit|गणित)(?:\s+(?:ka|ki|ke|का|की|के))?", normalized))
+    unidentified_literature = bool(
+        re.search(r"\b(?:english|hindi)\b", normalized)
+        and re.search(r"\b(?:poem|story|lesson)\b", normalized)
+        and re.search(r"\b(?:summary|theme|explain)\b", normalized)
+        and not chapter
+        and not re.search(r"\b(?:named|called|title)\b", normalized)
+    )
+    must_clarify = not original or subject_only or unidentified_literature
+    if must_clarify:
+        result["needs_clarification"] = True
+        result["confidence"] = 0.35 if subject_only else 0.5
+    elif word_count <= 2 and result["subject"] == "General":
+        result["confidence"] = 0.45
+
+    # Clear prompts do not need an extra network round-trip. The LLM is used as
+    # a constrained language/typo interpreter only when deterministic signals
+    # are weak; its output is never treated as textbook evidence.
+    should_use_llm = bool(settings.groq_api_key and original and (result["confidence"] < 0.85 or word_count <= 4))
+    if should_use_llm:
+        history_text = "\n".join(
+            f"- [{item.get('subject', '')}] {item.get('question', '')}" for item in history[-2:]
+        ) or "None"
+        payload = {
+            "model": settings.groq_model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Interpret a Class 10 student's noisy Hindi, English, or Hinglish prompt. Correct spelling and "
+                        "expand wording, but never invent a book, lesson title, chapter number, person, or fact. Use prior "
+                        "context only for an obvious follow-up. If the exact request cannot be identified, ask one short "
+                        "clarifying question. Return strict JSON with keys: language, subject, intent, topic, chapter, "
+                        "uses_previous_context, needs_clarification, clarification_question, confidence, normalized_prompt. "
+                        "subject must be Hindi, English, Sanskrit, Science, Math, Social Science, or General; confidence is 0-1."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"UI subject: {selected_subject}\nClass: {class_level}\nRecent prompts:\n{history_text}\n"
+                        f"Current prompt: {original}"
+                    ),
+                },
+            ],
+            "temperature": 0.0,
+            "max_tokens": 300,
+        }
+        try:
+            response = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"},
+                json=payload,
+                timeout=20,
+            )
+            content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "") if response.status_code == 200 else ""
+            json_match = re.search(r"\{[\s\S]*\}", content)
+            parsed = json.loads(json_match.group(0)) if json_match else {}
+            allowed_subjects = {"Hindi", "English", "Sanskrit", "Science", "Math", "Social Science", "General"}
+            candidate_subject = str(parsed.get("subject", "")).strip()
+            candidate_prompt = re.sub(r"\s+", " ", str(parsed.get("normalized_prompt", ""))).strip()
+            candidate_confidence = max(0.0, min(1.0, float(parsed.get("confidence", 0))))
+            original_numbers = set(re.findall(r"\d+(?:[.\-]\d+)*", original))
+            candidate_numbers = set(re.findall(r"\d+(?:[.\-]\d+)*", candidate_prompt))
+            safe_numbers = candidate_numbers.difference(original_numbers).issubset({str(class_level)})
+            subject_agrees = explicit_subject == "General" or candidate_subject in {explicit_subject, "General"}
+            if candidate_subject in allowed_subjects and candidate_prompt and safe_numbers and subject_agrees:
+                result.update({key: parsed[key] for key in (
+                    "language", "intent", "topic", "clarification_question",
+                ) if key in parsed})
+                candidate_chapter = str(parsed.get("chapter") or "").strip()
+                if not candidate_chapter or candidate_chapter == str(chapter or ""):
+                    result["chapter"] = candidate_chapter or chapter
+                result["uses_previous_context"] = parsed.get("uses_previous_context") is True
+                result["needs_clarification"] = parsed.get("needs_clarification") is True
+                result["subject"] = candidate_subject if candidate_subject != "General" else result["subject"]
+                result["normalized_prompt"] = candidate_prompt[:500]
+                result["confidence"] = candidate_confidence
+                result["source"] = "llm-interpreter"
+        except (requests.RequestException, json.JSONDecodeError, TypeError, ValueError):
+            logger.info("Prompt interpreter unavailable; using deterministic interpretation")
+
+    # Confidence is authoritative: uncertain prompts must be clarified even if
+    # the model forgot to set its boolean flag.
+    if must_clarify or result["confidence"] < 0.6:
+        result["needs_clarification"] = True
+    return result
+
+
 def _rewrite_query_for_retrieval(
     question: str,
     selected_subject: str,
@@ -2011,6 +2141,7 @@ async def run_rag(
     weak_topics: list[str] | None = None,
     answer_style: str = "exam",
     recent_history: list[dict[str, str]] | None = None,
+    prompt_confidence: float = 1.0,
 ) -> Tuple[str, List[str], str]:
     weak_topics = weak_topics or []
 
@@ -2105,6 +2236,21 @@ async def run_rag(
     strict_textbook_intent = False if (math_problem_intent or standalone_visual_intent) else (
         _requires_strict_textbook_grounding(inferred_subject, question)
     )
+
+    if should_retrieve and prompt_confidence < 0.85 and not has_strong_match:
+        if _detect_prompt_language(question) == "english":
+            return (
+                "**I need one more detail**\n\nI could not confidently match this to the correct textbook topic. "
+                "Please send the subject and chapter name/number, or paste the full question.",
+                sources,
+                "safe-mode",
+            )
+        return (
+            "**एक जानकारी और चाहिए**\n\nमैं इस प्रश्न को सही textbook topic से भरोसे के साथ नहीं मिला पाया। "
+            "कृपया विषय और अध्याय का नाम/क्रमांक लिखें, या पूरा प्रश्न भेजें।",
+            sources,
+            "safe-mode",
+        )
 
     # Board-specific language/literature chapters must be grounded in retrieved
     # textbook context. Standard Science/SST concepts continue to the model-only

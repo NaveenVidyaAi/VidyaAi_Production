@@ -623,6 +623,7 @@ export default function TeacherDashboard() {
   const [paperCatalogLoaded, setPaperCatalogLoaded] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef(null);
+  const mobileToolRefs = useRef({});
   const [streak, setStreak] = useState(() => {
     try { return JSON.parse(localStorage.getItem("vidyaai_streak") || "{\"count\":0,\"lastActive\":\"\"}"); } catch { return { count: 0, lastActive: "" }; }
   });
@@ -636,6 +637,13 @@ export default function TeacherDashboard() {
       setProfile(data);
     }).catch(() => navigate("/login", { replace: true }));
   }, [navigate]);
+
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 820px)").matches) {
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      mobileToolRefs.current[activeTool]?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "nearest", inline: "center" });
+    }
+  }, [activeTool]);
 
   useEffect(() => {
     let active = true;
@@ -943,10 +951,14 @@ export default function TeacherDashboard() {
           <BrandMark compact tone="teacher" tagline={t.brandTagline} />
         </div>
         <div className="teacher-role-badge">{t.roleBadge}</div>
-        <details className="teacher-mobile-tool-menu">
-          <summary><span><Icon name={activeTool === "home" ? "home" : activeTool === "curriculum" ? "curriculum" : activeTool === "paper" ? "paper" : activeTool === "lesson" ? "lesson" : activeTool === "chat" ? "chat" : "library"} size={18} /></span><strong>{t.nav[activeTool]}</strong><small>{lang === "hi" ? "टूल बदलें" : "Change tool"}</small><Icon name="arrowRight" size={17} /></summary>
-          <div>{[["home", "home"], ["curriculum", "curriculum"], ["paper", "paper"], ["lesson", "lesson"], ["chat", "chat"], ["pyq", "library"]].map(([id, icon]) => <button key={id} type="button" className={activeTool === id ? "active" : ""} onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); openTool(id); }}><Icon name={icon} size={18} /><span>{t.nav[id]}</span></button>)}</div>
-        </details>
+        <div className="teacher-mobile-tool-strip" role="navigation" aria-label={lang === "hi" ? "शिक्षक टूल" : "Teacher tools"}>
+          {[["home", "home"], ["curriculum", "curriculum"], ["paper", "paper"], ["lesson", "lesson"], ["chat", "chat"], ["pyq", "library"]].map(([id, icon]) => (
+            <button ref={(node) => { mobileToolRefs.current[id] = node; }} key={id} type="button" className={activeTool === id ? "active" : ""} aria-current={activeTool === id ? "page" : undefined} onClick={() => openTool(id)}>
+              <Icon name={icon} size={16} />
+              <span>{t.nav[id]}</span>
+            </button>
+          ))}
+        </div>
         <nav>
           {[
             ["home", "home"],
