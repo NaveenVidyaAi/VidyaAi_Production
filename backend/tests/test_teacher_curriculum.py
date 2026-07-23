@@ -150,6 +150,51 @@ class TeacherCurriculumTests(unittest.TestCase):
         self.assertEqual(lesson["duration_minutes"], 6)
         self.assertIn("अम्ल", lesson["title"])
 
+    def test_ai_teacher_retries_with_fallback_model(self):
+        payload = AITeacherRequest(
+            class_level="10",
+            subject="Science",
+            chapter_id="science-2",
+            chapter_or_topic="2: अम्ल, क्षारक एवं लवण",
+            medium="Hindi",
+        )
+        original_post = teacher_module.requests.post
+        original_key = teacher_module.settings.groq_api_key
+        calls = []
+
+        class FakeResponse:
+            def __init__(self, status_code):
+                self.status_code = status_code
+
+            def json(self):
+                if self.status_code != 200:
+                    return {"error": {"message": "temporary provider error"}}
+                return {"choices": [{"message": {"content": json.dumps({
+                    "title": "अम्ल और क्षारक",
+                    "objective": "विद्यार्थी मुख्य अंतर समझेंगे।",
+                    "duration_minutes": 5,
+                    "scenes": [
+                        {"title": f"भाग {index}", "narration": "सत्यापित पाठ्यपुस्तक संदर्भ से इस अवधारणा को एक सरल उदाहरण के साथ ध्यानपूर्वक समझते हैं।", "board_lines": [f"मुख्य बिंदु {index}"], "teacher_action": "explain"}
+                        for index in range(1, 4)
+                    ],
+                }, ensure_ascii=False)}}]}
+
+        def fake_post(*args, **kwargs):
+            calls.append(kwargs["json"]["model"])
+            return FakeResponse(500 if len(calls) == 1 else 200)
+
+        teacher_module.settings.groq_api_key = "test-key"
+        teacher_module.requests.post = fake_post
+        try:
+            lesson = _generate_ai_teacher_lesson(payload, "Verified chapter evidence")
+        finally:
+            teacher_module.requests.post = original_post
+            teacher_module.settings.groq_api_key = original_key
+
+        self.assertEqual(len(calls), 2)
+        self.assertNotEqual(calls[0], calls[1])
+        self.assertEqual(len(lesson["scenes"]), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

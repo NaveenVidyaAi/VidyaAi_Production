@@ -1089,46 +1089,91 @@ Rules:
 
 VERIFIED TEXTBOOK EVIDENCE
 {context[:14000]}"""
-    try:
-        response = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"},
-            json={
-                "model": settings.groq_paper_model or settings.groq_model,
-                "messages": [
-                    {"role": "system", "content": "You create concise, source-grounded classroom teaching scenes. Return valid JSON only."},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.18,
-                "max_tokens": 2600,
-                "response_format": {"type": "json_object"},
-            },
-            timeout=90,
-        )
-    except requests.RequestException:
-        raise HTTPException(status_code=502, detail="AI Teacher provider is temporarily unavailable. Please try again.")
-    if response.status_code != 200:
-        raise HTTPException(status_code=502, detail="AI Teacher lesson generation failed. Please try again.")
-    raw = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-    try:
-        lesson = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        raise HTTPException(status_code=502, detail="AI Teacher returned an incomplete lesson. Please regenerate.")
-    scenes = lesson.get("scenes")
-    if not isinstance(scenes, list) or not 3 <= len(scenes) <= 6:
-        raise HTTPException(status_code=502, detail="AI Teacher lesson structure was incomplete. Please regenerate.")
-    clean_scenes = []
-    for scene in scenes:
-        narration = str(scene.get("narration", "")).strip()
-        board_lines = [str(line).strip() for line in scene.get("board_lines", []) if str(line).strip()][:5]
-        if len(narration) < 30 or not board_lines:
-            raise HTTPException(status_code=502, detail="AI Teacher generated an incomplete scene. Please regenerate.")
-        clean_scenes.append({
-            "title": str(scene.get("title", "")).strip() or "Lesson",
-            "narration": narration[:1600],
-            "board_lines": board_lines,
-            "teacher_action": str(scene.get("teacher_action", "explain")).strip(),
-        })
+    models = list(dict.fromkeys(filter(None, [
+        settings.groq_paper_model,
+        settings.groq_paper_fallback_model,
+        settings.groq_model,
+    ])))
+    lesson = None
+    clean_scenes = None
+    last_failure = "unknown provider failure"
+    for model in models:
+        request_body = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You create concise, source-grounded classroom teaching scenes. Return valid JSON only."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.18,
+            "max_tokens": 2600,
+            "response_format": {"type": "json_object"},
+        }
+        if model.startswith("openai/gpt-oss-"):
+            request_body["reasoning_effort"] = "low"
+        try:
+            response = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"},
+                json=request_body,
+                timeout=90,
+            )
+        except requests.RequestException as exc:
+            last_failure = f"{model}: {exc.__class__.__name__}"
+            logger.warning("AI Teacher provider request failed for %s: %s", model, exc.__class__.__name__)
+            continue
+        if response.status_code != 200:
+            try:
+                provider_detail = str(response.json().get("error", {}).get("message", "")).strip()
+            except (AttributeError, TypeError, ValueError):
+                provider_detail = ""
+            provider_detail = re.sub(r"\s+", " ", provider_detail)[:500] or "no provider detail"
+            provider_detail = re.sub(r"organization `[^`]+`", "organization [redacted]", provider_detail, flags=re.IGNORECASE)
+            last_failure = f"{model}: HTTP {response.status_code}: {provider_detail}"
+            logger.warning("AI Teacher provider rejected %s with HTTP %s: %s", model, response.status_code, provider_detail)
+            continue
+        try:
+            raw = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+            candidate = json.loads(raw)
+        except (AttributeError, IndexError, json.JSONDecodeError, TypeError, ValueError):
+            last_failure = f"{model}: invalid JSON response"
+            logger.warning("AI Teacher returned invalid JSON from %s", model)
+            continue
+        scenes = candidate.get("scenes")
+        if not isinstance(scenes, list) or not 3 <= len(scenes) <= 6:
+            last_failure = f"{model}: invalid scene count"
+            logger.warning("AI Teacher returned an invalid scene count from %s", model)
+            continue
+        candidate_scenes = []
+        invalid_scene = False
+        for scene in scenes:
+            if not isinstance(scene, dict):
+                invalid_scene = True
+                break
+            narration = str(scene.get("narration", "")).strip()
+            board_lines_value = scene.get("board_lines", [])
+            if not isinstance(board_lines_value, list):
+                invalid_scene = True
+                break
+            board_lines = [str(line).strip() for line in board_lines_value if str(line).strip()][:5]
+            if len(narration) < 30 or not board_lines:
+                invalid_scene = True
+                break
+            candidate_scenes.append({
+                "title": str(scene.get("title", "")).strip() or "Lesson",
+                "narration": narration[:1600],
+                "board_lines": board_lines,
+                "teacher_action": str(scene.get("teacher_action", "explain")).strip(),
+            })
+        if invalid_scene:
+            last_failure = f"{model}: incomplete scene"
+            logger.warning("AI Teacher returned an incomplete scene from %s", model)
+            continue
+        lesson = candidate
+        clean_scenes = candidate_scenes
+        break
+    if lesson is None or clean_scenes is None:
+        logger.error("AI Teacher generation exhausted all configured models: %s", last_failure)
+        raise HTTPException(status_code=502, detail="AI Teacher could not complete this lesson. Please try again.")
     try:
         duration = int(lesson.get("duration_minutes", 6))
     except (TypeError, ValueError):
