@@ -637,6 +637,32 @@ export default function Dashboard() {
     }
   };
 
+  const handleLearningPath = async (stepId) => {
+    if (stepId === "quiz") { setActiveSection("quiz"); return; }
+    setActiveSection("chat");
+    if (stepId === "chat") {
+      requestAnimationFrame(() => document.getElementById("student-chat-input")?.focus());
+      return;
+    }
+    if (stepId === "understand") {
+      const prompt = lang === "hi"
+        ? `${selectedSubject} के एक महत्वपूर्ण टॉपिक को सरल भाषा और उदाहरणों के साथ समझाइए।`
+        : `Explain one important ${selectedSubject} topic clearly with simple examples.`;
+      await askQuestion(prompt, selectedSubject, "summary");
+      return;
+    }
+    const weakTopic = studentProfile?.weak_topics?.[0];
+    if (weakTopic) {
+      const prompt = lang === "hi"
+        ? `${weakTopic.subject} के ${weakTopic.topic} टॉपिक का छोटा revision और अभ्यास कराइए।`
+        : `Help me revise and practise ${weakTopic.topic} in ${weakTopic.subject}.`;
+      await askQuestion(prompt, weakTopic.subject, "summary");
+    } else {
+      setQuizSubject(selectedSubject);
+      setActiveSection("quiz");
+    }
+  };
+
   const generateActivityQuiz = async (message) => {
     setQuizLoading(true);
     try {
@@ -1399,11 +1425,7 @@ export default function Dashboard() {
                         { id: "understand", icon: "brain", label: lang === "hi" ? "समझें" : "Understand", note: lang === "hi" ? "सरल व्याख्या पाएँ" : "Get a clear explanation" },
                         { id: "quiz", icon: "lesson", label: lang === "hi" ? "अभ्यास" : "Practise", note: lang === "hi" ? "क्विज़ से जाँचें" : "Check with a quiz" },
                         { id: "progress", icon: "sparkle", label: lang === "hi" ? "सुधारें" : "Improve", note: lang === "hi" ? "कमज़ोर टॉपिक देखें" : "Review weak topics" },
-                      ].map((item, index) => <button key={item.id} type="button" onClick={() => {
-                        if (item.id === "quiz") setActiveSection("quiz");
-                        else if (item.id === "progress") document.querySelector(".dashboard-right-rail")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-                        else { setActiveSection("chat"); if (item.id === "understand") setQuestion(chatSuggestions[0] || ""); }
-                      }}><span>{index + 1}</span><Icon name={item.icon} size={18} /><strong>{item.label}</strong><small>{item.note}</small></button>)}
+                      ].map((item, index) => <button key={item.id} type="button" disabled={isLoading && ["understand", "progress"].includes(item.id)} onClick={() => handleLearningPath(item.id)}><span>{index + 1}</span><Icon name={item.icon} size={18} /><strong>{item.label}</strong><small>{item.note}</small></button>)}
                     </div>
                     <div className="study-welcome-actions">
                       {chatSuggestions.slice(0, 3).map((suggestion) => (
@@ -1539,6 +1561,7 @@ export default function Dashboard() {
 
             <form className="dashboard-chatgpt-form sticky-input" onSubmit={handleSubmit}>
               <input
+                id="student-chat-input"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 placeholder={t.placeholder}
