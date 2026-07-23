@@ -1297,8 +1297,46 @@ button:disabled {
 .teacher-message-actions .feedback-icon.positive { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
 .teacher-message-actions .feedback-icon.negative { border-color: #fecdd3; background: #fff1f2; color: #be123c; }
 .teacher-chat-message.error > div { background: #fef2f2; color: #b91c1c; }
-.teacher-chat-message footer { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
-.teacher-chat-message footer small { border-radius: 999px; background: #fff; color: var(--muted); padding: 4px 7px; }
+.teacher-chat-references { width: fit-content; max-width: 100%; margin-top: 8px; }
+.teacher-chat-references summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--muted);
+  padding: 4px 9px;
+  font-size: 0.72rem;
+  font-weight: 850;
+  list-style: none;
+  cursor: pointer;
+}
+.teacher-chat-references summary::-webkit-details-marker { display: none; }
+.teacher-chat-references summary span {
+  display: grid;
+  place-items: center;
+  min-width: 19px;
+  height: 19px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  font-size: 0.66rem;
+}
+.teacher-chat-references summary:hover,
+.teacher-chat-references summary:focus-visible { border-color: var(--brand); color: var(--brand-strong); }
+.teacher-chat-references > div { display: grid; gap: 5px; max-width: min(100%, 620px); margin-top: 7px; }
+.teacher-chat-references small {
+  overflow-wrap: anywhere;
+  border-left: 2px solid var(--brand);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--muted);
+  padding: 5px 8px;
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
 .teacher-chat-loading { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--muted); }
 .teacher-chat-loading .teacher-loader { width: 27px; height: 27px; margin: 0; border-width: 3px; }
 .teacher-chat-form { display: flex; align-items: flex-end; gap: 10px; border-top: 1px solid var(--line); background: #fff; padding: 14px 18px; }
@@ -6788,6 +6826,7 @@ button:active:not(:disabled) { transform: scale(0.98); }
 }
 
 @media (max-width: 820px) {
+  .teacher-chat-references summary { min-height: 44px; padding-inline: 11px; }
   .teacher-tool-chat .teacher-sidebar { padding: 6px 9px; }
   .teacher-mobile-tool-strip {
     display: flex;

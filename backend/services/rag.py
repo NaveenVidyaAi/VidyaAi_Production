@@ -363,7 +363,7 @@ def _extract_chapter_number(text: str) -> str | None:
         return ordinal_words[ordinal_match.group(1)]
 
     patterns = [
-        r"(?:chapter|अध्याय|पाठ)\s*[-:]?\s*(\d{1,2})",
+        r"(?:chapter|lesson|unit|adhyay|path|अध्याय|पाठ)\s*[-:]?\s*(\d{1,2})",
         r"class\s*\d{1,2}\s*.*?\s*(\d{1,2})\s*(?:chapter|अध्याय|पाठ)",
     ]
     for pattern in patterns:
@@ -1255,7 +1255,19 @@ def interpret_student_prompt(
         and not chapter
         and not re.search(r"\b(?:named|called|title)\b", normalized)
     )
-    must_clarify = not original or subject_only or unidentified_literature
+    known_titles = [
+        item["title"]
+        for units in (*CLASS_10_HINDI_UNITS.values(), *CLASS_10_ENGLISH_UNITS.values())
+        for item in units
+    ]
+    has_known_title = any(_normalize_for_match(title) in _normalize_for_match(original) for title in known_titles)
+    unresolved_chapter_request = bool(
+        re.search(r"\b(?:chapter|lesson|unit|adhyay|path)\b|(?:अध्याय|पाठ)", normalized)
+        and not chapter
+        and not has_known_title
+        and not result["uses_previous_context"]
+    )
+    must_clarify = not original or subject_only or unidentified_literature or unresolved_chapter_request
     if must_clarify:
         result["needs_clarification"] = True
         result["confidence"] = 0.35 if subject_only else 0.5
@@ -2248,6 +2260,21 @@ async def run_rag(
         return (
             "**एक जानकारी और चाहिए**\n\nमैं इस प्रश्न को सही textbook topic से भरोसे के साथ नहीं मिला पाया। "
             "कृपया विषय और अध्याय का नाम/क्रमांक लिखें, या पूरा प्रश्न भेजें।",
+            sources,
+            "safe-mode",
+        )
+
+    if should_retrieve and _is_chapter_style_question(question) and not has_strong_match:
+        if _detect_prompt_language(question) == "english":
+            return (
+                "**Please clarify the lesson**\n\nI could not match that lesson or chapter to a verified textbook source. "
+                "Please send its chapter number, exact title, or 2-3 lines from the lesson.",
+                sources,
+                "safe-mode",
+            )
+        return (
+            "**कृपया पाठ स्पष्ट करें**\n\nमैं इस पाठ या अध्याय को verified textbook source से नहीं मिला पाया। "
+            "कृपया अध्याय क्रमांक, सही नाम, या किताब की 2-3 पंक्तियाँ भेजें।",
             sources,
             "safe-mode",
         )

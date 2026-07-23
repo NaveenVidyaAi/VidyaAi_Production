@@ -718,6 +718,38 @@ class RAGRetrievalTests(unittest.TestCase):
         self.assertIn("कौन-सा विषय", chat._clarification_for_prompt("Maths ka", "Math", english_history))
         self.assertEqual(rag._infer_subject("General", "Bahupad"), "Math")
 
+    def test_english_lesson_number_returns_reading_choices(self):
+        options = rag.get_unit_options("General", "lesson 1 english", "10")
+
+        self.assertEqual(rag._extract_chapter_number("lesson 1 english"), "1")
+        self.assertEqual([option["section"] for option in options], ["1.1", "1.2", "1.3"])
+        self.assertEqual(
+            [option["title"] for option in options],
+            [
+                "Patriotism",
+                "How The Little Kite Learned To Fly?",
+                "A Great Moment For All Those Children",
+            ],
+        )
+
+    def test_unresolved_lesson_request_requires_clarification(self):
+        original_key = rag.settings.groq_api_key
+        rag.settings.groq_api_key = ""
+        try:
+            unresolved = rag.interpret_student_prompt("english lesson bataiye", "General", "10")
+            contextual = rag.interpret_student_prompt(
+                "is lesson ko explain karo",
+                "General",
+                "10",
+                [{"question": "English chapter 1-A Patriotism", "answer": "...", "subject": "English"}],
+            )
+        finally:
+            rag.settings.groq_api_key = original_key
+
+        self.assertTrue(unresolved["needs_clarification"])
+        self.assertFalse(contextual["needs_clarification"])
+        self.assertTrue(contextual["uses_previous_context"])
+
     def test_prompt_interpreter_handles_short_hinglish_without_llm(self):
         original_key = rag.settings.groq_api_key
         rag.settings.groq_api_key = ""

@@ -573,7 +573,12 @@ function TeacherChat({ compact = false, t, lang, question, setQuestion, subject,
             <div>
               {message.role === "assistant" ? <TeacherStreamingResponse content={message.content} animate={message.animateResponse} onProgress={followLatestOutput} /> : <RichMarkdown>{message.content}</RichMarkdown>}
               {message.chapterOptions?.length > 0 && <div className="chapter-option-list">{message.chapterOptions.map((option) => <button key={option.section} type="button" disabled={loading} onClick={() => onChapterOption(option)}><span>{option.section}</span>{option.title}</button>)}</div>}
-              {message.sources?.length > 0 && <footer>{message.sources.map((source) => <small key={source}>{source}</small>)}</footer>}
+              {message.sources?.length > 0 && (
+                <details className="teacher-chat-references">
+                  <summary><Icon name="library" size={14} />{lang === "hi" ? "संदर्भ देखें" : "View references"}<span>{new Set(message.sources).size}</span></summary>
+                  <div>{[...new Set(message.sources)].map((source) => <small key={source}>{source}</small>)}</div>
+                </details>
+              )}
             </div>
             {message.role !== "error" && <div className="teacher-message-actions">
               <button type="button" className="icon-btn copy-action" onClick={() => onCopy(message.content)} title={lang === "hi" ? "कॉपी करें" : "Copy"} aria-label={lang === "hi" ? "कॉपी करें" : "Copy"}><Icon name="copy" size={16} /></button>
