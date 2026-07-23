@@ -605,9 +605,41 @@ function AITeacherStudio({ lesson, sources, lang, onReset }) {
   const [muted, setMuted] = useState(false);
   const [rate, setRate] = useState(0.92);
   const [boardText, setBoardText] = useState("");
+  const [voices, setVoices] = useState([]);
+  const [selectedVoiceUri, setSelectedVoiceUri] = useState(() => localStorage.getItem("vidyaai_teacher_voice") || "");
+  const speechRunRef = useRef(0);
+  const activeUtteranceRef = useRef(null);
   const speechSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
   const scene = lesson.scenes[sceneIndex];
   const boardContent = scene.board_lines.join("\n");
+  const languagePrefix = lang === "hi" ? "hi" : "en";
+  const matchingVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith(languagePrefix));
+
+  const voiceScore = (voice) => {
+    const identity = `${voice.name} ${voice.voiceURI}`.toLowerCase();
+    const femaleHints = ["swara", "kalpana", "lekha", "heera", "veena", "female", "woman", "samantha", "karen", "moira", "tessa", "zira", "susan", "hazel", "google हिन्दी"];
+    const maleHints = ["madhur", "hemant", "ravi", "male", "man", "daniel", "david", "mark", "alex"];
+    let score = voice.lang.toLowerCase() === (lang === "hi" ? "hi-in" : "en-in") ? 30 : 10;
+    if (femaleHints.some((hint) => identity.includes(hint))) score += 100;
+    if (maleHints.some((hint) => identity.includes(hint))) score -= 100;
+    if (voice.localService) score += 5;
+    return score;
+  };
+  const prepareSpeechText = (text) => {
+    const cleaned = String(text || "")
+      .replace(/https?:\/\/\S+/gi, " ")
+      .replace(/[*_`#>~•●▪◦]+/g, " ")
+      .replace(/[\[\]{}()]+/g, " ")
+      .replace(/[!?！？]+/g, lang === "hi" ? "। " : ". ")
+      .replace(/[,，;；:：]+/g, " ")
+      .replace(/\.{2,}/g, lang === "hi" ? "। " : ". ")
+      .replace(/[—–-]{2,}/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return lang === "hi"
+      ? cleaned.replace(/\s*\.\s*/g, "। ").replace(/।(?:\s*।)+/g, "। ")
+      : cleaned;
+  };
 
   useEffect(() => {
     setBoardText("");
@@ -625,24 +657,71 @@ function AITeacherStudio({ lesson, sources, lang, onReset }) {
     return () => window.clearInterval(timer);
   }, [boardContent]);
 
-  useEffect(() => () => window.speechSynthesis?.cancel(), []);
+  useEffect(() => {
+    if (!speechSupported) return undefined;
+    const loadVoices = () => setVoices(window.speechSynthesis.getVoices());
+    loadVoices();
+    window.speechSynthesis.addEventListener?.("voiceschanged", loadVoices);
+    return () => window.speechSynthesis.removeEventListener?.("voiceschanged", loadVoices);
+  }, [speechSupported]);
+
+  useEffect(() => {
+    if (!matchingVoices.length) return;
+    const currentIsValid = matchingVoices.some((voice) => voice.voiceURI === selectedVoiceUri);
+    if (currentIsValid) return;
+    const preferred = [...matchingVoices].sort((a, b) => voiceScore(b) - voiceScore(a))[0];
+    setSelectedVoiceUri(preferred.voiceURI);
+    localStorage.setItem("vidyaai_teacher_voice", preferred.voiceURI);
+  }, [lang, matchingVoices.length, selectedVoiceUri]);
+
+  useEffect(() => () => {
+    speechRunRef.current += 1;
+    activeUtteranceRef.current = null;
+    window.speechSynthesis?.cancel();
+  }, []);
 
   const stop = () => {
+    speechRunRef.current += 1;
+    activeUtteranceRef.current = null;
     window.speechSynthesis?.cancel();
     setIsSpeaking(false);
   };
   const speak = () => {
     if (!window.speechSynthesis || muted) return;
     stop();
-    const utterance = new SpeechSynthesisUtterance(scene.narration);
-    utterance.lang = lang === "hi" ? "hi-IN" : "en-IN";
-    utterance.rate = rate;
-    const voices = window.speechSynthesis.getVoices();
-    utterance.voice = voices.find((voice) => voice.lang.toLowerCase().startsWith(lang === "hi" ? "hi" : "en-in")) || null;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+    const runId = ++speechRunRef.current;
+    const speechText = prepareSpeechText(scene.speech_text || scene.narration);
+    const sentences = speechText.match(/[^.!?।]+[.!?।]?/g)?.map((part) => part.trim()).filter(Boolean) || [speechText];
+    const chunks = [];
+    for (const sentence of sentences) {
+      const previous = chunks[chunks.length - 1];
+      if (previous && `${previous} ${sentence}`.length <= 220) chunks[chunks.length - 1] = `${previous} ${sentence}`;
+      else chunks.push(sentence);
+    }
+    const chosenVoice = matchingVoices.find((voice) => voice.voiceURI === selectedVoiceUri)
+      || [...matchingVoices].sort((a, b) => voiceScore(b) - voiceScore(a))[0]
+      || null;
+    const speakChunk = (index) => {
+      if (runId !== speechRunRef.current || index >= chunks.length) {
+        if (runId === speechRunRef.current) setIsSpeaking(false);
+        activeUtteranceRef.current = null;
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(chunks[index]);
+      activeUtteranceRef.current = utterance;
+      utterance.lang = lang === "hi" ? "hi-IN" : "en-IN";
+      utterance.rate = rate;
+      utterance.pitch = 1.03;
+      utterance.voice = chosenVoice;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => speakChunk(index + 1);
+      utterance.onerror = () => {
+        activeUtteranceRef.current = null;
+        setIsSpeaking(false);
+      };
+      window.speechSynthesis.speak(utterance);
+    };
+    speakChunk(0);
   };
   const goToScene = (next) => {
     stop();
@@ -690,9 +769,10 @@ function AITeacherStudio({ lesson, sources, lang, onReset }) {
       <div className="ai-teacher-caption" aria-live="polite"><Icon name="volume" size={16} /><p>{scene.narration}</p></div>
       <div className="ai-teacher-controls">
         <button type="button" onClick={() => goToScene(sceneIndex - 1)} disabled={sceneIndex === 0} aria-label={lang === "hi" ? "पिछला भाग" : "Previous scene"}><Icon name="arrowLeft" size={17} /></button>
-        <button type="button" className="ai-teacher-play" onClick={isSpeaking ? stop : speak} disabled={!speechSupported || muted} title={!speechSupported ? (lang === "hi" ? "इस ब्राउज़र में आवाज़ उपलब्ध नहीं है" : "Voice is unavailable in this browser") : ""}><Icon name={isSpeaking ? "pause" : "play"} size={18} />{isSpeaking ? (lang === "hi" ? "रोकें" : "Pause") : (lang === "hi" ? "सुनें" : "Teach")}</button>
+        <button type="button" className="ai-teacher-play" onClick={isSpeaking ? stop : speak} disabled={!speechSupported || !matchingVoices.length || muted} title={!speechSupported ? (lang === "hi" ? "इस ब्राउज़र में आवाज़ उपलब्ध नहीं है" : "Voice is unavailable in this browser") : !matchingVoices.length ? (lang === "hi" ? "इस डिवाइस में हिंदी आवाज़ उपलब्ध नहीं है" : "A matching voice is not installed on this device") : ""}><Icon name={isSpeaking ? "pause" : "play"} size={18} />{isSpeaking ? (lang === "hi" ? "रोकें" : "Pause") : (lang === "hi" ? "सुनें" : "Teach")}</button>
         <button type="button" onClick={() => goToScene(sceneIndex + 1)} disabled={sceneIndex === lesson.scenes.length - 1} aria-label={lang === "hi" ? "अगला भाग" : "Next scene"}><Icon name="arrowRight" size={17} /></button>
         <button type="button" onClick={() => { setMuted((value) => !value); stop(); }} aria-pressed={muted} aria-label={muted ? "Unmute" : "Mute"}><Icon name={muted ? "volumeOff" : "volume"} size={17} /></button>
+        {matchingVoices.length > 0 && <label className="ai-teacher-voice-select"><span>{lang === "hi" ? "आवाज़" : "Voice"}</span><select value={selectedVoiceUri} onChange={(event) => { stop(); setSelectedVoiceUri(event.target.value); localStorage.setItem("vidyaai_teacher_voice", event.target.value); }} aria-label={lang === "hi" ? "AI शिक्षिका की आवाज़ चुनें" : "Choose AI teacher voice"}>{[...matchingVoices].sort((a, b) => voiceScore(b) - voiceScore(a)).map((voice, index) => <option key={voice.voiceURI} value={voice.voiceURI}>{index === 0 ? `${voice.name} · ${lang === "hi" ? "सुझाई गई" : "Preferred"}` : voice.name}</option>)}</select></label>}
         <label><span>{lang === "hi" ? "गति" : "Speed"}</span><select value={rate} onChange={(event) => setRate(Number(event.target.value))}><option value="0.8">0.8×</option><option value="0.92">0.9×</option><option value="1.05">1×</option></select></label>
       </div>
       {sceneIndex === lesson.scenes.length - 1 && lesson.check_question && <details className="ai-teacher-check"><summary>{lang === "hi" ? "समझ जाँच प्रश्न" : "Check understanding"}</summary><p>{lesson.check_question}</p><small>{lesson.check_answer}</small></details>}
