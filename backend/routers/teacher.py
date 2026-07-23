@@ -119,6 +119,10 @@ class LessonGuideRequest(BaseModel):
     teacher_notes: str = Field(default="", max_length=1500)
 
 
+class AITeacherRequest(LessonGuideRequest):
+    chapter_id: str = Field(default="", max_length=120)
+
+
 async def require_teacher(current_user=Depends(get_current_student)):
     if getattr(current_user, "role", "student") != "teacher":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Teacher access required")
@@ -1045,6 +1049,100 @@ Return polished Markdown only. Make it classroom-ready, specific, inclusive, and
     return fallback
 
 
+def _generate_ai_teacher_lesson(payload: AITeacherRequest, context: str) -> dict:
+    if not settings.groq_api_key:
+        raise HTTPException(status_code=503, detail="AI Teacher requires GROQ_API_KEY.")
+    language = "natural Devanagari Hindi" if payload.medium == "Hindi" else "clear English" if payload.medium == "English" else "natural Hindi with essential English terms"
+    prompt = f"""Create a short interactive AI-teacher lesson using ONLY the verified textbook evidence below.
+
+Class: {payload.class_level}
+Subject: {payload.subject}
+Chapter: {payload.chapter_or_topic}
+Medium: {payload.medium} ({language})
+Student level: {payload.student_level}
+Teacher note: {payload.teacher_notes or 'None'}
+
+Return strict JSON only:
+{{
+  "title": "lesson title",
+  "objective": "one measurable objective",
+  "duration_minutes": 6,
+  "scenes": [
+    {{
+      "title": "short scene title",
+      "narration": "40-90 spoken words in a warm teaching style",
+      "board_lines": ["short heading", "key point", "example/equation"],
+      "teacher_action": "point|explain|question|recap"
+    }}
+  ],
+  "check_question": "one oral understanding-check question",
+  "check_answer": "concise expected answer"
+}}
+
+Rules:
+- Return 3 to 6 scenes and keep the total narration under 500 words.
+- Narration and board writing must agree exactly.
+- Introduce, explain, demonstrate, then recap/check.
+- Never add a chapter fact absent from the evidence.
+- Board lines must be concise and readable, maximum 5 lines per scene.
+- Do not include Markdown fences or citations inside narration.
+
+VERIFIED TEXTBOOK EVIDENCE
+{context[:14000]}"""
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"},
+            json={
+                "model": settings.groq_paper_model or settings.groq_model,
+                "messages": [
+                    {"role": "system", "content": "You create concise, source-grounded classroom teaching scenes. Return valid JSON only."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.18,
+                "max_tokens": 2600,
+                "response_format": {"type": "json_object"},
+            },
+            timeout=90,
+        )
+    except requests.RequestException:
+        raise HTTPException(status_code=502, detail="AI Teacher provider is temporarily unavailable. Please try again.")
+    if response.status_code != 200:
+        raise HTTPException(status_code=502, detail="AI Teacher lesson generation failed. Please try again.")
+    raw = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+    try:
+        lesson = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        raise HTTPException(status_code=502, detail="AI Teacher returned an incomplete lesson. Please regenerate.")
+    scenes = lesson.get("scenes")
+    if not isinstance(scenes, list) or not 3 <= len(scenes) <= 6:
+        raise HTTPException(status_code=502, detail="AI Teacher lesson structure was incomplete. Please regenerate.")
+    clean_scenes = []
+    for scene in scenes:
+        narration = str(scene.get("narration", "")).strip()
+        board_lines = [str(line).strip() for line in scene.get("board_lines", []) if str(line).strip()][:5]
+        if len(narration) < 30 or not board_lines:
+            raise HTTPException(status_code=502, detail="AI Teacher generated an incomplete scene. Please regenerate.")
+        clean_scenes.append({
+            "title": str(scene.get("title", "")).strip() or "Lesson",
+            "narration": narration[:1600],
+            "board_lines": board_lines,
+            "teacher_action": str(scene.get("teacher_action", "explain")).strip(),
+        })
+    try:
+        duration = int(lesson.get("duration_minutes", 6))
+    except (TypeError, ValueError):
+        duration = 6
+    return {
+        "title": str(lesson.get("title", payload.chapter_or_topic)).strip(),
+        "objective": str(lesson.get("objective", "")).strip(),
+        "duration_minutes": min(10, max(3, duration)),
+        "scenes": clean_scenes,
+        "check_question": str(lesson.get("check_question", "")).strip(),
+        "check_answer": str(lesson.get("check_answer", "")).strip(),
+    }
+
+
 def _curriculum_items(payload: CurriculumRequest) -> tuple[list[str], list[str]]:
     """Keep teacher-entered chapter names intact and supply official Class 10 scope when blank."""
     chapters = [
@@ -1565,3 +1663,32 @@ async def create_lesson_guide(payload: LessonGuideRequest, teacher=Depends(requi
     )
     content = await asyncio.to_thread(_generate_content, task=task, details=details, context=context, fallback=fallback)
     return {"content": content, "sources": sources, "type": "lesson-guide"}
+
+
+@router.post("/ai-teacher")
+async def create_ai_teacher(payload: AITeacherRequest, teacher=Depends(require_teacher)):
+    chapter_options = {option["id"]: option for option in _chapter_options(payload.subject, payload.class_level)}
+    selected = chapter_options.get(payload.chapter_id)
+    if not selected:
+        raise HTTPException(status_code=422, detail="Select a valid chapter before generating the AI lesson.")
+    query = selected.get("retrieval_query") or f"Class {payload.class_level} {payload.subject} {payload.chapter_or_topic}"
+    context, sources = _grounding_context(
+        class_level=payload.class_level,
+        subject=payload.subject,
+        query=query,
+        chapter_hint=selected.get("chapter_hint"),
+        section_hint=selected.get("section_hint"),
+        infer_chapter_hint=False,
+        result_limit=10,
+        document_type_boosts={
+            "textbook": 12.0,
+            "teacher_guide": 8.0,
+            "learning_outcome": 4.0,
+            "curriculum": 3.0,
+            "previous_year_question": 0.5,
+        },
+    )
+    if not context.strip():
+        raise HTTPException(status_code=422, detail="Verified RAG context was not found for this chapter. AI Teacher will not guess.")
+    lesson = await asyncio.to_thread(_generate_ai_teacher_lesson, payload, context)
+    return {"lesson": lesson, "sources": list(dict.fromkeys(sources)), "type": "ai-teacher"}

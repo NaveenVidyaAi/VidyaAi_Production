@@ -1337,6 +1337,237 @@ button:disabled {
   font-size: 0.7rem;
   line-height: 1.35;
 }
+
+/* AI Teacher classroom */
+.ai-teacher-workspace { grid-template-columns: minmax(0, 1fr); }
+.ai-teacher-workspace:not(.has-lesson) { max-width: 920px; margin-inline: auto; }
+.ai-teacher-form { position: relative; overflow: hidden; }
+.ai-teacher-form::before { content: ""; position: absolute; width: 220px; height: 220px; top: -110px; right: -80px; border-radius: 50%; background: radial-gradient(circle, rgba(124,58,237,.16), transparent 68%); pointer-events: none; }
+.ai-teacher-pipeline { display: grid; grid-template-columns: 1fr 30px 1fr 30px 1fr; align-items: center; gap: 7px; margin: 18px 0 22px; }
+.ai-teacher-pipeline span { display: flex; align-items: center; gap: 8px; min-height: 44px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); padding: 7px 10px; color: var(--muted); font-size: .75rem; font-weight: 850; }
+.ai-teacher-pipeline b { display: grid; place-items: center; flex: 0 0 25px; width: 25px; height: 25px; border-radius: 8px; background: var(--brand-soft); color: var(--brand-strong); }
+.ai-teacher-pipeline i { height: 1px; background: linear-gradient(90deg, var(--line-strong), var(--brand)); }
+.ai-teacher-generate { display: inline-flex; align-items: center; justify-content: center; gap: 9px; }
+.ai-teacher-loading-note { margin-top: 9px; color: var(--muted); font-size: .78rem; text-align: center; }
+.ai-teacher-studio { display: grid; gap: 14px; min-width: 0; border: 1px solid rgba(15,118,110,.18); border-radius: 24px; background: linear-gradient(150deg, #f5fffd, #f6f3ff 56%, #edf8ff); padding: 20px; box-shadow: 0 22px 60px rgba(15,78,74,.12); }
+.ai-teacher-studio-head { display: flex; align-items: center; gap: 18px; }
+.ai-teacher-studio-head > div { flex: 1; min-width: 0; }
+.ai-teacher-studio-head span { display: inline-flex; align-items: center; gap: 6px; color: var(--brand-strong); font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+.ai-teacher-studio-head h2 { margin: 5px 0 3px; color: var(--ink); font-size: clamp(1.2rem, 2vw, 1.65rem); }
+.ai-teacher-studio-head p { margin: 0; color: var(--muted); font-size: .85rem; }
+.ai-teacher-studio-head button { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; border: 1px solid var(--line-strong); border-radius: 12px; background: #fff; color: var(--brand-strong); padding: 8px 12px; font-weight: 850; cursor: pointer; }
+.ai-classroom { display: grid; grid-template-columns: minmax(180px, .42fr) minmax(360px, 1fr); gap: 16px; min-height: 390px; border-radius: 20px; background: linear-gradient(180deg, #dff7f4 0 72%, #d4b48f 72%); padding: 20px 20px 0; overflow: hidden; }
+.ai-teacher-avatar { position: relative; align-self: end; display: grid; justify-items: center; min-height: 340px; filter: drop-shadow(0 13px 12px rgba(28,67,63,.16)); }
+.ai-teacher-avatar.speaking { animation: ai-teacher-breathe 2.6s ease-in-out infinite; }
+.ai-avatar-aura { position: absolute; z-index: 0; top: 12px; width: 205px; height: 205px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.96), rgba(45,212,191,.13) 56%, transparent 73%); }
+.ai-avatar-head { position: relative; z-index: 4; width: 116px; height: 136px; border: 2px solid #68463b; border-radius: 47% 47% 43% 43%; background: linear-gradient(135deg, #d88e68 5%, #f3b891 47%, #d98e69 100%); box-shadow: inset -10px -8px rgba(120,55,36,.08), inset 8px 5px rgba(255,224,204,.15), 0 7px 10px rgba(70,42,35,.14); }
+.ai-avatar-head .hair-bun { position: absolute; z-index: -2; top: -34px; right: -8px; width: 54px; height: 54px; border: 3px solid #17191b; border-radius: 50% 50% 46% 54%; background: radial-gradient(circle at 35% 30%, #4b3b3a, #211d20 62%); box-shadow: inset -6px -5px rgba(0,0,0,.2), 0 5px 8px rgba(48,31,29,.2); }
+.ai-avatar-head .hair-bun::after { content: ""; position: absolute; inset: 9px; border: 2px solid rgba(255,255,255,.1); border-radius: 50%; }
+.ai-avatar-head .ear { position: absolute; z-index: -1; top: 57px; width: 20px; height: 31px; border: 2px solid #774b3c; background: #dda07b; border-radius: 50%; }
+.ai-avatar-head .ear.left { left: -13px; }.ai-avatar-head .ear.right { right: -13px; }
+.ai-avatar-head .earring { position: absolute; z-index: 5; top: 82px; width: 9px; height: 15px; border: 2px solid #d99a18; border-radius: 50%; background: #ffe38b; box-shadow: 0 2px 3px rgba(90,55,0,.2); }
+.ai-avatar-head .earring.left { left: -9px; }.ai-avatar-head .earring.right { right: -9px; }
+.ai-avatar-head .hair { position: absolute; inset: -7px -5px auto; height: 52px; border-radius: 58% 48% 37% 23%; background: linear-gradient(145deg, #17191b, #3d3332); transform: rotate(-2deg); box-shadow: inset 10px 7px rgba(255,255,255,.05); }
+.ai-avatar-head .hair::after { content: ""; position: absolute; left: 13px; bottom: -8px; width: 38px; height: 20px; border-radius: 60% 0 60% 0; background: #252224; transform: rotate(-13deg); }
+.ai-avatar-head .hair-side { position: absolute; z-index: -1; top: 27px; width: 14px; height: 45px; background: #292426; }
+.ai-avatar-head .hair-side.left { left: -1px; border-radius: 8px 0 8px 8px; }.ai-avatar-head .hair-side.right { right: -1px; border-radius: 0 8px 8px 8px; }
+.ai-avatar-head .bindi { position: absolute; z-index: 4; top: 45px; left: 54px; width: 7px; height: 8px; border-radius: 50% 50% 46% 46%; background: #9f1239; box-shadow: 0 1px 2px rgba(86,8,36,.25); }
+.ai-avatar-head .brow { position: absolute; top: 54px; width: 20px; height: 5px; border-top: 3px solid #47302c; border-radius: 50%; }
+.ai-avatar-head .brow.left { left: 22px; transform: rotate(-5deg); }.ai-avatar-head .brow.right { right: 22px; transform: rotate(5deg); }
+.ai-avatar-head .eye { position: absolute; z-index: 2; top: 65px; width: 8px; height: 8px; border: 2px solid #fff; border-radius: 50%; background: #302627; box-shadow: 0 0 0 1px #302627; animation: ai-blink 5s infinite; }
+.ai-avatar-head .eye.left { left: 29px; }.ai-avatar-head .eye.right { right: 29px; }
+.ai-avatar-head .glasses { position: absolute; z-index: 3; top: 57px; width: 37px; height: 27px; border: 3px solid #294e55; border-radius: 11px 11px 14px 14px; background: linear-gradient(135deg, rgba(255,255,255,.25), transparent 50%); }
+.ai-avatar-head .glasses.left { left: 10px; }.ai-avatar-head .glasses.right { right: 10px; }
+.ai-avatar-head .glasses-bridge { position: absolute; z-index: 3; top: 67px; left: 46px; width: 20px; border-top: 3px solid #294e55; }
+.ai-avatar-head .nose { position: absolute; top: 75px; left: 53px; width: 10px; height: 17px; border-right: 2px solid rgba(112,54,39,.48); border-bottom: 2px solid rgba(112,54,39,.48); border-radius: 0 0 7px; transform: skew(-5deg); }
+.ai-avatar-head .cheek { position: absolute; top: 88px; width: 17px; height: 8px; border-radius: 50%; background: rgba(201,76,74,.14); filter: blur(1px); }
+.ai-avatar-head .cheek.left { left: 15px; }.ai-avatar-head .cheek.right { right: 15px; }
+.ai-avatar-head .mouth { position: absolute; left: 50%; bottom: 22px; width: 27px; height: 9px; overflow: hidden; border: 2px solid #873e47; border-top: 0; border-radius: 0 0 50% 50%; background: #fff5ee; transform: translateX(-50%); }
+.ai-avatar-head .mouth span { position: absolute; bottom: -2px; left: 5px; width: 16px; height: 5px; border-radius: 50% 50% 0 0; background: #dc7580; }
+.ai-teacher-avatar.speaking .mouth { height: 15px; border: 3px solid #7c2d38; border-radius: 45%; background: #56202b; animation: ai-mouth .2s infinite alternate; }
+.ai-avatar-neck { position: relative; z-index: 2; width: 43px; height: 31px; margin-top: -6px; border-inline: 1px solid rgba(91,46,35,.35); background: linear-gradient(90deg, #ce8563, #e4a17b 55%, #c77e5f); }
+.ai-avatar-neck::after { content: ""; position: absolute; inset: auto -12px -4px; height: 14px; border-radius: 50%; background: rgba(96,47,37,.12); }
+.ai-avatar-body { position: relative; z-index: 1; width: 186px; height: 180px; border-radius: 58px 58px 0 0; background: linear-gradient(125deg, #15958a, #0f766e 48%, #164e63); box-shadow: inset -20px 0 rgba(0,0,0,.08), inset 12px 0 rgba(255,255,255,.06); }
+.ai-avatar-body b { position: absolute; top: 55px; left: 50%; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid rgba(255,255,255,.25); border-radius: 11px; background: rgba(255,255,255,.14); color: #fff; transform: translateX(-50%); }
+.ai-avatar-body .collar { position: absolute; top: 0; width: 58px; height: 45px; background: #fff; }
+.ai-avatar-body .collar.left { left: 35px; clip-path: polygon(0 0,100% 0,70% 100%); }
+.ai-avatar-body .collar.right { right: 35px; clip-path: polygon(0 0,100% 0,30% 100%); }
+.ai-avatar-body .dupatta { position: absolute; z-index: 2; top: 3px; width: 28px; height: 177px; background: linear-gradient(180deg, #f8c95c, #ea8c3c); box-shadow: inset 5px 0 rgba(255,255,255,.16); }
+.ai-avatar-body .dupatta.left { left: 18px; border-radius: 22px 5px 0 0; transform: rotate(5deg); transform-origin: top; }
+.ai-avatar-body .dupatta.right { right: 18px; border-radius: 5px 22px 0 0; transform: rotate(-5deg); transform-origin: top; }
+.ai-avatar-body .shirt-placket { position: absolute; top: 35px; bottom: 0; left: 50%; width: 2px; background: rgba(255,255,255,.12); }
+.ai-avatar-body .shirt-button { position: absolute; left: calc(50% - 3px); width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.7); }
+.ai-avatar-body .shirt-button.one { top: 101px; }.ai-avatar-body .shirt-button.two { top: 128px; }
+.ai-avatar-arm { position: absolute; z-index: 3; top: 193px; width: 108px; height: 29px; border-radius: 18px; background: linear-gradient(180deg, #168a81, #0d6965); transform-origin: 15px center; transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+.ai-avatar-arm.resting { left: 10px; z-index: 0; transform: rotate(72deg); }
+.ai-avatar-arm.teaching { right: -6px; transform: rotate(-19deg); }
+.ai-avatar-hand { position: absolute; right: -20px; top: -2px; width: 34px; height: 32px; border: 1px solid rgba(101,48,34,.4); border-radius: 48% 55% 48% 50%; background: linear-gradient(135deg, #ebb08c, #cf825f); }
+.ai-avatar-hand i { position: absolute; right: -10px; width: 20px; height: 5px; border: 1px solid rgba(101,48,34,.3); border-radius: 5px; background: #dc9672; transform-origin: left center; }
+.ai-avatar-hand i:nth-child(1) { top: 3px; transform: rotate(-21deg); }.ai-avatar-hand i:nth-child(2) { top: 11px; transform: rotate(-7deg); }.ai-avatar-hand i:nth-child(3) { top: 20px; transform: rotate(9deg); }
+.ai-avatar-arm.resting .ai-avatar-hand { transform: rotate(-15deg); }
+.ai-pointer { position: absolute; right: -91px; top: 12px; width: 90px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, #815c3c, #d8bd86); transform-origin: left center; }
+.ai-pointer::after { content: ""; position: absolute; right: -3px; top: -2px; width: 7px; height: 7px; border-radius: 50%; background: #f7e6bc; }
+.ai-teacher-avatar.action-question .ai-avatar-arm.teaching { transform: rotate(-42deg); }
+.ai-teacher-avatar.action-explain .ai-avatar-arm.teaching, .ai-teacher-avatar.action-write .ai-avatar-arm.teaching { animation: ai-teacher-gesture 2.4s ease-in-out infinite; }
+.ai-voice-state { position: absolute; z-index: 5; bottom: 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; background: rgba(4,47,46,.82); color: #fff; padding: 6px 10px; font-size: .7rem; font-weight: 850; }
+.ai-voice-state > span { width: 7px; height: 7px; border-radius: 50%; background: #5eead4; box-shadow: 0 0 0 4px rgba(94,234,212,.15); }
+.ai-teacher-avatar.speaking .ai-voice-state > span { animation: ai-pulse 1s infinite; }
+.ai-teacher-board { position: relative; align-self: center; min-height: 320px; border: 10px solid #8d5b3d; border-radius: 12px; background: radial-gradient(circle at 70% 20%, rgba(255,255,255,.05), transparent 28%), #173f37; color: #f8faf0; box-shadow: inset 0 0 40px rgba(0,0,0,.28), 0 12px 22px rgba(50,34,22,.18); }
+.board-top { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(255,255,255,.13); padding: 12px 15px; color: #fef3c7; font-weight: 850; }
+.board-top small { border-radius: 999px; background: rgba(255,255,255,.11); padding: 3px 8px; }
+.ai-teacher-board pre { margin: 0; padding: 22px 24px 34px; color: #fff; font-family: "Noto Sans Devanagari", "Segoe UI", sans-serif; font-size: clamp(1rem, 2vw, 1.35rem); font-weight: 650; line-height: 1.8; white-space: pre-wrap; }
+.ai-teacher-board pre i { display: inline-block; width: 2px; height: 1em; margin-left: 3px; background: #fef3c7; vertical-align: -.12em; animation: ai-cursor .8s steps(1) infinite; }
+.board-tray { position: absolute; right: 20px; bottom: -15px; display: flex; gap: 6px; width: 100px; height: 10px; border-radius: 2px; background: #75472f; padding: 3px 8px; }
+.board-tray span { width: 22px; height: 5px; border-radius: 3px; background: #fff; }
+.board-tray span:nth-child(2) { background: #fca5a5; }
+.board-tray span:nth-child(3) { background: #93c5fd; }
+.ai-teacher-caption { display: flex; align-items: flex-start; gap: 9px; border: 1px solid rgba(15,118,110,.15); border-radius: 14px; background: rgba(255,255,255,.82); padding: 11px 13px; color: var(--text); }
+.ai-teacher-caption svg { flex: 0 0 auto; margin-top: 3px; color: var(--brand); }
+.ai-teacher-caption p { margin: 0; font-size: .88rem; line-height: 1.55; }
+.ai-teacher-controls { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.ai-teacher-controls button, .ai-teacher-controls select { min-height: 44px; border: 1px solid var(--line-strong); border-radius: 12px; background: #fff; color: var(--text); padding: 8px 12px; font-weight: 850; cursor: pointer; }
+.ai-teacher-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.ai-teacher-controls button:disabled { opacity: .42; cursor: not-allowed; }
+.ai-teacher-controls .ai-teacher-play { min-width: 118px; border-color: transparent; background: linear-gradient(135deg, #0f766e, #0891b2); color: #fff; box-shadow: 0 8px 18px rgba(15,118,110,.2); }
+.ai-teacher-controls label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: .72rem; font-weight: 850; }
+.ai-teacher-check, .ai-teacher-sources { border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.72); padding: 9px 12px; }
+.ai-teacher-check summary, .ai-teacher-sources summary { display: flex; align-items: center; min-height: 44px; color: var(--brand-strong); font-size: .8rem; font-weight: 900; cursor: pointer; }
+.ai-teacher-check p { margin: 9px 0 4px; font-weight: 750; }
+.ai-teacher-check small { color: var(--muted); }
+.ai-teacher-sources summary span { border-radius: 999px; background: var(--brand-soft); padding: 2px 7px; }
+.ai-teacher-sources > div { display: grid; gap: 5px; margin-top: 8px; }
+.ai-teacher-sources small { overflow-wrap: anywhere; color: var(--muted); }
+@keyframes ai-mouth { from { transform: translateX(-50%) scaleY(.55); } to { transform: translateX(-50%) scaleY(1.15); } }
+@keyframes ai-blink { 0%,47%,50%,100% { transform: scaleY(1); } 48%,49% { transform: scaleY(.08); } }
+@keyframes ai-pulse { 50% { box-shadow: 0 0 0 8px rgba(94,234,212,0); } }
+@keyframes ai-cursor { 50% { opacity: 0; } }
+@keyframes ai-teacher-breathe { 0%,100% { transform: translateY(0); } 50% { transform: translateY(2px); } }
+@keyframes ai-teacher-gesture { 0%,100% { transform: rotate(-19deg); } 45% { transform: rotate(-28deg); } 70% { transform: rotate(-15deg); } }
+
+@media (max-width: 760px) {
+  .ai-teacher-studio { border-radius: 18px; padding: 12px; }
+  .ai-teacher-studio-head { align-items: flex-start; }
+  .ai-teacher-studio-head button { flex: 0 0 auto; font-size: 0; padding: 10px; }
+  .ai-classroom { grid-template-columns: 100px minmax(0, 1fr); min-height: 300px; padding: 12px 10px 0; }
+  .ai-teacher-avatar { min-height: 245px; transform: scale(.72); transform-origin: bottom center; margin-inline: -35px; }
+  .ai-teacher-board { min-height: 255px; border-width: 7px; }
+  .ai-teacher-board pre { padding: 15px 14px 28px; font-size: .9rem; line-height: 1.65; }
+  .board-top { padding: 9px 10px; font-size: .76rem; }
+  .ai-teacher-controls { flex-wrap: wrap; }
+  .ai-teacher-controls label { width: 100%; justify-content: center; }
+  .ai-teacher-pipeline { grid-template-columns: 1fr; }
+  .ai-teacher-pipeline i { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-teacher-avatar *, .ai-teacher-board pre i { animation: none !important; }
+}
+
+/* Teacher home — primary product launcher */
+.teacher-hero-tools { margin-top: 18px; }
+.teacher-hero-tools .teacher-tool-card {
+  position: relative;
+  min-height: 248px;
+  overflow: hidden;
+  border-color: rgba(15,118,110,.14);
+  background: linear-gradient(155deg, rgba(255,255,255,.96), rgba(240,253,250,.82));
+  box-shadow: 0 16px 36px rgba(15,78,74,.1);
+}
+.teacher-hero-tools .teacher-tool-card::after {
+  content: "";
+  position: absolute;
+  right: -48px;
+  bottom: -62px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: rgba(45,212,191,.08);
+  pointer-events: none;
+}
+.teacher-hero-tools .lesson-card {
+  border-color: rgba(217,119,6,.2);
+  background: linear-gradient(150deg, #fffdf7, #fff7e8);
+}
+.teacher-hero-tools .chat-card {
+  border-color: rgba(8,145,178,.2);
+  background: linear-gradient(150deg, #f8feff, #eaf9fd);
+}
+.teacher-tool-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.teacher-hero-tools .chat-card .teacher-tool-icon { background: #dff6fb; color: #0369a1; }
+.teacher-feature-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border-radius: 999px;
+  background: #fff0cb;
+  color: #92400e;
+  padding: 4px 10px;
+  font-size: .68rem;
+  font-weight: 950;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.teacher-hero-tools .teacher-tool-card button {
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border-radius: 12px;
+  background: #0f766e;
+  color: #fff;
+  padding: 10px 14px;
+  box-shadow: 0 8px 18px rgba(15,118,110,.16);
+}
+.teacher-hero-tools .lesson-card button { background: linear-gradient(135deg, #b45309, #ea8a13); }
+.teacher-hero-tools .chat-card button { background: linear-gradient(135deg, #0369a1, #0891b2); }
+.teacher-more-tools {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) repeat(2, minmax(180px, .65fr));
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  border: 1px solid rgba(15,118,110,.13);
+  border-radius: 16px;
+  background: rgba(255,255,255,.62);
+  padding: 12px;
+  box-shadow: var(--shadow-soft);
+}
+.teacher-more-tools > div { display: grid; gap: 2px; padding: 4px 8px; }
+.teacher-more-tools > div span { color: var(--ink); font-size: .84rem; font-weight: 950; }
+.teacher-more-tools > div small { color: var(--muted); font-size: .72rem; }
+.teacher-more-tools button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 48px;
+  border: 1px solid rgba(15,118,110,.13);
+  border-radius: 12px;
+  background: rgba(255,255,255,.8);
+  color: var(--brand-strong);
+  padding: 9px 12px;
+  text-align: left;
+  font-weight: 850;
+  cursor: pointer;
+}
+.teacher-more-tools button:hover { border-color: rgba(15,118,110,.32); background: #fff; }
+
+@media (max-width: 760px) {
+  .teacher-hero-tools { grid-template-columns: 1fr; }
+  .teacher-hero-tools .teacher-tool-card { min-height: 0; padding: 18px; }
+  .teacher-hero-tools .teacher-tool-card p { margin-bottom: 14px; }
+  .teacher-hero-tools .teacher-tool-card button { width: 100%; margin-top: 0; }
+  .teacher-more-tools { grid-template-columns: 1fr 1fr; }
+  .teacher-more-tools > div { grid-column: 1 / -1; }
+}
+
+@media (max-width: 430px) {
+  .teacher-more-tools { grid-template-columns: 1fr; }
+  .teacher-more-tools > div { grid-column: auto; }
+}
+
 .teacher-chat-loading { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--muted); }
 .teacher-chat-loading .teacher-loader { width: 27px; height: 27px; margin: 0; border-width: 3px; }
 .teacher-chat-form { display: flex; align-items: flex-end; gap: 10px; border-top: 1px solid var(--line); background: #fff; padding: 14px 18px; }

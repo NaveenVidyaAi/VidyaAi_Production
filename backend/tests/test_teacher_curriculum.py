@@ -1,12 +1,15 @@
 import unittest
+import json
 
 import backend.routers.teacher as teacher_module
 
 from backend.routers.teacher import (
+    AITeacherRequest,
     CurriculumRequest,
     _curriculum_items,
     _curriculum_validation_errors,
     _generate_curriculum_plan,
+    _generate_ai_teacher_lesson,
     _structured_curriculum_fallback,
 )
 
@@ -107,6 +110,45 @@ class TeacherCurriculumTests(unittest.TestCase):
 
         self.assertTrue(any("placeholder" in error for error in errors))
         self.assertTrue(any("week table" in error for error in errors))
+
+    def test_ai_teacher_builds_valid_grounded_scenes(self):
+        payload = AITeacherRequest(
+            class_level="10",
+            subject="Science",
+            chapter_id="science-2",
+            chapter_or_topic="2: अम्ल, क्षारक एवं लवण",
+            medium="Hindi",
+        )
+        original_post = teacher_module.requests.post
+        original_key = teacher_module.settings.groq_api_key
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"choices": [{"message": {"content": json.dumps({
+                    "title": "अम्ल, क्षारक एवं लवण",
+                    "objective": "विद्यार्थी अम्ल और क्षारक में अंतर बताएँगे।",
+                    "duration_minutes": 6,
+                    "scenes": [
+                        {"title": f"भाग {index}", "narration": "आज हम सत्यापित पाठ्यपुस्तक संदर्भ से अम्ल और क्षारक को सरल उदाहरण के साथ समझेंगे।", "board_lines": ["अम्ल एवं क्षारक", f"मुख्य बिंदु {index}"], "teacher_action": "explain"}
+                        for index in range(1, 4)
+                    ],
+                    "check_question": "अम्ल और क्षारक में एक अंतर क्या है?",
+                    "check_answer": "उनके गुण अलग होते हैं।",
+                }, ensure_ascii=False)}}]}
+
+        teacher_module.settings.groq_api_key = "test-key"
+        teacher_module.requests.post = lambda *args, **kwargs: FakeResponse()
+        try:
+            lesson = _generate_ai_teacher_lesson(payload, "Verified chapter evidence")
+        finally:
+            teacher_module.requests.post = original_post
+            teacher_module.settings.groq_api_key = original_key
+
+        self.assertEqual(len(lesson["scenes"]), 3)
+        self.assertEqual(lesson["duration_minutes"], 6)
+        self.assertIn("अम्ल", lesson["title"])
 
 
 if __name__ == "__main__":

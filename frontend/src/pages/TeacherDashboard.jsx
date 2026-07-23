@@ -56,7 +56,7 @@ function serializePaperSections(sections) {
 
 const copy = {
   en: {
-    nav: { home: "Overview", curriculum: "Curriculum Creator", paper: "Test & Paper Creator", lesson: "How to Teach", chat: "AI Chat", pyq: "PYQ Library" },
+    nav: { home: "Overview", curriculum: "Curriculum Creator", paper: "AI Paper Creator", lesson: "AI Teacher", chat: "AI Chat", pyq: "PYQ Library" },
     shared: "Teaching resources",
     ask: "Ask VidyaAI",
     chatWelcome: "Ask about a concept, lesson strategy, classroom activity, or student doubt.",
@@ -79,11 +79,12 @@ const copy = {
     subject: "Subject",
     classLabel: "Class",
     medium: "Medium",
-    hero: { kicker: "Good preparation creates a great classroom", title: "What would you like to prepare today?", text: "Plan your syllabus, build an assessment, prepare tomorrow's lesson, or ask VidyaAI from one focused workspace.", stat: "AI teacher tools", statNote: "including Chat & PYQ" },
+    hero: { kicker: "YOUR AI CLASSROOM WORKSPACE", title: "Ask, assess, or teach with VidyaAI", text: "Start with one of VidyaAI's three most powerful classroom tools.", stat: "hero AI tools", statNote: "ready in one tap" },
     cards: {
       curriculum: { title: "Curriculum Creator", text: "Build a week-wise scope, outcomes, activities, assessments, and revision plan.", action: "Plan curriculum" },
-      paper: { title: "Test & Paper Creator", text: "Set marks, questions, duration, difficulty, syllabus, answer key, and marking scheme.", action: "Create a paper" },
-      lesson: { title: "How to Teach", text: "Learn the topic before class and receive a minute-by-minute teaching strategy.", action: "Prepare a lesson" },
+      paper: { title: "AI Paper Creator", text: "Generate a balanced paper, edit every question, add your own questions, and download it instantly.", action: "Create a paper" },
+      lesson: { title: "AI Teacher", text: "Turn a verified textbook chapter into an animated, voice-led lesson with synchronized board work.", action: "Generate AI Teacher" },
+      chat: { title: "AI Chat", text: "Ask in Hindi, English, or Hinglish and get curriculum-grounded explanations and teaching support.", action: "Start AI Chat" },
     },
     recent: { title: "Recent resources", note: "Resources are kept in this browser for quick access.", empty: "Your generated curricula, papers, and teaching guides will appear here.", curriculum: "Curriculum", paper: "Test paper", lesson: "Teaching guide" },
     insights: { title: "Teacher pulse", note: "Your preparation activity", resources: "Resources", activeDays: "Active days", curricula: "Curricula", papers: "Papers", recent: "Recent activity", noRecent: "Create your first resource to start the activity timeline.", quick: "Quick create", lastActive: "Last active" },
@@ -98,7 +99,7 @@ const copy = {
     subjectNames: { Hindi: "Hindi", English: "English", Math: "Math", Science: "Science", "Social Science": "Social Science", Sanskrit: "Sanskrit" },
   },
   hi: {
-    nav: { home: "अवलोकन", curriculum: "पाठ्यक्रम निर्माता", paper: "टेस्ट एवं पेपर", lesson: "कैसे पढ़ाएँ", chat: "AI चैट", pyq: "PYQ लाइब्रेरी" },
+    nav: { home: "अवलोकन", curriculum: "पाठ्यक्रम निर्माता", paper: "AI पेपर निर्माता", lesson: "AI शिक्षिका", chat: "AI चैट", pyq: "PYQ लाइब्रेरी" },
     shared: "शिक्षण संसाधन",
     ask: "VidyaAI से पूछें",
     chatWelcome: "किसी अवधारणा, पाठ योजना, कक्षा गतिविधि या विद्यार्थी के संदेह के बारे में पूछें।",
@@ -121,11 +122,12 @@ const copy = {
     subject: "विषय",
     classLabel: "कक्षा",
     medium: "माध्यम",
-    hero: { kicker: "अच्छी तैयारी से बनती है बेहतरीन कक्षा", title: "आज आप क्या तैयार करना चाहेंगे?", text: "एक ही कार्यक्षेत्र में पाठ्यक्रम बनाएँ, मूल्यांकन तैयार करें, कल का पाठ समझें या VidyaAI से पूछें।", stat: "AI शिक्षक टूल", statNote: "चैट और PYQ सहित" },
+    hero: { kicker: "आपका AI कक्षा कार्यक्षेत्र", title: "VidyaAI के साथ पूछें, जाँचें या पढ़ाएँ", text: "VidyaAI के तीन सबसे शक्तिशाली कक्षा टूल में से किसी एक से शुरू करें।", stat: "मुख्य AI टूल", statNote: "एक टैप में तैयार" },
     cards: {
       curriculum: { title: "पाठ्यक्रम निर्माता", text: "सप्ताहवार विषय, परिणाम, गतिविधियाँ, मूल्यांकन और पुनरावृत्ति योजना बनाएँ।", action: "पाठ्यक्रम बनाएँ" },
-      paper: { title: "टेस्ट एवं पेपर निर्माता", text: "अंक, प्रश्न, समय, कठिनाई, पाठ्यक्रम, उत्तर कुंजी और अंक योजना तय करें।", action: "पेपर बनाएँ" },
-      lesson: { title: "कैसे पढ़ाएँ", text: "कक्षा से पहले विषय समझें और मिनट-दर-मिनट शिक्षण रणनीति पाएँ।", action: "पाठ तैयार करें" },
+      paper: { title: "AI पेपर निर्माता", text: "संतुलित पेपर बनाएँ, हर प्रश्न संपादित करें, अपने प्रश्न जोड़ें और तुरंत डाउनलोड करें।", action: "पेपर बनाएँ" },
+      lesson: { title: "AI शिक्षिका", text: "सत्यापित पाठ्यपुस्तक अध्याय को आवाज़, एनिमेशन और बोर्ड लेखन वाले पाठ में बदलें।", action: "AI शिक्षिका बनाएँ" },
+      chat: { title: "AI चैट", text: "हिंदी, अंग्रेज़ी या हिंग्लिश में पूछें और पाठ्यक्रम-आधारित व्याख्या व शिक्षण सहायता पाएँ।", action: "AI चैट शुरू करें" },
     },
     recent: { title: "हाल के संसाधन", note: "त्वरित उपयोग के लिए संसाधन इस ब्राउज़र में सुरक्षित रहते हैं।", empty: "आपके बनाए पाठ्यक्रम, पेपर और शिक्षण मार्गदर्शिकाएँ यहाँ दिखाई देंगी।", curriculum: "पाठ्यक्रम", paper: "टेस्ट पेपर", lesson: "शिक्षण मार्गदर्शिका" },
     insights: { title: "शिक्षक प्रगति", note: "आपकी तैयारी की गतिविधि", resources: "संसाधन", activeDays: "सक्रिय दिन", curricula: "पाठ्यक्रम", papers: "पेपर", recent: "हाल की गतिविधि", noRecent: "गतिविधि टाइमलाइन शुरू करने के लिए पहला संसाधन बनाएँ।", quick: "त्वरित निर्माण", lastActive: "अंतिम सक्रियता" },
@@ -145,16 +147,16 @@ const toolMeta = {
   en: {
     home: { title: "Teacher Workspace", subtitle: "Plan lessons, build assessments, and prepare confidently for every class." },
     curriculum: { title: "Curriculum Creator", subtitle: "Turn learning goals and chapters into a practical week-wise teaching roadmap." },
-    paper: { title: "Test & Paper Creator", subtitle: "Create a balanced, printable paper with an answer key and marking scheme." },
-    lesson: { title: "How to Teach", subtitle: "Understand the topic, anticipate misconceptions, and walk into class with a clear plan." },
+    paper: { title: "AI Paper Creator", subtitle: "Create, edit, and download a balanced paper with an answer key and marking scheme." },
+    lesson: { title: "AI Teacher", subtitle: "Generate an animated, voice-led lesson grounded in verified textbook content." },
     chat: { title: "AI Chat", subtitle: "Get curriculum-grounded teaching support inside your workspace." },
     pyq: { title: "PYQ Library", subtitle: "Browse previous board papers for classroom and assessment planning." },
   },
   hi: {
     home: { title: "शिक्षक कार्यक्षेत्र", subtitle: "पाठ की योजना बनाएँ, मूल्यांकन तैयार करें और हर कक्षा के लिए आत्मविश्वास से तैयारी करें।" },
     curriculum: { title: "पाठ्यक्रम निर्माता", subtitle: "सीखने के लक्ष्यों और अध्यायों को सप्ताहवार शिक्षण योजना में बदलें।" },
-    paper: { title: "टेस्ट एवं पेपर निर्माता", subtitle: "उत्तर कुंजी और अंक योजना के साथ संतुलित प्रश्नपत्र बनाएँ।" },
-    lesson: { title: "कैसे पढ़ाएँ", subtitle: "विषय समझें, सामान्य भ्रम पहचानें और स्पष्ट योजना के साथ कक्षा में जाएँ।" },
+    paper: { title: "AI पेपर निर्माता", subtitle: "उत्तर कुंजी सहित संतुलित प्रश्नपत्र बनाएँ, संपादित करें और डाउनलोड करें।" },
+    lesson: { title: "AI शिक्षिका", subtitle: "सत्यापित पाठ्यपुस्तक सामग्री से आवाज़ और एनिमेशन वाला पाठ बनाएँ।" },
     chat: { title: "AI चैट", subtitle: "अपने कार्यक्षेत्र में पाठ्यक्रम-आधारित शिक्षण सहायता पाएँ।" },
     pyq: { title: "PYQ लाइब्रेरी", subtitle: "कक्षा और मूल्यांकन योजना के लिए पुराने बोर्ड प्रश्नपत्र देखें।" },
   },
@@ -178,7 +180,7 @@ const buildTemplateSections = (template) => template.sections.map((section, inde
   ui_id: createPaperUiId("paper-template"), ui_open: index === 0, custom_questions: [], word_limit: paperTypePresets[section.type].word_limit,
   label_hi: paperTypePresets[section.type].label_hi, ...section,
 }));
-const initialLesson = { class_level: "10", subject: "Science", chapter_or_topic: "", lesson_minutes: 45, medium: "Hindi", student_level: "mixed", teacher_notes: "" };
+const initialLesson = { class_level: "10", subject: "Science", chapter_id: "", chapter_or_topic: "", lesson_minutes: 45, medium: "Hindi", student_level: "mixed", teacher_notes: "" };
 const paperOptionalFields = [
   ["duration", "duration"],
   ["difficulty", "difficulty"],
@@ -597,6 +599,108 @@ function TeacherChat({ compact = false, t, lang, question, setQuestion, subject,
   );
 }
 
+function AITeacherStudio({ lesson, sources, lang, onReset }) {
+  const [sceneIndex, setSceneIndex] = useState(0);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [rate, setRate] = useState(0.92);
+  const [boardText, setBoardText] = useState("");
+  const speechSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+  const scene = lesson.scenes[sceneIndex];
+  const boardContent = scene.board_lines.join("\n");
+
+  useEffect(() => {
+    setBoardText("");
+    let cursor = 0;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion) {
+      setBoardText(boardContent);
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      cursor += 1;
+      setBoardText(boardContent.slice(0, cursor));
+      if (cursor >= boardContent.length) window.clearInterval(timer);
+    }, 24);
+    return () => window.clearInterval(timer);
+  }, [boardContent]);
+
+  useEffect(() => () => window.speechSynthesis?.cancel(), []);
+
+  const stop = () => {
+    window.speechSynthesis?.cancel();
+    setIsSpeaking(false);
+  };
+  const speak = () => {
+    if (!window.speechSynthesis || muted) return;
+    stop();
+    const utterance = new SpeechSynthesisUtterance(scene.narration);
+    utterance.lang = lang === "hi" ? "hi-IN" : "en-IN";
+    utterance.rate = rate;
+    const voices = window.speechSynthesis.getVoices();
+    utterance.voice = voices.find((voice) => voice.lang.toLowerCase().startsWith(lang === "hi" ? "hi" : "en-in")) || null;
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
+  const goToScene = (next) => {
+    stop();
+    setSceneIndex(Math.max(0, Math.min(lesson.scenes.length - 1, next)));
+  };
+
+  return (
+    <section className="ai-teacher-studio" aria-label={lang === "hi" ? "AI शिक्षक कक्षा" : "AI teacher classroom"}>
+      <header className="ai-teacher-studio-head">
+        <div><span><Icon name="sparkle" size={15} />{lang === "hi" ? "RAG से तैयार पाठ" : "RAG-grounded lesson"}</span><h2>{lesson.title}</h2><p>{lesson.objective}</p></div>
+        <button type="button" onClick={() => { stop(); onReset(); }}><Icon name="refresh" size={16} />{lang === "hi" ? "नया पाठ" : "New lesson"}</button>
+      </header>
+      <div className="ai-classroom">
+        <div className={`ai-teacher-avatar ai-woman-teacher ${isSpeaking ? "speaking" : ""} action-${scene.teacher_action}`} role="img" aria-label={lang === "hi" ? "बोर्ड के पास पढ़ाती हुई एनिमेटेड महिला AI शिक्षिका" : "Animated woman AI teacher teaching beside the board"}>
+          <div className="ai-avatar-aura" />
+          <div className="ai-avatar-head">
+            <i className="hair-bun" />
+            <i className="ear left" /><i className="ear right" />
+            <i className="earring left" /><i className="earring right" />
+            <i className="hair" /><i className="hair-side left" /><i className="hair-side right" />
+            <i className="bindi" />
+            <i className="brow left" /><i className="brow right" />
+            <i className="eye left" /><i className="eye right" />
+            <i className="glasses left" /><i className="glasses right" /><i className="glasses-bridge" />
+            <i className="nose" /><i className="cheek left" /><i className="cheek right" />
+            <i className="mouth"><span /></i>
+          </div>
+          <div className="ai-avatar-neck" />
+          <div className="ai-avatar-body">
+            <span className="collar left" /><span className="collar right" />
+            <span className="dupatta left" /><span className="dupatta right" />
+            <i className="shirt-placket" /><i className="shirt-button one" /><i className="shirt-button two" />
+            <b><Icon name="sparkle" size={17} /></b>
+          </div>
+          <div className="ai-avatar-arm resting"><span className="ai-avatar-hand" /></div>
+          <div className="ai-avatar-arm teaching"><span className="ai-avatar-hand"><i /><i /><i /></span><b className="ai-pointer" /></div>
+          <div className="ai-voice-state"><span />{isSpeaking ? (lang === "hi" ? "पढ़ा रही हैं…" : "Teaching…") : (lang === "hi" ? "तैयार" : "Ready")}</div>
+        </div>
+        <div className="ai-teacher-board">
+          <div className="board-top"><span>{scene.title}</span><small>{sceneIndex + 1}/{lesson.scenes.length}</small></div>
+          <pre>{boardText}<i aria-hidden="true" /></pre>
+          <div className="board-tray"><span /><span /><span /></div>
+        </div>
+      </div>
+      <div className="ai-teacher-caption" aria-live="polite"><Icon name="volume" size={16} /><p>{scene.narration}</p></div>
+      <div className="ai-teacher-controls">
+        <button type="button" onClick={() => goToScene(sceneIndex - 1)} disabled={sceneIndex === 0} aria-label={lang === "hi" ? "पिछला भाग" : "Previous scene"}><Icon name="arrowLeft" size={17} /></button>
+        <button type="button" className="ai-teacher-play" onClick={isSpeaking ? stop : speak} disabled={!speechSupported || muted} title={!speechSupported ? (lang === "hi" ? "इस ब्राउज़र में आवाज़ उपलब्ध नहीं है" : "Voice is unavailable in this browser") : ""}><Icon name={isSpeaking ? "pause" : "play"} size={18} />{isSpeaking ? (lang === "hi" ? "रोकें" : "Pause") : (lang === "hi" ? "सुनें" : "Teach")}</button>
+        <button type="button" onClick={() => goToScene(sceneIndex + 1)} disabled={sceneIndex === lesson.scenes.length - 1} aria-label={lang === "hi" ? "अगला भाग" : "Next scene"}><Icon name="arrowRight" size={17} /></button>
+        <button type="button" onClick={() => { setMuted((value) => !value); stop(); }} aria-pressed={muted} aria-label={muted ? "Unmute" : "Mute"}><Icon name={muted ? "volumeOff" : "volume"} size={17} /></button>
+        <label><span>{lang === "hi" ? "गति" : "Speed"}</span><select value={rate} onChange={(event) => setRate(Number(event.target.value))}><option value="0.8">0.8×</option><option value="0.92">0.9×</option><option value="1.05">1×</option></select></label>
+      </div>
+      {sceneIndex === lesson.scenes.length - 1 && lesson.check_question && <details className="ai-teacher-check"><summary>{lang === "hi" ? "समझ जाँच प्रश्न" : "Check understanding"}</summary><p>{lesson.check_question}</p><small>{lesson.check_answer}</small></details>}
+      {sources?.length > 0 && <details className="ai-teacher-sources"><summary>{lang === "hi" ? "सत्यापित स्रोत देखें" : "View verified sources"} <span>{new Set(sources).size}</span></summary><div>{[...new Set(sources)].map((source) => <small key={source}>{source}</small>)}</div></details>}
+    </section>
+  );
+}
+
 export default function TeacherDashboard() {
   const navigate = useNavigate();
   const [activeTool, setActiveTool] = useState("home");
@@ -615,6 +719,11 @@ export default function TeacherDashboard() {
   const paperDraftLoadedRef = useRef(false);
   const [paperDraftStatus, setPaperDraftStatus] = useState("");
   const [lesson, setLesson] = useState(initialLesson);
+  const [lessonChapterOptions, setLessonChapterOptions] = useState([]);
+  const [aiLesson, setAiLesson] = useState(null);
+  const [aiLessonSources, setAiLessonSources] = useState([]);
+  const [aiTeacherLoading, setAiTeacherLoading] = useState(false);
+  const [aiTeacherError, setAiTeacherError] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -676,6 +785,19 @@ export default function TeacherDashboard() {
       .finally(() => { if (active) setChapterLoading(false); });
     return () => { active = false; };
   }, [paper.class_level, paper.subject, chapterRetry]);
+
+  useEffect(() => {
+    let active = true;
+    api.get("/teacher/chapter-options", { params: { subject: lesson.subject, class_level: lesson.class_level } })
+      .then(({ data }) => {
+        if (!active) return;
+        const chapters = Array.isArray(data?.chapters) ? data.chapters : [];
+        setLessonChapterOptions(chapters);
+        setLesson((current) => ({ ...current, chapter_id: "", chapter_or_topic: "" }));
+      })
+      .catch(() => { if (active) setLessonChapterOptions([]); });
+    return () => { active = false; };
+  }, [lesson.class_level, lesson.subject]);
 
   useEffect(() => {
     if (activeTool !== "pyq" || assessmentPapers.length) return;
@@ -853,6 +975,24 @@ export default function TeacherDashboard() {
     }
   };
 
+  const generateAiTeacher = async (event) => {
+    event.preventDefault();
+    if (!lesson.chapter_id) return;
+    setAiTeacherLoading(true);
+    setAiTeacherError("");
+    setAiLesson(null);
+    try {
+      const response = await api.post("/teacher/ai-teacher", lesson);
+      setAiLesson(response.data.lesson);
+      setAiLessonSources(response.data.sources || []);
+      recordActivity();
+    } catch (err) {
+      setAiTeacherError(err?.response?.data?.detail || (lang === "hi" ? "AI शिक्षक पाठ नहीं बना सका। फिर प्रयास करें।" : "AI Teacher could not build this lesson. Please try again."));
+    } finally {
+      setAiTeacherLoading(false);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem("vidyaai_token");
     localStorage.removeItem("vidyaai_role");
@@ -957,7 +1097,7 @@ export default function TeacherDashboard() {
         </div>
         <div className="teacher-role-badge">{t.roleBadge}</div>
         <div className="teacher-mobile-tool-strip" role="navigation" aria-label={lang === "hi" ? "शिक्षक टूल" : "Teacher tools"}>
-          {[["home", "home"], ["curriculum", "curriculum"], ["paper", "paper"], ["lesson", "lesson"], ["chat", "chat"], ["pyq", "library"]].map(([id, icon]) => (
+          {[["home", "home"], ["lesson", "teacher"], ["chat", "chat"], ["paper", "paper"], ["curriculum", "curriculum"], ["pyq", "library"]].map(([id, icon]) => (
             <button ref={(node) => { mobileToolRefs.current[id] = node; }} key={id} type="button" className={activeTool === id ? "active" : ""} aria-current={activeTool === id ? "page" : undefined} onClick={() => openTool(id)}>
               <Icon name={icon} size={16} />
               <span>{t.nav[id]}</span>
@@ -967,16 +1107,16 @@ export default function TeacherDashboard() {
         <nav>
           {[
             ["home", "home"],
-            ["curriculum", "curriculum"],
+            ["lesson", "teacher"],
+            ["chat", "chat"],
             ["paper", "paper"],
-            ["lesson", "lesson"],
           ].map(([id, icon]) => (
             <button key={id} type="button" className={activeTool === id ? "active" : ""} aria-current={activeTool === id ? "page" : undefined} onClick={() => openTool(id)}><span><Icon name={icon} size={17} /></span>{t.nav[id]}</button>
           ))}
         </nav>
         <div className="teacher-shared-tools">
           <p>{t.shared}</p>
-          <button type="button" className={activeTool === "chat" ? "active" : ""} aria-current={activeTool === "chat" ? "page" : undefined} onClick={() => openTool("chat")}><span className="teacher-shared-icon"><Icon name="chat" size={17} /></span>{t.nav.chat}<Icon name="arrowRight" size={16} /></button>
+          <button type="button" className={activeTool === "curriculum" ? "active" : ""} aria-current={activeTool === "curriculum" ? "page" : undefined} onClick={() => openTool("curriculum")}><span className="teacher-shared-icon"><Icon name="curriculum" size={17} /></span>{t.nav.curriculum}<Icon name="arrowRight" size={16} /></button>
           <button type="button" className={activeTool === "pyq" ? "active" : ""} aria-current={activeTool === "pyq" ? "page" : undefined} onClick={() => openTool("pyq")}><span className="teacher-shared-icon"><Icon name="library" size={17} /></span>{t.nav.pyq}<Icon name="arrowRight" size={16} /></button>
         </div>
         <div className="teacher-account" aria-label={lang === "hi" ? "शिक्षक प्रोफाइल" : "Teacher profile"}>
@@ -994,14 +1134,24 @@ export default function TeacherDashboard() {
           <>
             <section className="teacher-hero">
               <div><span>{t.hero.kicker}</span><h2>{t.hero.title}</h2><p>{t.hero.text}</p></div>
-              <div className="teacher-hero-stat"><strong>5</strong><span>{t.hero.stat}</span><small>{t.hero.statNote}</small></div>
+              <div className="teacher-hero-stat"><strong>3</strong><span>{t.hero.stat}</span><small>{t.hero.statNote}</small></div>
             </section>
-            <div className="teacher-home-chat-heading"><span>{t.homeChat.kicker}</span></div>
-            <TeacherChat compact t={t} lang={lang} question={chatQuestion} setQuestion={setChatQuestion} subject={chatSubject} setSubject={setChatSubject} answerStyle={chatAnswerStyle} setAnswerStyle={setChatAnswerStyle} loading={chatLoading} messages={chatMessages} onSubmit={askChat} onClear={() => setChatMessages([])} onOpenFull={() => openTool("chat")} onCopy={copyChatMessage} onRetry={retryChatMessage} onFeedback={rateChatMessage} onChapterOption={chooseChatChapter} />
-            <section className="teacher-tool-grid">
-              {[["curriculum", "curriculum-card"], ["paper", "paper-card"], ["lesson", "lesson-card"]].map(([id, className]) => (
-                <article key={id} className={`teacher-tool-card ${className}`}><div className="teacher-tool-icon"><Icon name={id === "curriculum" ? "curriculum" : id === "paper" ? "paper" : "lesson"} size={22} /></div><h3>{t.cards[id].title}</h3><p>{t.cards[id].text}</p><button type="button" onClick={() => openTool(id)}>{t.cards[id].action}<Icon name="arrowRight" size={17} /></button></article>
+            <section className="teacher-tool-grid teacher-hero-tools" aria-label={lang === "hi" ? "मुख्य AI टूल" : "Primary AI tools"}>
+              {[["lesson", "lesson-card", "teacher"], ["chat", "chat-card", "chat"], ["paper", "paper-card", "paper"]].map(([id, className, icon], index) => (
+                <article key={id} className={`teacher-tool-card ${className}`}>
+                  <div className="teacher-tool-card-top">
+                    <div className="teacher-tool-icon"><Icon name={icon} size={23} /></div>
+                    {index === 0 && <span className="teacher-feature-badge">{lang === "hi" ? "नया" : "New"}</span>}
+                  </div>
+                  <h3>{t.cards[id].title}</h3><p>{t.cards[id].text}</p>
+                  <button type="button" onClick={() => openTool(id)}>{t.cards[id].action}<Icon name="arrowRight" size={17} /></button>
+                </article>
               ))}
+            </section>
+            <section className="teacher-more-tools">
+              <div><span>{lang === "hi" ? "और शिक्षक टूल" : "More teacher tools"}</span><small>{lang === "hi" ? "योजना और पिछले प्रश्नपत्र" : "Planning and previous papers"}</small></div>
+              <button type="button" onClick={() => openTool("curriculum")}><Icon name="curriculum" size={18} /><span>{t.nav.curriculum}</span><Icon name="arrowRight" size={15} /></button>
+              <button type="button" onClick={() => openTool("pyq")}><Icon name="library" size={18} /><span>{t.nav.pyq}</span><Icon name="arrowRight" size={15} /></button>
             </section>
             <section className="teacher-recent-panel">
               <div className="teacher-section-head"><div><h2>{t.recent.title}</h2><p>{t.recent.note}</p></div></div>
@@ -1076,21 +1226,25 @@ export default function TeacherDashboard() {
         )}
 
         {activeTool === "lesson" && (
-          <section className="teacher-workspace">
-            <form onSubmit={(e) => { e.preventDefault(); runTool("/teacher/lesson-guide", lesson, `${lesson.class_level} ${lesson.subject}: ${lesson.chapter_or_topic}`, "lesson"); }} className="teacher-generator-form">
-              <div className="teacher-form-title"><span>03</span><div><h2>{t.lessonForm.title}</h2><p>{t.lessonForm.note}</p></div></div>
+          <section className={`teacher-workspace ai-teacher-workspace${aiLesson ? " has-lesson" : ""}`}>
+            {!aiLesson && <form onSubmit={generateAiTeacher} className="teacher-generator-form ai-teacher-form">
+              <div className="teacher-form-title"><span><Icon name="teacher" size={20} /></span><div><h2>{lang === "hi" ? "अपना AI शिक्षक तैयार करें" : "Create your AI Teacher"}</h2><p>{lang === "hi" ? "VidyaAI पहले RAG से अध्याय पढ़ेगा, फिर बोलने और बोर्ड पर लिखने वाला छोटा पाठ बनाएगा।" : "VidyaAI reads the chapter through RAG, then creates a short spoken lesson with synchronized board work."}</p></div></div>
+              <div className="ai-teacher-pipeline" aria-label={lang === "hi" ? "पाठ निर्माण प्रक्रिया" : "Lesson generation pipeline"}>
+                <span><b>1</b>{lang === "hi" ? "RAG संदर्भ" : "RAG context"}</span><i /><span><b>2</b>{lang === "hi" ? "शिक्षण स्क्रिप्ट" : "Teaching script"}</span><i /><span><b>3</b>{lang === "hi" ? "आवाज़ + बोर्ड" : "Voice + board"}</span>
+              </div>
               <div className="teacher-form-grid">
-                <Field label={t.classLabel}><select value={lesson.class_level} onChange={(e) => setLesson({ ...lesson, class_level: e.target.value })}>{Array.from({ length: 12 }, (_, i) => <option key={i + 1}>{i + 1}</option>)}</select></Field>
+                <Field label={t.classLabel}><select value={lesson.class_level} onChange={(e) => setLesson({ ...lesson, class_level: e.target.value })}><option value="10">10</option></select></Field>
                 <Field label={t.subject}><select value={lesson.subject} onChange={(e) => setLesson({ ...lesson, subject: e.target.value })}>{subjects.map((item) => <option key={item} value={item}>{t.subjectNames[item]}</option>)}</select></Field>
-                <Field label={t.lessonForm.duration}><input type="number" min="15" max="180" value={lesson.lesson_minutes} onChange={(e) => setLesson({ ...lesson, lesson_minutes: Number(e.target.value) })} /></Field>
                 <Field label={t.lessonForm.readiness}><select value={lesson.student_level} onChange={(e) => setLesson({ ...lesson, student_level: e.target.value })}><option value="mixed">{t.options.mixed}</option><option value="foundation">{t.options.foundation}</option><option value="advanced">{t.options.advanced}</option></select></Field>
                 <Field label={t.medium}><select value={lesson.medium} onChange={(e) => setLesson({ ...lesson, medium: e.target.value })}><option value="Hindi">{t.options.hindi}</option><option value="English">{t.options.english}</option><option value="Bilingual">{t.options.bilingual}</option></select></Field>
-                <Field label={t.lessonForm.topic} wide><input required value={lesson.chapter_or_topic} onChange={(e) => setLesson({ ...lesson, chapter_or_topic: e.target.value })} placeholder={t.lessonForm.topicPlaceholder} /></Field>
+                <Field label={lang === "hi" ? "सत्यापित अध्याय" : "Verified chapter"} wide><select required value={lesson.chapter_id} onChange={(event) => { const option = lessonChapterOptions.find((item) => item.id === event.target.value); setLesson({ ...lesson, chapter_id: event.target.value, chapter_or_topic: option ? `${option.code}: ${option.label}` : "" }); }}><option value="">{lang === "hi" ? "अध्याय चुनें" : "Select a chapter"}</option>{lessonChapterOptions.map((option) => <option key={option.id} value={option.id}>{option.code} — {option.label}</option>)}</select></Field>
                 <Field label={t.lessonForm.notes} wide><textarea rows="3" value={lesson.teacher_notes} onChange={(e) => setLesson({ ...lesson, teacher_notes: e.target.value })} placeholder={t.lessonForm.notesPlaceholder} /></Field>
               </div>
-              <button className="teacher-generate" type="submit" disabled={loading}>{loading ? t.lessonForm.loading : t.lessonForm.action}</button>
-            </form>
-            {renderResult(result, error, loading, copyResult, t)}
+              {aiTeacherError && <p className="paper-form-error" role="alert">{aiTeacherError}</p>}
+              <button className="teacher-generate ai-teacher-generate" type="submit" disabled={aiTeacherLoading || !lesson.chapter_id}>{aiTeacherLoading ? <><span className="teacher-loader" />{lang === "hi" ? "RAG पढ़ रहा है और कक्षा बना रहा है…" : "Reading RAG and building the classroom…"}</> : <><Icon name="sparkle" size={18} />{lang === "hi" ? "AI शिक्षक बनाएँ" : "Generate AI Teacher"}</>}</button>
+              {aiTeacherLoading && <div className="ai-teacher-loading-note">{lang === "hi" ? "इसमें कुछ मिनट लग सकते हैं। सत्यापित संदर्भ मिलने के बाद ही पाठ बनेगा।" : "This can take a few minutes. The lesson is created only after verified context is found."}</div>}
+            </form>}
+            {aiLesson && <AITeacherStudio lesson={aiLesson} sources={aiLessonSources} lang={lang} onReset={() => { setAiLesson(null); setAiLessonSources([]); setAiTeacherError(""); }} />}
           </section>
         )}
 
