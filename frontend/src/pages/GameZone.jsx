@@ -33,6 +33,21 @@ const answerSparkles = Array.from({ length: 9 }, (_, index) => ({
   y: Math.sin((index / 9) * Math.PI * 2) * (45 + (index % 3) * 14),
 }));
 
+const prepareChapterForPlay = (chapter) => {
+  const startingShift = Math.floor(Math.random() * 4);
+  return {
+    ...chapter,
+    questions: chapter.questions.map((question, questionPosition) => {
+      const shift = (startingShift + questionPosition) % question.options.length;
+      return {
+        ...question,
+        options: [...question.options.slice(shift), ...question.options.slice(0, shift)],
+        answer: (question.answer - shift + question.options.length) % question.options.length,
+      };
+    }),
+  };
+};
+
 function GameGlyph({ type, size = 32, className = "" }) {
   const art = {
     arena: <><path d="M7 9.5h10a4.5 4.5 0 0 1 4.3 5.8l-1 3.2a2 2 0 0 1-3.3.8l-2.1-1.8H9.1L7 19.3a2 2 0 0 1-3.3-.8l-1-3.2A4.5 4.5 0 0 1 7 9.5Z" fill="currentColor"/><path d="M8 12v4M6 14h4M16.5 13h.01M18.5 15h.01" stroke="#fff"/><path d="m9 7 3-3 3 3" stroke="#ffd95c"/></>,
@@ -182,7 +197,7 @@ export default function GameZone() {
 
   useEffect(() => {
     if (!showArenaEntry) return undefined;
-    const timer = window.setTimeout(() => setShowArenaEntry(false), reduceMotion ? 250 : 1550);
+    const timer = window.setTimeout(() => setShowArenaEntry(false), reduceMotion ? 120 : 900);
     return () => window.clearTimeout(timer);
   }, [showArenaEntry, reduceMotion]);
 
@@ -230,7 +245,7 @@ export default function GameZone() {
   };
 
   const startChapter = (chapter) => {
-    setSelectedChapter(chapter);
+    setSelectedChapter(prepareChapterForPlay(chapter));
     setQuestionIndex(0);
     setSelected(null);
     setScore(0);
@@ -298,8 +313,8 @@ export default function GameZone() {
       <AnimatePresence>
         {showArenaEntry && (
           <motion.div className="gz-arena-entry" initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? .05 : .28 }}>
-            <motion.div className="gz-entry-gate gate-left" initial={{ x: 0 }} animate={{ x: reduceMotion ? "-100%" : "-104%" }} transition={{ delay: reduceMotion ? 0 : .72, duration: reduceMotion ? .05 : .65, ease: [0.76, 0, 0.24, 1] }} />
-            <motion.div className="gz-entry-gate gate-right" initial={{ x: 0 }} animate={{ x: reduceMotion ? "100%" : "104%" }} transition={{ delay: reduceMotion ? 0 : .72, duration: reduceMotion ? .05 : .65, ease: [0.76, 0, 0.24, 1] }} />
+            <motion.div className="gz-entry-gate gate-left" initial={{ x: 0 }} animate={{ x: reduceMotion ? "-100%" : "-104%" }} transition={{ delay: reduceMotion ? 0 : .34, duration: reduceMotion ? .05 : .46, ease: [0.76, 0, 0.24, 1] }} />
+            <motion.div className="gz-entry-gate gate-right" initial={{ x: 0 }} animate={{ x: reduceMotion ? "100%" : "104%" }} transition={{ delay: reduceMotion ? 0 : .34, duration: reduceMotion ? .05 : .46, ease: [0.76, 0, 0.24, 1] }} />
             <motion.div className="gz-entry-core" initial={reduceMotion ? false : { opacity: 0, scale: .72 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 18 }}>
               <span><Icon name="sparkle" size={34} /></span>
               <small>VIDYAAI</small>
@@ -489,7 +504,7 @@ export default function GameZone() {
           ) : result ? (
             <motion.section key="result" className="gz-result" initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }}>
               {burst.map((item) => <motion.i key={item.id} style={{ background: item.color }} initial={{ x: 0, y: 0, opacity: 1 }} animate={{ x: item.x, y: item.y, opacity: 0, rotate: 180 }} transition={{ duration: 1.1, delay: 0.15 }} />)}
-              <motion.div className="gz-result-badge" initial={{ rotate: -15, scale: 0 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: "spring", delay: 0.1 }}>★</motion.div>
+              <motion.div className="gz-result-badge" initial={{ rotate: -15, scale: 0 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: "spring", delay: 0.1 }}><GameGlyph type="medal" size={48} /></motion.div>
               <span>अभियान पूरा हुआ</span><h1>{result.accuracy >= 80 ? "शानदार प्रदर्शन!" : "बहुत अच्छी प्रगति!"}</h1>
               <p>आपने <strong>{selectedChapter.hindiTitle}</strong> की आवश्यक अवधारणाओं का अभ्यास पूरा किया।</p>
               <div className="gz-result-score">
@@ -507,15 +522,8 @@ export default function GameZone() {
             <motion.section key={`question-${questionIndex}`} className="gz-game gz-theme-science" style={{ "--game-accent": selectedChapter.accent }} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}>
               <div className="gz-game-top">
                 <button type="button" onClick={exitGame} aria-label="Exit quest"><Icon name="close" /></button>
-                <div className="gz-hud-progress"><span><b>मिशन प्रगति</b><small>{questionIndex + 1}/{selectedChapter.questions.length}</small></span><div className="gz-progress-track"><motion.span initial={{ width: 0 }} animate={{ width: `${((questionIndex + 1) / selectedChapter.questions.length) * 100}%` }} /></div></div>
+                <div className="gz-hud-progress"><span><b>{selectedChapter.hindiTitle}</b><small>प्रश्न {questionIndex + 1}/{selectedChapter.questions.length}</small></span><div className="gz-progress-track"><motion.span initial={{ width: 0 }} animate={{ width: `${((questionIndex + 1) / selectedChapter.questions.length) * 100}%` }} /></div></div>
                 <span className="gz-hearts" aria-label={`${hearts} hearts`}>{[0, 1, 2].map((heart) => <b key={heart} className={heart < hearts ? "" : "lost"}>♥</b>)}</span>
-                <button type="button" onClick={toggleSound} aria-label={soundOn ? "आवाज़ बंद करें" : "आवाज़ चालू करें"}><Icon name={soundOn ? "volume" : "volumeOff"} size={17} /></button>
-              </div>
-              <div className="gz-game-meta">
-                <span style={{ color: selectedChapter.accent }}><GameGlyph type={selectedChapter.id === "chemical-reactions" ? "reaction" : selectedChapter.id === "acids-bases" ? "potion" : "life"} size={25} /></span>
-                <div><small>{selectedChapter.hindiTitle}</small><strong>चुनौती {questionIndex + 1} / {selectedChapter.questions.length}</strong></div>
-                <div className={`gz-combo ${combo >= 2 ? "hot" : ""}`}><span><Icon name="sparkle" size={14} /> कॉम्बो ×{combo}</span><i><b style={{ width: `${Math.min(combo * 25, 100)}%` }} /></i></div>
-                <div className="gz-live-xp"><small>इस मिशन में</small><strong>+{earnedXp} XP</strong></div>
               </div>
               <motion.div className="gz-question-card" layout>
                 <AnimatePresence>

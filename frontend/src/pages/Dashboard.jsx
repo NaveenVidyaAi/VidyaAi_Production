@@ -175,6 +175,7 @@ const subjectQuestionSamples = {
 };
 
 const answerStyles = [
+  { id: "default", hi: "डिफ़ॉल्ट", en: "Default" },
   { id: "summary", hi: "सारांश", en: "Summary" },
   { id: "two", hi: "2 अंक", en: "2 marks" },
   { id: "five", hi: "5 अंक", en: "5 marks" },
@@ -351,7 +352,7 @@ export default function Dashboard() {
   const [completedTargets, setCompletedTargets] = useState(() => readJson(`vidyaai_targets_${dateKey()}`, []));
   const [streak, setStreak] = useState(() => readJson("vidyaai_streak", { count: 0, lastActive: "" }));
   const [selectedSubject, setSelectedSubject] = useState("Hindi");
-  const [answerStyle, setAnswerStyle] = useState("exam");
+  const [answerStyle, setAnswerStyle] = useState(() => localStorage.getItem("vidyaai_student_answer_style") || "default");
   const [quizLoading, setQuizLoading] = useState(false);
   const [activeSection, setActiveSection] = useState("chat");
   const [standaloneQuiz, setStandaloneQuiz] = useState(null);
@@ -420,6 +421,7 @@ export default function Dashboard() {
   }, [location.search]);
 
   useEffect(() => { localStorage.setItem("vidyaai_student_question_draft", question); }, [question]);
+  useEffect(() => { localStorage.setItem("vidyaai_student_answer_style", answerStyle); }, [answerStyle]);
 
   useEffect(() => {
     if (activeSection !== "pyq" || pyqPapers.length) return;

@@ -48,6 +48,10 @@ export default function Login() {
       const response = await api.post("/auth/login", new URLSearchParams({ username: email, password, role }));
       localStorage.setItem("vidyaai_token", response.data.access_token);
       localStorage.setItem("vidyaai_role", response.data.role || role);
+      if ((response.data.role || role) === "student") {
+        localStorage.setItem("vidyaai_student_lang", "hi");
+        localStorage.setItem("vidyaai_student_answer_style", "default");
+      }
       navigate((response.data.role || role) === "teacher" ? "/teacher" : "/dashboard");
     } catch (err) {
       setError(err?.response?.data?.detail || "Login failed. Please check credentials.");
