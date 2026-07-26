@@ -573,6 +573,31 @@ export default function Dashboard() {
     setQuestion("");
   };
 
+  const openGameArena = () => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext && localStorage.getItem("vidyaai_game_sound") !== "off") {
+        const context = new AudioContext();
+        [[294, 0], [392, 0.08], [523, 0.16], [659, 0.25]].forEach(([frequency, delay], index) => {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          oscillator.type = index === 3 ? "triangle" : "sine";
+          oscillator.frequency.value = frequency;
+          gain.gain.setValueAtTime(0.0001, context.currentTime + delay);
+          gain.gain.exponentialRampToValueAtTime(0.075, context.currentTime + delay + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + delay + 0.22);
+          oscillator.connect(gain);
+          gain.connect(context.destination);
+          oscillator.start(context.currentTime + delay);
+          oscillator.stop(context.currentTime + delay + 0.24);
+        });
+        window.setTimeout(() => context.close().catch(() => {}), 700);
+      }
+      navigator.vibrate?.(18);
+    } catch {}
+    navigate("/game-zone", { state: { arenaEntry: true } });
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("vidyaai_token");
     localStorage.removeItem("vidyaai_role");
@@ -1046,6 +1071,7 @@ export default function Dashboard() {
           <p>{lang === "hi" ? "अध्ययन उपकरण" : "Study Tools"}</p>
           {[
             { id: "chat", label: t.navChat, helper: lang === "hi" ? "मुख्य चैट" : "Main chat" },
+            { id: "games", label: lang === "hi" ? "गेम ज़ोन" : "Game Zone", helper: lang === "hi" ? "खेलकर अध्याय सीखें" : "Play chapter quests" },
             { id: "pyq", label: t.navPyq, helper: lang === "hi" ? "पुराने प्रश्नपत्र" : "Previous papers" },
             { id: "plan", label: t.navPlan, helper: lang === "hi" ? "दैनिक अध्ययन योजना" : "Daily roadmap" },
             { id: "quiz", label: t.navQuiz, helper: lang === "hi" ? "बहुविकल्पीय अभ्यास" : "MCQ practice" },
@@ -1055,6 +1081,10 @@ export default function Dashboard() {
               type="button"
               className={`plain-list-button ${activeSection === item.id ? "active" : ""}`}
               onClick={() => {
+                if (item.id === "games") {
+                  openGameArena();
+                  return;
+                }
                 setActiveSection(item.id);
                 setShowRecentPanel(false);
               }}
@@ -1095,6 +1125,13 @@ export default function Dashboard() {
                     <path d="m8.5 13 1.8 1.8 4.4-5" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M9 17h4.8" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
                     <rect x="5" y="3.5" width="14" height="17" rx="3" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                )}
+                {item.id === "games" && (
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M8 8h8a5 5 0 0 1 4.8 6.4l-1.1 3.8a2.2 2.2 0 0 1-3.7 1l-2.1-2.1h-3.8L8 19.2a2.2 2.2 0 0 1-3.7-1l-1.1-3.8A5 5 0 0 1 8 8Z" fill="currentColor" opacity=".24"/>
+                    <path d="M7.5 11.5v4M5.5 13.5h4M15.5 12.5h.01M18 15h.01" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+                    <path d="M8 8h8a5 5 0 0 1 4.8 6.4l-1.1 3.8a2.2 2.2 0 0 1-3.7 1l-2.1-2.1h-3.8L8 19.2a2.2 2.2 0 0 1-3.7-1l-1.1-3.8A5 5 0 0 1 8 8Z" stroke="currentColor" strokeWidth="1.9"/>
                   </svg>
                 )}
               </span>
@@ -1313,19 +1350,21 @@ export default function Dashboard() {
         <div className="mobile-study-controls" aria-label="study-controls">
           <div className="mobile-tool-strip">
             {[
-              { id: "chat", label: t.navChat },
-              { id: "quiz", label: t.navQuiz },
-              { id: "pyq", label: t.navPyq },
-              { id: "plan", label: t.navPlan },
+              { id: "chat", label: t.navChat, icon: "chat" },
+              { id: "games", label: lang === "hi" ? "गेम्स" : "Games", icon: "play" },
+              { id: "quiz", label: t.navQuiz, icon: "lesson" },
+              { id: "pyq", label: t.navPyq, icon: "paper" },
+              { id: "plan", label: t.navPlan, icon: "curriculum" },
             ].map((item) => (
               <button
                 key={item.id}
                 type="button"
                 className={activeSection === item.id ? "active" : ""}
-                onClick={() => setActiveSection(item.id)}
+                onClick={() => item.id === "games" ? openGameArena() : setActiveSection(item.id)}
                 aria-current={activeSection === item.id ? "page" : undefined}
               >
-                {item.label}
+                <span><Icon name={item.icon} size={18} /></span>
+                <strong>{item.label}</strong>
               </button>
             ))}
           </div>

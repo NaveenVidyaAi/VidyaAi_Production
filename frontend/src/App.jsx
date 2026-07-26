@@ -14,6 +14,7 @@ const Privacy = lazy(() => import("./pages/Privacy"));
 const AIUse = lazy(() => import("./pages/AIUse"));
 const Home = lazy(() => import("./pages/Home"));
 const TeacherTools = lazy(() => import("./pages/TeacherTools"));
+const GameZone = lazy(() => import("./pages/GameZone"));
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -25,6 +26,7 @@ function AnimatedRoutes() {
           <Route path="/register" element={<Register />} />
           <Route path="/chat" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/game-zone" element={<GameZone />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/teacher" element={<TeacherDashboard />} />
           <Route path="/about" element={<About />} />
